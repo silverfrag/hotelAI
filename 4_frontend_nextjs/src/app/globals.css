@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+/*
+  Hotel Operations Dashboard — theme foundation.
+  Enterprise SaaS look: light content surface, dark navy sidebar,
+  slate neutrals, a confident blue primary, and clear status colors.
+  Keep this file limited to global theme tokens + truly global base rules.
+*/
+
+@theme {
+  /* Typography */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Radius scale */
+  --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Neutrals / surfaces */
+  --color-background: #f4f6fa;
+  --color-foreground: #0f172a;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0f172a;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+  --color-border: #e2e8f0;
+  --color-input: #e2e8f0;
+  --color-ring: #2563eb;
+
+  /* Brand primary */
+  --color-primary: #1d4ed8;
+  --color-primary-foreground: #ffffff;
+  --color-primary-muted: #eff4ff;
+
+  /* Secondary / subtle accents */
+  --color-secondary: #f1f5f9;
+  --color-secondary-foreground: #0f172a;
+  --color-accent: #eef2ff;
+  --color-accent-foreground: #1e293b;
+
+  /* Sidebar (dark navy) */
+  --color-sidebar: #0e1729;
+  --color-sidebar-foreground: #94a3b8;
+  --color-sidebar-heading: #64748b;
+  --color-sidebar-item: #cbd5e1;
+  --color-sidebar-hover: #1c2740;
+  --color-sidebar-active: #1d4ed8;
+  --color-sidebar-active-foreground: #ffffff;
+  --color-sidebar-border: #1e293b;
+
+  /* Status colors */
+  --color-success: #16a34a;
+  --color-success-foreground: #ffffff;
+  --color-success-muted: #ecfdf3;
+  --color-warning: #d97706;
+  --color-warning-foreground: #ffffff;
+  --color-warning-muted: #fffbeb;
+  --color-danger: #dc2626;
+  --color-danger-foreground: #ffffff;
+  --color-danger-muted: #fef2f2;
+  --color-info: #2563eb;
+  --color-info-foreground: #ffffff;
+  --color-info-muted: #eff6ff;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Tabular figures for data-dense numeric cells */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
