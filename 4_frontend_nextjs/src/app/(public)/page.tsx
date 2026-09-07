@@ -1,25 +1,12 @@
-import { BookingForm } from '@/components/features/booking/BookingForm';
-import { getRoomTypes } from '@/services/room.service';
+﻿import HomeView from '@/components/features/figma/HomeView';
+import { rooms } from '@/data/figma-mock';
+import { getHotelBusinessDate } from '@/utils/businessDate';
 
-export default async function HomePage() {
-  const roomTypes = await getRoomTypes();
+export const metadata = {
+  title: 'Aurum | Where Luxury Meets Horizon',
+  description: 'Explore refined rooms and plan your next stay with HotelAI.',
+};
 
-  return (
-    <main>
-      <h1>Hotel AI</h1>
-      <p className="subtitle">
-        Chọn phòng, ngày lưu trú và nhận giá được tính từ mô hình AI.
-      </p>
-      <section className="grid">
-        {roomTypes.map((room) => (
-          <article className="card" key={room.type_id}>
-            <h2>{room.type_name}</h2>
-            <p>{room.capacity} khách</p>
-            <strong>Từ {room.base_price.toLocaleString('vi-VN')} VND/đêm</strong>
-          </article>
-        ))}
-      </section>
-      <BookingForm roomTypes={roomTypes} />
-    </main>
-  );
+export default function HomePage() {
+  return <HomeView rooms={rooms} businessDate={getHotelBusinessDate()} />;
 }

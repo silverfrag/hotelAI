@@ -1,10 +1,10 @@
 # Current State
 
-Last updated: 2026-09-06
+Last updated: 2026-09-07
 Current branch: v0/hotel-management-dashboard-513c8baf
-Latest safe commit: b0f4338 (pre-session HEAD; discovery commit pending)
-Current phase: Discovery and baseline complete; UI migration starting
-Current task: Port Figma public presentation with existing services preserved
+Latest safe commit: 676e677 chore(agent): record migration architecture and baseline
+Current phase: FIGMA_UI_MIGRATION_COMPLETE; backend integration starting
+Current task: Reconnect source-derived views to existing backend contracts
 Status: IN_PROGRESS
 
 ## Repository layout discovered
@@ -22,12 +22,14 @@ See MASTER_PLAN.md. Production Next frontend, Figma export, Nest backend, FastAP
 
 ## Currently working on
 
-- Parallel read-only Figma and backend/AI audits.
-- Preparing scoped public assets/styles/shell and six page migration.
+- Source-derived Home/public shell and Rooms/detail/About/Destinations are ported; Book view is being implemented independently.
+- UI gate passed: all six routes render, production build passes (19 routes), browser desktop/mobile navigation, gallery, booking steps, search/list and theme verified. Transactional mocks must now be replaced.
+- Local Next dev server at http://127.0.0.1:3100 (exec session 27788).
 
 ## Files modified during current task
 
-- New `docs/agent/{MASTER_PLAN,STATE,TASKS,DECISIONS,API_MAP,TEST_LOG}.md` only so far.
+- Agent docs, `src/components/features/figma/*`, `src/data/figma-mock.ts`, `src/styles/figma.css`, public route wrappers/loading/error, assets.
+- Existing `src/app/styles.css` scoped to `.legacy-public` to prevent broad grid/button/form rules breaking source presentation and admin.
 - Build can regenerate Next type artifacts; preserve baseline changes.
 
 ## Commands successfully run
@@ -37,10 +39,11 @@ See MASTER_PLAN.md. Production Next frontend, Figma export, Nest backend, FastAP
 
 ## Current errors / blockers
 
-- No frontend baseline build errors.
+- No frontend baseline build errors. Interim migration builds caught partially-written agent views (Destinations then missing Book); wait for agent completion before next full build.
 - Many preexisting modifications/untracked files; do not treat them as changes from this task.
 - Figma prototype has fake booking confirmation, taxes/extras/payment card inputs and mock destination/room data. Must not send unsupported fields or claim charges/real inventory.
-- Separate AI allocation and occupancy forecasting not yet found; audit ongoing.
+- No separate AI allocation/occupancy forecasting implementation found. Assignment is deterministic.
+- Another backend thread completed migrations 015/016 and booking workflow since discovery; read updated API_MAP before integration. Existing frontend status types lag Pending/Expired/NoShow.
 
 ## Important technical observations
 
@@ -51,10 +54,10 @@ See MASTER_PLAN.md. Production Next frontend, Figma export, Nest backend, FastAP
 
 ## Next exact actions
 
-1. Finish architecture/API audit and commit only these new agent docs.
-2. Copy source-derived public components and assets; convert React Router to Next, add scoped CSS. Port Home then remaining pages against isolated Figma mocks.
-3. Run build and desktop/mobile browser validation; record FIGMA_UI_MIGRATION_COMPLETE.
-4. Reconnect each domain using existing services/adapters; verify real auth/quote/booking journey against isolated test data.
+1. Create real room presentation adapter; reconnect server routes and remove unsupported mock fees/discounts/reviews/services from transactional UI.
+2. Connect BookView via existing useDynamicPrice/createBooking/auth/quote telemetry; show actual Pending/Confirmed/deposit terms. Preserve other existing pages.
+3. Add same-origin Next core API boundary with server-only backend target and origin checks, then update lifecycle fields/status handling.
+4. Use isolated operations validation stack (never restart default live stack) for mutation tests. `docs/execution-checkpoint.md` has current backend test setup.
 
 ## Resume instruction
 

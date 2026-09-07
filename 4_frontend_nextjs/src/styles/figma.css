@@ -1,0 +1,59 @@
+/* Source Figma Make design tokens, scoped to the public shell. */
+.figma-site {
+  --bg:          #0c0905;
+  --bg2:         #0f0b07;
+  --bg3:         #13100b;
+  --fg:          #f0e8db;
+  --fg2:         #e8d4b0;
+  --muted:       #9a8060;
+  --dim:         #4a3820;
+  --dim2:        #2e1e0e;
+  --gold:        #c4995a;
+  --gold-hi:     #ddb06a;
+  --border:      rgba(196,153,90,0.10);
+  --border-gold: rgba(196,153,90,0.22);
+  --nav-bg:      rgba(12,9,5,0.88);
+  --card-hover:  rgba(196,153,90,0.04);
+  --overlay:     rgba(12,9,5,0.70);
+  --overlay-2:   rgba(12,9,5,0.45);
+}
+
+
+[data-theme='light'] .figma-site {
+  --bg:          #f5ede0;
+  --bg2:         #ede3d0;
+  --bg3:         #e4d8c4;
+  --fg:          #1a1008;
+  --fg2:         #2e1e0e;
+  --muted:       #7a6245;
+  --dim:         #b09870;
+  --dim2:        #d0bfa0;
+  --gold:        #8a5e1e;
+  --gold-hi:     #a87030;
+  --border:      rgba(140,100,50,0.14);
+  --border-gold: rgba(140,100,50,0.28);
+  --nav-bg:      rgba(245,237,224,0.92);
+  --card-hover:  rgba(140,100,50,0.05);
+  --overlay:     rgba(10,6,2,0.72);
+  --overlay-2:   rgba(10,6,2,0.42);
+}
+
+
+.figma-site { min-height: 100vh; background: var(--bg); color: var(--fg); font-family: var(--font-dm-sans), system-ui, sans-serif; }
+.figma-site .font-display { font-family: var(--font-fraunces), Georgia, serif; }
+.figma-site h1, .figma-site h2, .figma-site h3 { letter-spacing: normal; }
+.figma-site *, .figma-site *::before, .figma-site *::after { transition-property: background-color, border-color, color, fill, stroke; transition-duration: .3s; transition-timing-function: ease; }
+.figma-site .transition-all { transition-property: all; }
+.figma-site .transition-transform { transition-property: transform; }
+.figma-site .transition-opacity { transition-property: opacity; }
+.figma-site input[type='date']::-webkit-calendar-picker-indicator { filter: opacity(.4); cursor: pointer; }
+.figma-site button, .figma-site a, .figma-site summary { -webkit-tap-highlight-color: transparent; }
+.figma-site button:not(:disabled), .figma-site summary { cursor: pointer; }
+.figma-site :focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
+.figma-site button:disabled, .figma-site [aria-disabled='true'] { opacity: .5; cursor: not-allowed; }
+.figma-site .account-menu summary { list-style: none; }
+.figma-site .account-menu summary::-webkit-details-marker { display: none; }
+.figma-site .account-menu a, .figma-site .account-menu button { display: block; width: 100%; padding: .6rem .8rem; text-align: left; }
+.figma-site .account-menu a:hover, .figma-site .account-menu button:hover { background: var(--card-hover); color: var(--gold); }
+.figma-site .legacy-public { min-height: 70vh; padding-top: 6rem; }
+@media (prefers-reduced-motion: reduce) { .figma-site *, .figma-site *::before, .figma-site *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; } }

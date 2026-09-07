@@ -1,11 +1,7 @@
-import { Navbar } from '@/components/layouts/Navbar';
+import PublicShell from '@/components/features/figma/PublicShell';
 import '../styles.css';
+import '@/styles/figma.css';
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <Navbar />
-      {children}
-    </>
-  );
+  return <PublicShell>{children}</PublicShell>;
 }
