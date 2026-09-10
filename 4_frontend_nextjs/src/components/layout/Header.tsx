@@ -1,11 +1,15 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
-import { Bell, Menu, Search } from 'lucide-react';
+import { FormEvent, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { LogOut, Menu, Search } from 'lucide-react';
 import { adminNav } from './adminNav';
+import { useAuth } from '@/hooks/useAuth';
+import type { User } from '@/types/user.type';
 
 interface HeaderProps {
   onMobileOpen: () => void;
+  user: User;
 }
 
 function currentPageLabel(pathname: string): string {
@@ -16,9 +20,33 @@ function currentPageLabel(pathname: string): string {
   return match?.label ?? 'Dashboard';
 }
 
-export function Header({ onMobileOpen }: HeaderProps) {
+export function Header({ onMobileOpen, user }: HeaderProps) {
   const pathname = usePathname() ?? '';
+  const router = useRouter();
+  const { logout, loggingOut, logoutError } = useAuth();
+  const [search, setSearch] = useState('');
   const label = currentPageLabel(pathname);
+  const initials = (user?.full_name ?? 'Admin')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(-2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalized = search.trim().slice(0, 100);
+    router.push(normalized ? `/admin/bookings?search=${encodeURIComponent(normalized)}` : '/admin/bookings');
+  }
+
+  async function signOut() {
+    try {
+      await logout();
+      router.replace('/login');
+    } catch {
+      // The shared error remains visible beside the retry action.
+    }
+  }
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-card/95 px-4 backdrop-blur md:px-6">
@@ -40,36 +68,48 @@ export function Header({ onMobileOpen }: HeaderProps) {
         <span className="truncate text-sm font-semibold text-foreground">{label}</span>
       </div>
 
-      {/* Search */}
-      <div className="relative ml-auto hidden w-full max-w-xs lg:block">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <form className="relative ml-auto hidden w-full max-w-xs lg:block" role="search" onSubmit={submitSearch}>
+        <label htmlFor="admin-global-search" className="sr-only">Tìm booking</label>
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         <input
+          id="admin-global-search"
           type="search"
-          placeholder="Search reservations, guests, rooms..."
-          className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Tìm khách, phòng, mã booking…"
+          maxLength={100}
+          className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         />
-      </div>
-
-      {/* Notifications */}
-      <button
-        type="button"
-        aria-label="Notifications"
-        className="relative ml-auto rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:ml-0"
-      >
-        <Bell className="size-5" />
-        <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-danger ring-2 ring-card" aria-hidden="true" />
-      </button>
+        <button
+          type="submit"
+          aria-label="Tìm booking"
+          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Search className="size-4" />
+        </button>
+      </form>
 
       {/* Profile */}
-      <div className="flex items-center gap-3 border-l border-border pl-3">
+      <div className="ml-auto flex items-center gap-3 border-l border-border pl-3 lg:ml-0">
         <div className="hidden text-right leading-tight sm:block">
-          <p className="text-sm font-medium text-foreground">Front Desk</p>
-          <p className="text-xs text-muted-foreground">Operations</p>
+          <p className="max-w-40 truncate text-sm font-medium text-foreground">{user?.full_name ?? 'Admin'}</p>
+          <p className="text-xs text-muted-foreground">Quản trị viên</p>
         </div>
         <div className="flex size-9 items-center justify-center rounded-full bg-primary-muted text-sm font-semibold text-primary">
-          FD
+          {initials || 'A'}
         </div>
+        <button
+          type="button"
+          aria-label="Đăng xuất"
+          title="Đăng xuất"
+          disabled={loggingOut}
+          onClick={() => void signOut()}
+          className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <LogOut className="size-4" />
+        </button>
       </div>
+      {logoutError && <p role="alert" className="absolute right-4 top-full mt-2 max-w-sm rounded-md border border-danger/20 bg-card px-3 py-2 text-sm text-danger shadow-sm">{logoutError}</p>}
     </header>
   );
 }

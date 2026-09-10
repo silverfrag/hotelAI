@@ -53,9 +53,22 @@ export function useBookingHistory({
         setError(handleError(caught, 'Không thể tải lịch sử đặt phòng.'));
       }
     } finally {
-      if (showLoading && requestSequence.current === sequence) setLoading(false);
+      if (requestSequence.current === sequence) setLoading(false);
     }
   }, [accessToken, enabled, handleError]);
+
+  useEffect(() => {
+    if (!enabled || !accessToken) return;
+    const refresh = () => { if (document.visibilityState === 'visible') void load(false); };
+    window.addEventListener('focus', refresh);
+    const timer = bookings.some((booking) => booking.status === 'Pending')
+      ? window.setInterval(refresh, 15000)
+      : undefined;
+    return () => {
+      window.removeEventListener('focus', refresh);
+      if (timer !== undefined) window.clearInterval(timer);
+    };
+  }, [accessToken, enabled, load, bookings.some((booking) => booking.status === 'Pending')]);
 
   useEffect(() => {
     if (!enabled || !accessToken) {
@@ -85,7 +98,10 @@ export function useBookingHistory({
         if (requestSequence.current === sequence) setLoading(false);
       });
 
-    return () => controller.abort();
+    return () => {
+      requestSequence.current += 1;
+      controller.abort();
+    };
   }, [accessToken, enabled, handleError]);
 
   const cancel = useCallback(async (bookingId: string) => {
@@ -96,16 +112,17 @@ export function useBookingHistory({
     setError('');
 
     try {
-      await cancelBookingRequest(bookingId, accessToken);
+      const canceledBooking = await cancelBookingRequest(bookingId, accessToken);
       setBookings((current) => current.map((booking) => (
         booking.booking_id === bookingId
-          ? { ...booking, status: 'Cancelled' }
+          ? canceledBooking
           : booking
       )));
       setActionMessage('Đã hủy đặt phòng thành công.');
       await load(false);
       return true;
     } catch (caught) {
+      if (caught instanceof BookingServiceError && caught.status === 409) await load(false);
       setError(handleError(caught, 'Không thể hủy đặt phòng.'));
       return false;
     } finally {
@@ -123,4 +140,3 @@ export function useBookingHistory({
     cancel,
   };
 }
-

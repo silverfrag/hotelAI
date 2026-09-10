@@ -14,7 +14,7 @@ const VALUES = [
   {
     num: "02",
     title: "The Art of Anticipation",
-    body: "Plan around what matters to you. Our assistant can help you explore room information; availability and booking details are confirmed in the reservation flow.",
+    body: "Plan around what matters to you. Compare room information and request a price for your dates; availability and booking details are confirmed in the reservation flow.",
   },
   {
     num: "03",
@@ -54,7 +54,7 @@ const TEAM = [
     name: "Help Along the Way",
     role: "For Every Guest",
     img: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=300&h=300&fit=crop&auto=format",
-    quote: "Ask our AI assistant about the hotel and available rooms, then review your final reservation details before booking.",
+    quote: "Request a price for your dates, then review the room, availability and final reservation details before booking.",
   },
 ];
 
@@ -139,7 +139,7 @@ export default function AboutView() {
               {[
                 { v: "Discover", l: "Room Collection" },
                 { v: "Plan", l: "Check Your Dates" },
-                { v: "Ask", l: "AI Assistance" },
+                { v: "Quote", l: "Stay Pricing" },
                 { v: "Return", l: "Your Reservations" },
               ].map((s) => (
                 <div key={s.l} className="p-4" style={{ border: "1px solid var(--border-gold)" }}>

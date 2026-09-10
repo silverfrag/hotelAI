@@ -1,9 +1,16 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useBookingHistory } from '@/hooks/useBookingHistory';
-import { BookingSummary } from '@/types/booking.type';
+import { BookingServiceError, getBookingPayment } from '@/services/booking.service';
+import type {
+  BookingPaymentSummary,
+  BookingSummary,
+  PaymentMethod,
+  PaymentStatus,
+} from '@/types/booking.type';
 import { formatCurrency } from '@/utils/formatCurrency';
 
 const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
@@ -18,6 +25,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
   year: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
+  timeZone: 'Asia/Bangkok',
 });
 
 function formatHotelDate(value: string): string {
@@ -33,14 +41,21 @@ function formatCreatedAt(value: string): string {
 
 function statusDetails(status: string): { label: string; className: string } {
   switch (status.toLowerCase()) {
+    case 'pending':
+      return { label: 'Chờ đặt cọc', className: 'payment-unpaid' };
+    case 'expired':
+      return { label: 'Hết hạn giữ phòng', className: 'status-cancelled' };
+    case 'noshow':
+      return { label: 'Không đến nhận phòng', className: 'status-cancelled' };
     case 'confirmed':
       return { label: 'Đã xác nhận', className: 'status-confirmed' };
     case 'cancelled':
     case 'canceled':
       return { label: 'Đã hủy', className: 'status-cancelled' };
+    case 'checkedin':
     case 'checked-in':
     case 'checked_in':
-      return { label: 'Đã nhận phòng', className: 'status-active' };
+      return { label: 'Đang lưu trú', className: 'status-active' };
     case 'checked-out':
     case 'checked_out':
     case 'completed':
@@ -50,31 +65,50 @@ function statusDetails(status: string): { label: string; className: string } {
   }
 }
 
-function hotelToday(): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Bangkok',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-  return `${values.year}-${values.month}-${values.day}`;
-}
+const paymentStatusDetails: Record<PaymentStatus, { label: string; className: string }> = {
+  Unpaid: { label: 'Chưa thanh toán', className: 'payment-unpaid' },
+  PartiallyPaid: { label: 'Thanh toán một phần', className: 'payment-partial' },
+  Paid: { label: 'Đã thanh toán', className: 'payment-paid' },
+  RefundPending: { label: 'Chờ hoàn tiền', className: 'payment-refund-pending' },
+  PartiallyRefunded: { label: 'Đã hoàn một phần', className: 'payment-partial' },
+  Refunded: { label: 'Đã hoàn tiền', className: 'payment-refunded' },
+};
+
+const paymentMethodLabels: Record<PaymentMethod, string> = {
+  Cash: 'Tiền mặt',
+  BankTransfer: 'Chuyển khoản',
+  CardTerminal: 'Thẻ tại quầy',
+};
 
 function canCancel(booking: BookingSummary): boolean {
-  return booking.status.toLowerCase() === 'confirmed'
-    && booking.check_in_date.slice(0, 10) > hotelToday();
+  return booking.can_cancel;
 }
 
 interface BookingCardProps {
   booking: BookingSummary;
   cancelling: boolean;
   actionDisabled: boolean;
+  paymentOpen: boolean;
+  paymentLoading: boolean;
+  paymentError: string;
+  paymentSummary: BookingPaymentSummary | null;
   onCancel: (booking: BookingSummary) => void;
+  onTogglePayment: (booking: BookingSummary) => void;
 }
 
-function BookingCard({ booking, cancelling, actionDisabled, onCancel }: BookingCardProps) {
+function BookingCard({
+  booking,
+  cancelling,
+  actionDisabled,
+  paymentOpen,
+  paymentLoading,
+  paymentError,
+  paymentSummary,
+  onCancel,
+  onTogglePayment,
+}: BookingCardProps) {
   const status = statusDetails(booking.status);
+  const payment = paymentStatusDetails[booking.payment_status] ?? paymentStatusDetails.Unpaid;
 
   return (
     <article className="booking-history-card">
@@ -84,7 +118,10 @@ function BookingCard({ booking, cancelling, actionDisabled, onCancel }: BookingC
           <h2>{booking.room_type}</h2>
           <p className="muted">Phòng {booking.room_number}</p>
         </div>
-        <span className={`booking-status ${status.className}`}>{status.label}</span>
+        <div className="booking-status-stack">
+          <span className={`booking-status ${status.className}`}>{status.label}</span>
+          <span className={`booking-status ${payment.className}`}>{payment.label}</span>
+        </div>
       </header>
 
       <dl className="booking-details">
@@ -106,13 +143,43 @@ function BookingCard({ booking, cancelling, actionDisabled, onCancel }: BookingC
         </div>
       </dl>
 
+      {booking.status === 'Pending' && (
+        <p className="muted" role="status">
+          Booking đang chờ đủ tiền cọc {formatCurrency(booking.deposit_required)}.
+          {' '}Còn cần cọc {formatCurrency(Math.max(0, booking.deposit_required - booking.net_paid))}.
+          {booking.pending_expires_at && <> Hạn giữ phòng: {formatCreatedAt(booking.pending_expires_at)} (giờ khách sạn).</>}
+          {' '}Liên hệ khách sạn để được hướng dẫn thanh toán trước thời hạn. Trạng thái sẽ được cập nhật sau khi khoản cọc được ghi nhận.
+        </p>
+      )}
+      {(booking.status === 'Expired' || booking.status === 'NoShow') && (
+        <p className="muted">
+          {booking.status === 'Expired' ? 'Thời hạn giữ phòng đã kết thúc.' : 'Booking đã được ghi nhận là khách không đến.'}
+          {' '}Booking này không còn giữ phòng. Khoản hoàn tiền, nếu có, được theo dõi riêng trong lịch sử thanh toán.
+        </p>
+      )}
+
       <footer className="booking-card-footer">
         <div>
-          <span className="muted">Tổng thanh toán</span>
+          <span className="muted">Tổng giá booking</span>
           <strong>{formatCurrency(booking.total_price)}</strong>
+          <span className="booking-payment-balance">
+            Đã thu {formatCurrency(booking.paid_amount)}
+            {booking.balance_due > 0 && <> · Còn phải thu {formatCurrency(booking.balance_due)}</>}
+            {booking.refunded_amount > 0 && <> · Đã hoàn {formatCurrency(booking.refunded_amount)}</>}
+            {booking.refund_due > 0 && <> · Còn phải hoàn {formatCurrency(booking.refund_due)}</>}
+          </span>
           <small>Đặt lúc {formatCreatedAt(booking.created_at)}</small>
         </div>
-        {canCancel(booking) && (
+        <div className="booking-card-actions">
+          <button
+            className="payment-history-button"
+            onClick={() => onTogglePayment(booking)}
+            type="button"
+            aria-expanded={paymentOpen}
+          >
+            {paymentOpen ? 'Ẩn giao dịch' : 'Lịch sử thanh toán'}
+          </button>
+          {canCancel(booking) && (
           <button
             className="cancel-booking-button"
             disabled={actionDisabled}
@@ -121,14 +188,51 @@ function BookingCard({ booking, cancelling, actionDisabled, onCancel }: BookingC
           >
             {cancelling ? 'Đang hủy...' : 'Hủy đặt phòng'}
           </button>
-        )}
+          )}
+        </div>
       </footer>
+
+      {paymentOpen && (
+        <section className="payment-history-panel" aria-live="polite">
+          {paymentLoading ? (
+            <p className="muted">Đang tải lịch sử thanh toán…</p>
+          ) : paymentError ? (
+            <p className="error" role="alert">{paymentError}</p>
+          ) : paymentSummary && paymentSummary.transactions.length > 0 ? (
+            <ol className="payment-transaction-list">
+              {paymentSummary.transactions.map((transaction) => (
+                <li key={transaction.payment_id}>
+                  <div>
+                    <strong>{transaction.transaction_type === 'Payment' ? 'Thanh toán' : 'Hoàn tiền'}</strong>
+                    <span>
+                      {paymentMethodLabels[transaction.method]} · {formatCreatedAt(transaction.created_at)}
+                    </span>
+                    {(transaction.external_reference || transaction.note) && (
+                      <small>{transaction.external_reference || transaction.note}</small>
+                    )}
+                  </div>
+                  <strong className={transaction.transaction_type === 'Refund' ? 'refund-amount' : ''}>
+                    {transaction.transaction_type === 'Refund' ? '−' : '+'}{formatCurrency(transaction.amount)}
+                  </strong>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="muted">Booking này chưa có giao dịch thanh toán.</p>
+          )}
+        </section>
+      )}
     </article>
   );
 }
 
 export function BookingHistory() {
-  const { accessToken, isAuthenticated, ready, logout } = useAuth();
+  const { accessToken, isAuthenticated, ready, invalidateSession } = useAuth();
+  const [paymentBookingId, setPaymentBookingId] = useState<string | null>(null);
+  const [paymentSummary, setPaymentSummary] = useState<BookingPaymentSummary | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const paymentController = useRef<AbortController | null>(null);
   const {
     bookings,
     loading,
@@ -140,14 +244,56 @@ export function BookingHistory() {
   } = useBookingHistory({
     accessToken,
     enabled: ready && isAuthenticated,
-    onUnauthorized: logout,
+    onUnauthorized: invalidateSession,
   });
+
+  useEffect(() => () => paymentController.current?.abort(), []);
+
+  async function loadPayment(bookingId: string) {
+    if (!accessToken) return;
+    paymentController.current?.abort();
+    const controller = new AbortController();
+    paymentController.current = controller;
+    setPaymentSummary(null);
+    setPaymentError('');
+    setPaymentLoading(true);
+    try {
+      const summary = await getBookingPayment(bookingId, accessToken, controller.signal);
+      if (!controller.signal.aborted) setPaymentSummary(summary);
+    } catch (caught) {
+      if (caught instanceof DOMException && caught.name === 'AbortError') return;
+      if (caught instanceof BookingServiceError && caught.status === 401) invalidateSession();
+      if (!controller.signal.aborted) {
+        setPaymentError(caught instanceof Error ? caught.message : 'Không thể tải lịch sử thanh toán.');
+      }
+    } finally {
+      if (!controller.signal.aborted) setPaymentLoading(false);
+    }
+  }
+
+  function togglePayment(booking: BookingSummary) {
+    if (paymentBookingId === booking.booking_id) {
+      paymentController.current?.abort();
+      setPaymentBookingId(null);
+      setPaymentSummary(null);
+      setPaymentError('');
+      setPaymentLoading(false);
+      return;
+    }
+    setPaymentBookingId(booking.booking_id);
+    void loadPayment(booking.booking_id);
+  }
 
   async function confirmCancellation(booking: BookingSummary) {
     const confirmed = window.confirm(
       `Bạn có chắc muốn hủy phòng ${booking.room_number} từ ${formatHotelDate(booking.check_in_date)} đến ${formatHotelDate(booking.check_out_date)}?`,
     );
-    if (confirmed) await cancel(booking.booking_id);
+    if (confirmed) {
+      const canceled = await cancel(booking.booking_id);
+      if (canceled && paymentBookingId === booking.booking_id) {
+        await loadPayment(booking.booking_id);
+      }
+    }
   }
 
   return (
@@ -220,6 +366,11 @@ export function BookingHistory() {
                 cancelling={cancellingId === booking.booking_id}
                 key={booking.booking_id}
                 onCancel={(selected) => void confirmCancellation(selected)}
+                onTogglePayment={togglePayment}
+                paymentError={paymentBookingId === booking.booking_id ? paymentError : ''}
+                paymentLoading={paymentBookingId === booking.booking_id && paymentLoading}
+                paymentOpen={paymentBookingId === booking.booking_id}
+                paymentSummary={paymentBookingId === booking.booking_id ? paymentSummary : null}
               />
             ))}
           </section>
@@ -228,4 +379,3 @@ export function BookingHistory() {
     </main>
   );
 }
-

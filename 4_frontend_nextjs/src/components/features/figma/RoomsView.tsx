@@ -2,8 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { FigmaRoom } from "@/data/figma-mock";
+import type { RoomPresentation } from "@/types/room-presentation.type";
 import { addIsoDays } from "@/utils/businessDate";
+import { formatCurrency } from "@/utils/formatCurrency";
+
+function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
 
 function StarIcon() {
   return (
@@ -23,8 +30,11 @@ function CheckIcon() {
 
 const NIGHTS_OPTIONS = [1, 2, 3, 5, 7, 14];
 
-export default function RoomsView({ rooms, businessDate }: { rooms: FigmaRoom[]; businessDate: string }) {
+export default function RoomsView({ rooms, businessDate }: { rooms: RoomPresentation[]; businessDate: string }) {
   const [category, setCategory] = useState("All");
+  const [search, setSearch] = useState("");
+  const [capacity, setCapacity] = useState(0);
+  const [availableOnly, setAvailableOnly] = useState(false);
   const [selectedId, setSelectedId] = useState(rooms[0]?.id);
   const selected = rooms.find((room) => room.id === selectedId) ?? rooms[0];
   const [nights, setNights] = useState(3);
@@ -32,21 +42,26 @@ export default function RoomsView({ rooms, businessDate }: { rooms: FigmaRoom[];
   const [guests, setGuests] = useState(2);
   const [expanded, setExpanded] = useState<number | null>(null);
 
-  const filtered =
-    category === "All" ? rooms : rooms.filter((r) => r.category === category);
+  const normalizedSearch = search.trim().toLocaleLowerCase("vi");
+  const filtered = rooms.filter((room) =>
+    (category === "All" || room.category === category) &&
+    (!normalizedSearch || room.name.toLocaleLowerCase("vi").includes(normalizedSearch)) &&
+    (capacity === 0 || room.guests >= capacity) &&
+    (!availableOnly || room.availableNow > 0)
+  );
 
   const categories = ["All", ...new Set(rooms.map((room) => room.category))];
-  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(checkIn) && checkIn >= businessDate;
+  const checkOut = isCalendarDate(checkIn) ? addIsoDays(checkIn, nights) : "";
+  const validDate = isCalendarDate(checkIn) && isCalendarDate(checkOut) && checkIn >= businessDate && checkOut > checkIn;
+  const capacities = [...new Set([1, 2, 3, 4, 5, 6, ...rooms.map((room) => room.guests)])].sort((a, b) => a - b);
 
   if (!selected) {
     return <section className="px-5 md:px-10 lg:px-16 pt-32 pb-24"><h1 className="font-display text-4xl mb-4">Refined Spaces</h1><p style={{ color: "var(--muted)" }}>No rooms are available to display. Please try again shortly.</p></section>;
   }
 
   const guestCount = Math.min(guests, selected.guests);
-  const bookingHref = validDate ? `/book?${new URLSearchParams({ room_type_id: String(selected.id), check_in_date: checkIn, check_out_date: addIsoDays(checkIn, nights), guest_count: String(guestCount) })}` : "/book";
+  const bookingHref = validDate ? `/book?${new URLSearchParams({ room_type_id: String(selected.id), check_in_date: checkIn, check_out_date: checkOut, guest_count: String(guestCount) })}` : "/book";
   const total = selected.price * nights;
-  const tax = Math.round(total * 0.12);
-  const serviceFee = 45;
 
   return (
     <>
@@ -68,6 +83,7 @@ export default function RoomsView({ rooms, businessDate }: { rooms: FigmaRoom[];
           <h1 className="font-display text-5xl md:text-6xl text-white leading-[0.95]">
             Refined Spaces
           </h1>
+          <p className="mt-3 text-[10px] tracking-wider text-white/60">Illustrative photography</p>
         </div>
       </section>
 
@@ -96,8 +112,23 @@ export default function RoomsView({ rooms, businessDate }: { rooms: FigmaRoom[];
               </button>
             ))}
             <span className="ml-auto text-[10px] self-center" style={{ color: "var(--muted)" }}>
-              {filtered.length} rooms
+              {filtered.length} room type{filtered.length === 1 ? "" : "s"}
             </span>
+            <div className="w-full flex flex-wrap items-center gap-3 pt-3">
+              <label className="flex-1 min-w-[180px]">
+                <span className="sr-only">Search room types</span>
+                <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search room types" className="w-full px-3 py-2 text-[11px] bg-transparent outline-none" style={{ border: "1px solid var(--border-gold)", color: "var(--fg)" }} />
+              </label>
+              <label>
+                <span className="sr-only">Minimum guest capacity</span>
+                <select value={capacity} onChange={(event) => setCapacity(Number(event.target.value))} className="px-3 py-2 text-[11px] outline-none" style={{ background: "var(--bg2)", border: "1px solid var(--border-gold)", color: "var(--muted)" }}>
+                  <option value={0}>Any guest capacity</option>
+                  {capacities.map((value) => <option key={value} value={value}>At least {value} guest{value === 1 ? "" : "s"}</option>)}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: "var(--muted)" }}><input type="checkbox" checked={availableOnly} onChange={(event) => setAvailableOnly(event.target.checked)} className="accent-[var(--gold)]" />Available now</label>
+              <p className="w-full text-[10px]" style={{ color: "var(--muted)" }}>Availability for your stay dates is checked when you request a final price.</p>
+            </div>
           </div>
 
           <div className="px-5 md:px-10 py-10">
@@ -121,35 +152,37 @@ export default function RoomsView({ rooms, businessDate }: { rooms: FigmaRoom[];
                   >
                     <div className="flex flex-col sm:flex-row gap-0">
                       {/* image */}
-                      <div className="sm:w-56 shrink-0 overflow-hidden">
+                      <div className="sm:w-56 shrink-0 overflow-hidden relative">
                         <div className="aspect-[4/3] sm:aspect-auto sm:h-full">
                           <img
                             src={room.img}
-                            alt={room.name}
+                            alt={`Illustrative photograph for ${room.name}`}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.05]"
                             style={{ minHeight: "160px" }}
                           />
+                          <span className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white/80 text-[9px]">Illustrative photo</span>
                         </div>
                       </div>
 
                       {/* content */}
-                      <div className="flex-1 p-5 flex flex-col justify-between">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
+                      <div className="flex-1 min-w-0 p-5 flex flex-col justify-between">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div className="min-w-0">
                             <div className="text-[9px] tracking-[0.2em] uppercase mb-1" style={{ color: isSelected ? "var(--gold)" : "var(--dim)" }}>
                               {room.category} · {room.type}
                             </div>
                             <h3 className="font-display text-xl mb-1" style={{ color: "var(--fg)" }}>
                               <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(room.id); setGuests((value) => Math.min(value, room.guests)); }} aria-pressed={isSelected} className="text-left">{room.name}</button>
                             </h3>
-                            <div className="flex items-center gap-3 mb-3">
-                              <span className="flex items-center gap-1 text-[10px]" style={{ color: "var(--gold)" }}>
+                            <div className="flex flex-wrap items-center gap-3 mb-3">
+                              {room.rating !== null && <span className="flex items-center gap-1 text-[10px]" style={{ color: "var(--gold)" }}>
                                 <StarIcon />
                                 <span style={{ color: "var(--muted)" }}>{room.rating}</span>
-                              </span>
+                              </span>}
                               <span className="text-[9px]" style={{ color: "var(--dim)" }}>
-                                {room.sqm} m² · Up to {room.guests} guests
+                                {room.sqm !== null && `${room.sqm} m² · `}Up to {room.guests} guests
                               </span>
+                              <span className="text-[10px]" style={{ color: "var(--muted)" }}>{room.availableNow} available now · {room.totalRooms} rooms</span>
                             </div>
                             <p
                               id={`room-description-${room.id}`}
@@ -163,13 +196,13 @@ export default function RoomsView({ rooms, businessDate }: { rooms: FigmaRoom[];
                           </div>
                           <div className="text-right shrink-0">
                             <div className="font-display text-2xl" style={{ color: "var(--gold)" }}>
-                              ${room.price}
+                              {formatCurrency(room.price, room.currency)}
                             </div>
-                            <div className="text-[9px]" style={{ color: "var(--dim)" }}>/night</div>
+                            <div className="text-[9px]" style={{ color: "var(--dim)" }}>base price / night</div>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+                        <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
                           <div className="flex flex-wrap gap-1.5">
                             {room.features.map((f) => (
                               <span
@@ -211,7 +244,7 @@ export default function RoomsView({ rooms, businessDate }: { rooms: FigmaRoom[];
                   </div>
                 );
               })}
-              {filtered.length === 0 && <p className="py-10 text-sm" style={{ color: "var(--muted)" }}>No rooms match this category.</p>}
+              {filtered.length === 0 && <div className="py-10 text-sm" style={{ color: "var(--muted)" }}><p>No room types match these filters.</p><button type="button" onClick={() => { setCategory("All"); setSearch(""); setCapacity(0); setAvailableOnly(false); }} className="mt-4 text-[10px] uppercase tracking-wider px-4 py-2" style={{ color: "var(--gold)", border: "1px solid var(--border-gold)" }}>Clear filters</button></div>}
             </div>
           </div>
         </div>
@@ -227,12 +260,13 @@ export default function RoomsView({ rooms, businessDate }: { rooms: FigmaRoom[];
           >
             {/* selected room preview */}
             <div className="mb-6 overflow-hidden" style={{ borderRadius: "4px" }}>
-              <div className="aspect-[16/9] overflow-hidden">
+              <div className="aspect-[16/9] overflow-hidden relative">
                 <img
                   src={selected.img}
-                  alt={selected.name}
+                  alt={`Illustrative photograph for ${selected.name}`}
                   className="w-full h-full object-cover transition-all duration-500"
                 />
+                <span className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white/80 text-[9px]">Illustrative photo</span>
               </div>
               <div className="pt-4">
                 <div className="text-[9px] tracking-[0.2em] uppercase mb-1" style={{ color: "var(--gold)" }}>
@@ -240,14 +274,15 @@ export default function RoomsView({ rooms, businessDate }: { rooms: FigmaRoom[];
                 </div>
                 <h3 className="font-display text-xl" style={{ color: "var(--fg)" }}>{selected.name}</h3>
                 <p className="text-[11px] mt-1" style={{ color: "var(--muted)" }}>{selected.type}</p>
-                <div className="flex items-center gap-1 mt-2">
+                {selected.rating !== null && <div className="flex items-center gap-1 mt-2">
                   {[1,2,3,4,5].map(i => (
-                    <span key={i} style={{ color: i <= Math.floor(selected.rating) ? "var(--gold)" : "var(--border-gold)" }}>
+                    <span key={i} style={{ color: i <= Math.floor(selected.rating ?? 0) ? "var(--gold)" : "var(--border-gold)" }}>
                       <StarIcon />
                     </span>
                   ))}
                   <span className="text-[9px] ml-1" style={{ color: "var(--dim)" }}>{selected.rating}</span>
-                </div>
+                </div>}
+                <p className="text-[10px] mt-3" style={{ color: "var(--muted)" }}>{selected.availableNow} available now · {selected.totalRooms} rooms in this category</p>
               </div>
             </div>
 
@@ -266,7 +301,7 @@ export default function RoomsView({ rooms, businessDate }: { rooms: FigmaRoom[];
                   aria-invalid={!validDate}
                   value={checkIn}
                   onChange={(e) => setCheckIn(e.target.value)}
-                  className="w-full bg-transparent text-sm outline-none pb-2 [color-scheme:dark]"
+                  className="w-full bg-transparent text-sm outline-none pb-2"
                   style={{
                     borderBottom: "1px solid var(--border-gold)",
                     color: "var(--fg)",
@@ -332,23 +367,15 @@ export default function RoomsView({ rooms, businessDate }: { rooms: FigmaRoom[];
             {/* pricing breakdown */}
             <div className="space-y-2.5 mb-5">
               <div className="flex justify-between text-[11px]">
-                <span style={{ color: "var(--muted)" }}>${selected.price} × {nights} night{nights > 1 ? "s" : ""}</span>
-                <span style={{ color: "var(--fg)" }}>${total.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-[11px]">
-                <span style={{ color: "var(--muted)" }}>Service fee</span>
-                <span style={{ color: "var(--fg)" }}>${serviceFee}</span>
-              </div>
-              <div className="flex justify-between text-[11px]">
-                <span style={{ color: "var(--muted)" }}>Tax (12%)</span>
-                <span style={{ color: "var(--fg)" }}>${tax.toLocaleString()}</span>
+                <span style={{ color: "var(--muted)" }}>Base price / night</span>
+                <span style={{ color: "var(--fg)" }}>{formatCurrency(selected.price, selected.currency)}</span>
               </div>
               <div className="h-px" style={{ background: "var(--border)" }} />
               <div className="flex justify-between">
-                <span className="text-[11px] font-medium" style={{ color: "var(--fg)" }}>Total</span>
+                <span className="text-[11px] font-medium" style={{ color: "var(--fg)" }}>Base-price estimate</span>
                 <div className="text-right">
                   <div className="font-display text-xl" style={{ color: "var(--gold)" }}>
-                    ${(total + tax + serviceFee).toLocaleString()}
+                    {formatCurrency(total, selected.currency)}
                   </div>
                   <div className="text-[9px]" style={{ color: "var(--dim)" }}>for {nights} nights</div>
                 </div>
@@ -364,25 +391,12 @@ export default function RoomsView({ rooms, businessDate }: { rooms: FigmaRoom[];
               onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--gold-hi)")}
               onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--gold)")}
             >
-              Reserve Now
+              Check final price and availability
             </Link>
             {!validDate && <p role="alert" className="text-xs mt-3" style={{ color: "var(--gold)" }}>Choose a check-in date on or after {businessDate}.</p>}
             <p className="text-[9px] text-center mt-3" style={{ color: "var(--dim)" }}>
-              Free cancellation up to 48h before check-in
+              Your final price and available rooms depend on your stay dates. This estimate does not reserve a room or guarantee a price.
             </p>
-
-            {/* payment icons */}
-            <div className="flex items-center justify-center gap-2 mt-5">
-              {["VISA", "MC", "AMEX", "PayPal"].map((p) => (
-                <span
-                  key={p}
-                  className="text-[8px] tracking-wider px-2 py-1"
-                  style={{ border: "1px solid var(--border)", color: "var(--dim)" }}
-                >
-                  {p}
-                </span>
-              ))}
-            </div>
           </div>
         </div>
       </div>

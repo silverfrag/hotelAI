@@ -1,10 +1,12 @@
 import { notFound } from 'next/navigation';
 import RoomDetailView from '@/components/features/figma/RoomDetailView';
-import { rooms } from '@/data/figma-mock';
+import { getRoomType } from '@/services/room.service';
+import { mapApiRoomToPresentation } from '@/services/room-presentation';
 import { getHotelBusinessDate } from '@/utils/businessDate';
 export default async function RoomDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const room = rooms.find((item) => String(item.id) === id);
+  if (!/^[1-9]\d*$/.test(id) || Number(id) > 2147483647) notFound();
+  const room = await getRoomType(Number(id));
   if (!room) notFound();
-  return <RoomDetailView room={room} businessDate={getHotelBusinessDate()} />;
+  return <RoomDetailView room={mapApiRoomToPresentation(room)} businessDate={getHotelBusinessDate()} />;
 }

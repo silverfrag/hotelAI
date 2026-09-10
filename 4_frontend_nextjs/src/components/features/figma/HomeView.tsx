@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { destinations, type FigmaRoom } from "@/data/figma-mock";
+import { destinations } from "@/data/travel-inspiration";
+import type { RoomPresentation } from "@/types/room-presentation.type";
 import { addIsoDays } from "@/utils/businessDate";
 
 const HERO_BG =
@@ -32,7 +33,7 @@ function StarIcon() {
   );
 }
 
-export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; businessDate: string }) {
+export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentation[]; businessDate: string }) {
   const [activeFilter, setActiveFilter] = useState("All");
   const [destination, setDestination] = useState("");
   const [checkIn, setCheckIn] = useState(businessDate);
@@ -51,7 +52,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; 
   return (
     <>
       {/* ── HERO ── */}
-      <section className="relative h-screen min-h-[680px] flex flex-col justify-end overflow-hidden">
+      <section className="relative min-h-[900px] sm:min-h-[680px] sm:h-screen flex flex-col justify-end overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: `url(${[HERO_BG, ...destinations.slice(1, 4).map((d) => d.imgWide)][activeDot]})` }}
@@ -83,8 +84,8 @@ export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; 
         {/* floating stats */}
         <div className="absolute top-32 right-16 lg:right-28 hidden lg:flex flex-col gap-3">
           {[
-            { label: "Guests Served", value: "48,000+" },
-            { label: "Satisfaction", value: "98.6%" },
+            { label: "Room Collection", value: "Discover" },
+            { label: "Your Stay", value: "Plan" },
           ].map((s) => (
             <div
               key={s.label}
@@ -126,7 +127,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; 
               Horizon
             </h1>
             <p className="text-sm text-[rgba(255,255,255,0.6)] max-w-sm leading-relaxed mb-10">
-              Curated sanctuaries at the world's most breathtaking destinations.
+              Inspired by the world's most breathtaking destinations.
               Every detail designed for the extraordinary.
             </p>
           </div>
@@ -259,7 +260,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; 
           {filtered.map((dest) => (
             <Link
               key={dest.id}
-              href={`/destinations`}
+              href={`/destinations?q=${encodeURIComponent(dest.name)}`}
               className="group cursor-pointer block"
             >
               <div
@@ -280,7 +281,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; 
                       {dest.tagline}
                     </span>
                     <span className="text-[10px] text-white/60 flex items-center gap-1">
-                      <StarIcon /> {dest.rating}
+                      <StarIcon /> {dest.tag}
                     </span>
                   </div>
                   <h3 className="font-display text-xl text-white">{dest.name}</h3>
@@ -289,10 +290,10 @@ export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; 
                     style={{ borderTop: "1px solid rgba(196,153,90,0.2)" }}
                   >
                     <span className="text-[11px] text-white/50">
-                      from <span className="text-white/90 font-medium">{dest.price}</span>/night
+                      <span className="text-white/90 font-medium">Travel inspiration</span>
                     </span>
                     <span className="text-[9px] text-white/30 uppercase tracking-wider">
-                      {dest.nights} nights
+                      Explore
                     </span>
                   </div>
                 </div>
@@ -358,10 +359,11 @@ export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; 
           className="mx-5 md:mx-10 lg:mx-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px"
           style={{ background: "var(--border)" }}
         >
+          {!featuredRooms.length && <p className="p-8 text-sm" style={{color:"var(--muted)"}}>No rooms are currently listed. Please check back soon.</p>}
           {featuredRooms.map((room) => (
             <Link
               key={room.id}
-              href="/rooms"
+              href={`/rooms/${room.id}`}
               className="group block overflow-hidden"
               style={{ background: "var(--bg2)" }}
             >
@@ -379,7 +381,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; 
                 <h3 className="font-display text-lg mb-3" style={{ color: "var(--fg)" }}>
                   {room.name}
                 </h3>
-                <div className="text-[10px] mb-3" style={{ color: "var(--dim)" }}>{room.sqm} m²</div>
+                <div className="text-[10px] mb-3" style={{ color: "var(--dim)" }}>{room.guests} max guests · {room.availableNow} available</div>
                 <div className="flex flex-wrap gap-1.5 mb-5">
                   {room.features.slice(0, 3).map((f) => (
                     <span
@@ -396,8 +398,8 @@ export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; 
                   style={{ borderTop: "1px solid var(--border)" }}
                 >
                   <div>
-                    <span className="font-display text-xl" style={{ color: "var(--gold)" }}>
-                      ${room.price}
+                    <span className="font-display text-lg" style={{ color: "var(--gold)" }}>
+                      {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(room.price)}
                     </span>
                     <span className="text-[10px] ml-1" style={{ color: "var(--dim)" }}>/night</span>
                   </div>
@@ -445,10 +447,10 @@ export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; 
           </div>
           <div className="grid grid-cols-2 gap-4">
             {[
-              { value: "200+", label: "Luxury Properties", sub: "Across 42 countries" },
-              { value: "48K", label: "Happy Guests", sub: "And counting" },
-              { value: "98%", label: "Satisfaction Rate", sub: "Verified reviews" },
-              { value: "15yr", label: "Of Excellence", sub: "In luxury travel" },
+              { value: String(rooms.length), label: "Room Categories", sub: "Explore the collection" },
+              { value: "Plan", label: "Your Dates", sub: "Check availability" },
+              { value: "AI", label: "Dynamic Pricing", sub: "A quote for your dates" },
+              { value: "Stay", label: "Your Reservations", sub: "Saved to your account" },
             ].map((stat, i) => (
               <div
                 key={i}
@@ -488,7 +490,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; 
         <div className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-[rgba(0,0,0,0.55)] to-transparent" />
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
           <div className="text-[9px] tracking-[0.3em] uppercase mb-5" style={{ color: "var(--gold)" }}>
-            140+ Destinations · 200+ Properties
+            Travel Inspiration · Thoughtful Stays
           </div>
           <h2 className="font-display text-4xl md:text-6xl lg:text-7xl text-white leading-[0.95]">
             The World<br />
@@ -520,19 +522,19 @@ export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; 
             className="font-display text-2xl md:text-3xl leading-snug mb-10 italic -mt-6"
             style={{ color: "var(--fg)" }}
           >
-            Aurum didn't just book us a hotel. They composed an entire chapter of our lives we'll never forget.
+            A memorable stay begins with thoughtful details and room to discover.
           </blockquote>
           <div className="flex items-center justify-center gap-4">
             <img
               src="https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=80&h=80&fit=crop&auto=format"
-              alt="Sofia Laurent"
+              alt=""
               className="w-12 h-12 rounded-full object-cover"
               style={{ border: "1px solid var(--border-gold)" }}
             />
             <div className="text-left">
-              <div className="text-sm font-medium" style={{ color: "var(--fg2)" }}>Sofia Laurent</div>
+              <div className="text-sm font-medium" style={{ color: "var(--fg2)" }}>Aurum Travel Notes</div>
               <div className="text-[9px] tracking-[0.2em] uppercase mt-0.5" style={{ color: "var(--dim)" }}>
-                Maldives Retreat, 2026
+                Our approach to thoughtful stays
               </div>
             </div>
           </div>
@@ -581,7 +583,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: FigmaRoom[]; 
               className="text-[10px] tracking-[0.16em] uppercase px-8 py-3 whitespace-nowrap transition-all duration-300"
               style={{ border: "1px solid rgba(196,153,90,0.4)", color: "var(--gold)" }}
             >
-              Talk to an Expert
+              Plan Your Stay
             </Link>
           </div>
         </div>

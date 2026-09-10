@@ -71,6 +71,15 @@ export default function PublicShell({ children }: { children: React.ReactNode })
 
   }, [pathname]);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = previous; window.removeEventListener("keydown", onKey); };
+  }, [menuOpen]);
+
   const isActive = (to: string) =>
     to === "/" ? pathname === "/" : pathname.startsWith(to);
 
@@ -218,12 +227,12 @@ export default function PublicShell({ children }: { children: React.ReactNode })
       </div>
 
       {/* ── PAGE CONTENT ── */}
-      <div id="public-content" tabIndex={-1} className={/^\/(checkout|login|register|profile|bookings)(\/|$)/.test(pathname) ? "legacy-public" : undefined}>
+      <div inert={menuOpen} id="public-content" tabIndex={-1} className={/^\/(checkout|login|register|profile|bookings)(\/|$)/.test(pathname) ? "legacy-public" : undefined}>
         {children}
       </div>
 
       {/* ── FOOTER ── */}
-      <footer
+      <footer inert={menuOpen}
         className="px-5 md:px-10 lg:px-16 pt-14 pb-10"
         style={{ borderTop: "1px solid var(--border)" }}
       >
@@ -244,7 +253,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
               </span>
             </div>
             <p className="text-[11px] leading-relaxed max-w-[190px]" style={{ color: "var(--dim)" }}>
-              Curating the world's most extraordinary travel experiences since 2011.
+              Thoughtful travel inspiration, refined rooms and a clear path to your next stay.
             </p>
             <div className="flex gap-3 mt-6">
               {["IG", "FB", "TW", "YT"].map((s) => (
@@ -272,8 +281,8 @@ export default function PublicShell({ children }: { children: React.ReactNode })
           </div>
           {[
             { title: "Destinations", links: ["Maldives", "Santorini", "Bali", "Amalfi"] },
-            { title: "Services", links: ["Private Villas", "Yacht Charters", "Concierge", "Transfers"] },
-            { title: "Company", links: ["About Us", "Careers", "Press", "Contact"] },
+            { title: "Your Stay", links: ["Room Collection", "Plan Your Stay", "My Bookings", "My Profile"] },
+            { title: "Discover", links: ["About Us", "Destinations", "Sign In", "Create Account"] },
           ].map((col) => (
             <div key={col.title}>
               <div
@@ -286,7 +295,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
                 {col.links.map((link) => (
                   <li key={link}>
                     <a
-                      href={col.title === "Destinations" ? `/destinations?q=${encodeURIComponent(link)}` : col.title === "Services" ? "/book" : "/about"}
+                      href={col.title === "Destinations" ? `/destinations?q=${encodeURIComponent(link)}` : ({ "Room Collection": "/rooms", "Plan Your Stay": "/book", "My Bookings": "/bookings", "My Profile": "/profile", "About Us": "/about", "Destinations": "/destinations", "Sign In": "/login", "Create Account": "/register" } as Record<string,string>)[link] ?? "/about"}
                       className="text-[11px] transition-colors"
                       style={{ color: "var(--dim)" }}
                       onMouseEnter={(e) =>

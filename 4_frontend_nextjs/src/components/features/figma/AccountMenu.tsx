@@ -8,11 +8,21 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/contexts/LanguageContext';
 
 export function AccountMenu() {
-  const { user, ready, logout } = useAuth();
+  const { user, ready, logout, loggingOut, logoutError } = useAuth();
   const { language, setLanguage } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const menu = useRef<HTMLDetailsElement>(null);
+  async function signOut() {
+    try {
+      await logout();
+      router.push('/');
+      router.refresh();
+      menu.current?.removeAttribute('open');
+    } catch {
+      // Keep the menu open so the provider's error and retry action remain visible.
+    }
+  }
   useEffect(() => { menu.current?.removeAttribute('open'); }, [pathname]);
   return (
     <details ref={menu} className="account-menu relative" onKeyDown={(event) => {
@@ -25,7 +35,8 @@ export function AccountMenu() {
           <Link href="/profile">My profile</Link>
           <Link href="/bookings">My bookings</Link>
           {user.role === 'admin' && <Link href="/admin">Hotel management</Link>}
-          <button onClick={() => { logout(); router.push('/'); router.refresh(); menu.current?.removeAttribute('open'); }}>Sign out</button>
+          <button disabled={loggingOut} onClick={() => void signOut()}>{loggingOut ? 'Signing out…' : 'Sign out'}</button>
+          {logoutError && <p role="alert" className="px-3 py-2">Sign out failed. Please try again.</p>}
         </> : <><Link href="/login">Sign in</Link><Link href="/register">Create account</Link></>}
         <Link href="/checkout">Price quote</Link>
         <button onClick={() => setLanguage(language === 'en' ? 'vi' : 'en')}>Account language: {language.toUpperCase()}</button>

@@ -1,13 +1,13 @@
 ﻿# API integration map
 
-Last inspected: 2026-09-07. Includes newer booking workflow (migration 015) and runtime permissions (016). Existing frontend services remain authoritative. Integration statuses below describe source code, not proof that the Figma migration is connected.
+Last inspected: 2026-09-09. Includes newer booking workflow (migration 015) and runtime permissions (016). Integration statuses describe implemented wiring; TEST_LOG.md separates unit/build evidence from runtime verification.
 
 ## Runtime and common contracts
 
 - Backend: `3_backend_core`, NestJS 11, TypeORM, PostgreSQL. Entrypoints `src/main.ts`, `src/app.module.ts`; global prefix `/api/v1/core`.
 - AI: `2_ai_pricing_service`, FastAPI, scikit-learn/joblib. Entrypoint `app.main:app`; pricing champion `random_forest_v2`, feature contract `2.0.0`.
 - Docker gateway `http://localhost`; core API `http://localhost/api/v1/core`; backend internal `http://backend_core:3000/api/v1/core`; AI internal `http://ai_service:8000`.
-- Browser uses `NEXT_PUBLIC_API_URL` via `services/axiosClient.ts` (a URL constant). Server room service uses `BACKEND_API_URL`, then `NEXT_PUBLIC_API_URL`. Existing fallback uses port 3000; native dev needs deliberate non-conflicting ports. Never expose private AI URLs/secrets in public variables.
+- Browser defaults to `/api/v1/core` via `services/axiosClient.ts`; optional `NEXT_PUBLIC_API_URL` is build-time configuration. Server-only `backend-url.ts` uses `BACKEND_API_URL`, then an absolute public URL, then localhost3000/core. Native Next proxies the relative core path with origin/body/timeout/cookie checks; existing Nginx deployment routes it directly to core. Never expose private AI URLs/secrets in public variables.
 - Source Nginx still proxies `/api/v1/ai/*` publicly. Current frontend only consumes core. Closing this alias needs coordination with operational smoke scripts/README; do not connect new UI directly to it.
 - Typical success: `{status:'success',data:T,request_id}`. Lists often add `count`. Auth success and auth/me differ (below). Response interceptor adds request ID while preserving endpoint shapes.
 - Errors: `{status:'error',statusCode,error,message:string|string[],path,timestamp,request_id}`. `X-Request-ID` header is returned. `core-api.ts` normalizes into `CoreApiError`; domain errors preserve status/tracing. Global validation rejects unknown request keys.
@@ -21,16 +21,16 @@ Paths are relative to `/api/v1/core` unless explicitly AI-internal.
 
 | Feature | Existing frontend service/UI | Backend endpoints | Integration state |
 |---|---|---|---|
-| Room catalog/detail | `room.service.ts`, `/rooms`, `/rooms/[id]` | `GET /rooms`, `/rooms/:typeId` | Existing; Figma adapter pending |
-| Date-specific AI quote | `booking.service.ts:getPriceQuote`, `useDynamicPrice`, checkout | `POST /pricing/quote` | Preserve after UI gate |
+| Room catalog/detail | `room.service.ts`, `/`, `/rooms`, `/rooms/[id]`, `/book` | `GET /rooms`, `/rooms/:typeId` | Connected through validated RoomPresentation adapter |
+| Date-specific AI quote | `booking.service.ts:getPriceQuote`, `useDynamicPrice`, shared `useReservation` | `POST /pricing/quote` | Connected in Book and existing checkout; expiry/outage handling |
 | Quote exposure/rejection | `recordQuoteEvent`, `quote-telemetry.ts` | `POST /pricing/quotes/:quoteId/events` | Preserve confirmed exposure/stable IDs |
-| Create booking | `createBooking`, `CheckoutForm` | `POST /bookings` | Existing; success must handle Pending/Confirmed |
-| History/cancel | `getBookings`, `cancelBooking`, `BookingHistory` | `GET /bookings`, `PATCH /bookings/:bookingId/cancel` | Existing; frontend types lag migration 015 |
+| Create booking | `createBooking`, `useReservation`, Book and Checkout | `POST /bookings` | Connected; actual status/deposit/result and same-key recovery |
+| History/cancel | `getBookings`, `cancelBooking`, `BookingHistory` | `GET /bookings`, `PATCH /bookings/:bookingId/cancel` | Seven lifecycle states; server eligibility and returned cancellation summary |
 | Payment history | `getBookingPayment` | `GET /bookings/:bookingId/payment` | Existing ledger; no online card gateway |
 | Authentication | `auth.service.ts`, `useAuth`, `/login`, `/register` | `POST /auth/register`, `/login`, `/logout`; `GET /auth/me` | Real cookie session; reuse |
 | Customer account | `user.service.ts`, `/profile` | `GET/PATCH /users/me`; `PATCH /users/me/password`; `POST /users/me/deactivate` | Existing |
 | Notifications | No frontend method found | `GET /users/me/notifications`; `PATCH /users/me/notifications/:notificationId/read` | New backend; UI pending |
-| Hotel operations | `admin.service.ts`, `/admin`, `/admin/bookings` | `GET /admin/dashboard`, `/admin/bookings`; `PATCH /admin/bookings/:bookingId/check-in`, `/check-out`, `/complete` | Existing; lifecycle rules changed |
+| Hotel operations | `admin.service.ts`, `/admin`, `/admin/bookings` | `GET /admin/dashboard`, `/admin/bookings`; `PATCH /admin/bookings/:bookingId/check-in`, `/check-out`; `POST /admin/bookings/:bookingId/no-show` | Preserved; seven states, server eligibility and versioned/audited no-show |
 | Room/type management | `admin.service.ts`, `/admin/rooms` | `GET/POST /admin/room-types`, `PATCH/DELETE /admin/room-types/:typeId`; same methods for `/admin/rooms` and `/:roomId` | Existing |
 | Housekeeping/reassignment | `getAdminHousekeeping`, `updateAdminHousekeepingStatus`, `reassignAdminBookingRoom` | `GET /admin/housekeeping`; `PATCH /admin/rooms/:roomId/housekeeping`; `POST /admin/bookings/:bookingId/reassign-room` | Existing deterministic operations |
 | Pricing controls/logs | `admin.service.ts`, `/admin/pricing` | `GET/PATCH /admin/pricing/settings`; `GET /admin/pricing/logs` | Existing |
@@ -61,7 +61,7 @@ Backend has no gallery/destination/area/beds/amenities/description/reviews/ratin
 - Register `{full_name,email,password}`; login `{email,password}`. Email trimmed/lowercased, password 8..72, name 1..150. Both rate limited.
 - Success `{access_token,user,status,request_id}` plus `hotelai_session` cookie: HttpOnly, SameSite=Lax, path `/`, 7 days, Secure via `COOKIE_SECURE`. Browser ignores token payload and uses non-secret `accessToken:'cookie-session'` marker; actual JWT must not enter localStorage.
 - `GET /auth/me` returns user at top level: `{id,full_name,email,phone,nationality,role,account_status,version,status,request_id}`. No data wrapper. Anonymous => 401; inactive account => 403. JWT guard supports Bearer for non-browser use, checks HS256/issuer/audience and current DB account/auth version.
-- Browser authenticated fetch uses `credentials:'include'`. Unsafe cross-origin browser mutations rejected before controller; CORS trusted origins must match frontend. Logout clears cookie. Current frontend logout request swallows network errors: robust sign-out is an integration gap.
+- Browser authenticated fetch uses `credentials:'include'`. Unsafe cross-origin browser mutations rejected before controller or native Next boundary. Logout waits for a successful core acknowledgment before clearing client state; failed logout retains the session and displays a retry error. Known revocation (401/password/deactivation) clears local state directly. Pending/stale session responses are guarded.
 - Roles `customer|admin`; account states `Active|Suspended|Deactivated`. All `/admin/*` requires active authenticated admin.
 - `GET/PATCH /users/me` returns `{status,data:UserProfile,request_id}`; profile adds created_at/updated_at. Patch `{expected_version,full_name?,phone?,nationality?}`, phone/nationality nullable, at least one edit. Stale version => 409.
 - Password `{current_password,new_password}`; deactivate `{password}`. Existing service invalidates session. No reset-password or email-verification endpoint found.
@@ -123,7 +123,7 @@ Confirm/no-show `{expected_version,reason}` + required `Idempotency-Key` => `{re
 
 Notifications are in-app only. List pagination result `{status,count,data,total,unread,limit,offset,request_id}`; row `{notification_id,booking_id,kind,payload:{status,pending_expires_at,deposit_required},created_at,read_at}`. Mark-read `{notification_id,read_at}` for authenticated owner. No email/SMS delivery exists.
 
-Frontend drift at inspection: `types/booking.type.ts` has only four states and lacks guest/policy/expiry/lifecycle fields. `types/room.type.ts` has minimal creation booking and payment_status Unpaid only. Workflow/notification/shadow methods absent. Checkout success/history/admin badges need updating after UI gate.
+Frontend lifecycle drift has been corrected: seven states, guest/policy/deposit/expiry/lifecycle fields and all payment statuses are represented in receipts/history/admin. No-show replaces the deprecated complete action with required version/reason/key. Policy administration, notifications and shadow controls have no new UI in this migration; their existing API gates remain unchanged.
 
 ## Admin operations details
 
@@ -146,6 +146,11 @@ Frontend drift at inspection: `types/booking.type.ts` has only four states and l
 - No AI allocation/occupancy forecasting found across backend controllers and AI routers/services/contracts. Occupancy fields are snapshots; room assignment is SQL.
 
 ## Verification and startup reference
+
+- First-create booking responses now serialize `deposit_required` as a number,
+  matching replay/history and the declared frontend contract. PostgreSQL numeric
+  hydration had returned a string on this one response path; no schema or policy
+  change was needed. Verified by isolated booking and Next integration smoke tests.
 
 - 2026-09-06 backend `npm run build` PASS. AI initial pytest hit Windows temp/cache ACL errors; rerun `.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider --basetemp <new verified workspace temp path>` PASS: 25 tests/16 NumPy-joblib deprecation warnings. These predate migrations 015/016, not validation of those files.
 - 2026-09-06 live read-only gateway health/readiness/rooms/room 1 => 200; anonymous auth/me => 401; AI model ready random_forest_v2. Revalidate runtime after new migrations/backend rebuild.

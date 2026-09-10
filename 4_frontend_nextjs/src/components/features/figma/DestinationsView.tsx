@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { destinations, REGIONS } from "@/data/figma-mock";
+import { destinations, REGIONS } from "@/data/travel-inspiration";
 
 function StarIcon() {
   return (

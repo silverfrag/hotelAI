@@ -2,10 +2,17 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import type { FigmaRoom } from "@/data/figma-mock";
+import type { RoomPresentation } from "@/types/room-presentation.type";
 import { addIsoDays } from "@/utils/businessDate";
+import { formatCurrency } from "@/utils/formatCurrency";
 
 type TabKey = "description" | "features" | "virtual" | "reviews";
+
+function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
 
 /* ── tiny icon set ── */
 function FeatureIcon({ type }: { type: string }) {
@@ -50,27 +57,20 @@ function CheckIcon() {
   );
 }
 
-export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom; businessDate: string }) {
+export default function RoomDetailView({ room, businessDate }: { room: RoomPresentation; businessDate: string }) {
   const galleryDialog = useRef<HTMLDialogElement>(null);
+  const gallery = room.gallery.length > 0 ? room.gallery : [room.img];
   const [activeTab, setActiveTab] = useState<TabKey>("description");
   const [activeGalleryImg, setActiveGalleryImg] = useState(0);
   const [checkIn, setCheckIn] = useState(businessDate);
   const [checkOut, setCheckOut] = useState(addIsoDays(businessDate, 3));
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
-  const [extras, setExtras] = useState<Record<string, boolean>>(
-    Object.fromEntries(room.extraServices.map((s) => [s.id, s.defaultOn]))
-  );
-  const validDates = /^\d{4}-\d{2}-\d{2}$/.test(checkIn) && /^\d{4}-\d{2}-\d{2}$/.test(checkOut) && checkIn >= businessDate && checkOut > checkIn;
+  const validDates = isCalendarDate(checkIn) && isCalendarDate(checkOut) && checkIn >= businessDate && checkOut > checkIn;
   const nights = validDates ? Math.round((new Date(`${checkOut}T00:00:00Z`).getTime() - new Date(`${checkIn}T00:00:00Z`).getTime()) / 86400000) : 0;
   const bookingHref = `/book?${new URLSearchParams({ room_type_id: String(room.id), check_in_date: checkIn, check_out_date: checkOut, guest_count: String(adults + children) })}`;
 
-  const activeExtras = room.extraServices.filter((s) => extras[s.id] && s.price > 0);
-  const extrasTotal = activeExtras.reduce((sum, s) => sum + s.price * nights, 0);
   const roomTotal = room.price * nights;
-  const serviceFee = 100;
-  const discountAmt = Math.round((roomTotal + extrasTotal) * (room.discount / 100));
-  const grandTotal = roomTotal + extrasTotal + serviceFee - discountAmt;
 
   const TABS: { key: TabKey; label: string }[] = [
     { key: "description", label: "Description" },
@@ -82,12 +82,13 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
   return (
     <div className="pt-20" style={{ background: "var(--bg)", color: "var(--fg)" }}>
       <dialog ref={galleryDialog} aria-label={`${room.name} photo gallery`} className="fixed inset-0 m-auto w-[calc(100%_-_2rem)] max-w-5xl max-h-[90vh] p-4 backdrop:bg-black/80" style={{ background: "var(--bg)", color: "var(--fg)", border: "1px solid var(--border-gold)" }} onKeyDown={(event) => {
-        if (event.key === "ArrowLeft") setActiveGalleryImg((value) => (value - 1 + room.gallery.length) % room.gallery.length);
-        if (event.key === "ArrowRight") setActiveGalleryImg((value) => (value + 1) % room.gallery.length);
+        if (event.key === "ArrowLeft") setActiveGalleryImg((value) => (value - 1 + gallery.length) % gallery.length);
+        if (event.key === "ArrowRight") setActiveGalleryImg((value) => (value + 1) % gallery.length);
       }}>
         <div className="flex items-center justify-between mb-4 gap-4"><span className="font-display text-xl">{room.name}</span><button type="button" onClick={() => galleryDialog.current?.close()} aria-label="Close photo gallery" className="px-3 py-2 text-sm" style={{ color: "var(--gold)" }}>Close ×</button></div>
-        <img src={room.gallery[activeGalleryImg] ?? room.img} alt={`${room.name} view ${activeGalleryImg + 1}`} className="w-full max-h-[65vh] object-contain" />
-        <div className="flex items-center justify-between mt-4 text-sm"><button type="button" onClick={() => setActiveGalleryImg((value) => (value - 1 + room.gallery.length) % room.gallery.length)} aria-label="Previous photo" className="px-3 py-2" style={{ color: "var(--gold)" }}>← Previous</button><span aria-live="polite">{activeGalleryImg + 1} / {room.gallery.length}</span><button type="button" onClick={() => setActiveGalleryImg((value) => (value + 1) % room.gallery.length)} aria-label="Next photo" className="px-3 py-2" style={{ color: "var(--gold)" }}>Next →</button></div>
+        <img src={gallery[activeGalleryImg] ?? room.img} alt={`Illustrative photograph ${activeGalleryImg + 1} for ${room.name}`} className="w-full max-h-[65vh] object-contain" />
+        <p className="mt-3 text-[11px]" style={{ color: "var(--muted)" }}>Illustrative photography. Actual room interiors may vary.</p>
+        <div className="flex items-center justify-between mt-4 text-sm"><button type="button" onClick={() => setActiveGalleryImg((value) => (value - 1 + gallery.length) % gallery.length)} aria-label="Previous photo" className="px-3 py-2" style={{ color: "var(--gold)" }}>← Previous</button><span aria-live="polite">{activeGalleryImg + 1} / {gallery.length}</span><button type="button" onClick={() => setActiveGalleryImg((value) => (value + 1) % gallery.length)} aria-label="Next photo" className="px-3 py-2" style={{ color: "var(--gold)" }}>Next →</button></div>
       </dialog>
       {/* ── BACK LINK ── */}
       <div className="px-6 md:px-10 lg:px-16 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
@@ -110,43 +111,41 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
         <div className="flex-1 min-w-0 px-6 md:px-10 lg:px-16 py-8">
 
           {/* ── PHOTO GALLERY ── */}
-          <div className="flex gap-3 mb-8">
+          <div className="flex flex-col sm:flex-row gap-3 mb-3">
             {/* Main large photo */}
             <button
               type="button"
               aria-label={`Enlarge ${room.name} photo ${activeGalleryImg + 1}`}
-              className="overflow-hidden cursor-pointer shrink-0"
-              style={{ width: "52%", borderRadius: "6px" }}
+              className="overflow-hidden cursor-pointer min-w-0 shrink-0 w-full sm:w-[52%]"
+              style={{ borderRadius: "6px" }}
               onClick={() => galleryDialog.current?.showModal()}
             >
               <img
-                src={room.gallery[activeGalleryImg] ?? room.img}
-                alt={room.name}
-                className="w-full h-full object-cover transition-transform duration-500 hover:scale-[1.03]"
-                style={{ minHeight: "320px", maxHeight: "420px" }}
+                src={gallery[activeGalleryImg] ?? room.img}
+                alt={`Illustrative photograph for ${room.name}`}
+                className="w-full h-[260px] sm:h-full sm:min-h-[320px] sm:max-h-[420px] object-cover transition-transform duration-500 hover:scale-[1.03]"
               />
             </button>
 
             {/* 2×2 grid */}
             <div
-              className="flex-1 grid grid-cols-2 gap-3"
+              className="flex-1 min-w-0 grid grid-cols-4 sm:grid-cols-2 gap-3"
               style={{ gridTemplateRows: "1fr 1fr" }}
             >
-              {room.gallery.slice(1, 5).map((img, i) => (
+              {gallery.slice(1, 5).map((img, i) => (
                 <button
                   key={i}
                   type="button"
                   aria-label={i === 3 ? "Open all room photos" : `Show ${room.name} photo ${i + 2}`}
                   aria-pressed={activeGalleryImg === i + 1}
-                  className="overflow-hidden cursor-pointer relative group"
+                  className="overflow-hidden cursor-pointer min-w-0 relative group"
                   style={{ borderRadius: "5px" }}
                   onClick={() => { setActiveGalleryImg(i + 1); if (i === 3) galleryDialog.current?.showModal(); }}
                 >
                   <img
                     src={img}
-                    alt={`${room.name} view ${i + 2}`}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
-                    style={{ minHeight: "130px", maxHeight: "200px" }}
+                    alt={`Illustrative photograph ${i + 2} for ${room.name}`}
+                    className="w-full h-20 sm:h-full sm:min-h-[130px] sm:max-h-[200px] object-cover transition-transform duration-500 group-hover:scale-[1.05]"
                   />
                   {/* show more overlay on last */}
                   {i === 3 && (
@@ -161,6 +160,7 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
               ))}
             </div>
           </div>
+          <p className="text-[10px] mb-8" style={{ color: "var(--muted)" }}>Illustrative photography. Actual room interiors may vary.</p>
 
           {/* ── ROOM TITLE ── */}
           <h1
@@ -169,9 +169,7 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
           >
             {room.name}
           </h1>
-          <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>
-            {room.address} · {room.floor}
-          </p>
+          {(room.address || room.floor) && <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>{[room.address, room.floor].filter(Boolean).join(" · ")}</p>}
 
           {/* category tags */}
           <div className="flex flex-wrap gap-2 mb-7">
@@ -195,7 +193,7 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
               className="text-sm font-medium mb-4 tracking-wide"
               style={{ color: "var(--fg)" }}
             >
-              Hotel Features
+              Room Information
             </h3>
             <div className="flex flex-wrap gap-x-6 gap-y-3">
               {room.featureIcons.map((f) => (
@@ -258,7 +256,7 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
                 className="font-display text-2xl mb-4"
                 style={{ color: "var(--fg)" }}
               >
-                Our Suite
+                Your Room
               </h2>
               <p
                 className="text-sm leading-relaxed mb-6"
@@ -270,7 +268,7 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
                 className="text-sm leading-relaxed"
                 style={{ color: "var(--muted)" }}
               >
-                Every morning begins with curated amenities delivered to your door. Every evening, the room is transformed — bedding turned, surfaces refreshed, and a selection of artisan chocolates placed on your pillow. This is not hospitality. This is an art form.
+                This room type accommodates up to {room.guests} guests. There are {room.totalRooms} rooms in this category, with {room.availableNow} available now. Check your stay dates for a current quote and availability.
               </p>
             </div>
           )}
@@ -281,7 +279,7 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
                 className="font-display text-2xl mb-6"
                 style={{ color: "var(--fg)" }}
               >
-                Room Amenities
+                Room Details
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {room.features_detail.map((feat) => (
@@ -294,6 +292,7 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
                     </span>
                   </div>
                 ))}
+                {room.features_detail.length === 0 && <p className="text-sm" style={{ color: "var(--muted)" }}>Additional room details are not available yet.</p>}
               </div>
             </div>
           )}
@@ -326,7 +325,7 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
                   360° Virtual Tour
                 </span>
                 <span className="text-[10px] tracking-widest uppercase" style={{ color: "var(--dim)" }}>
-                  Coming Soon
+                  No virtual tour is available for this room.
                 </span>
               </div>
             </div>
@@ -334,21 +333,22 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
 
           {activeTab === "reviews" && (
             <div role="tabpanel" id="room-panel-reviews" aria-labelledby="room-tab-reviews" className="max-w-2xl space-y-6">
-              <div className="flex items-center gap-4 mb-8">
+              {room.rating !== null && <div className="flex items-center gap-4 mb-8">
                 <div className="font-display text-5xl" style={{ color: "var(--gold)" }}>
                   {room.rating.toFixed(1)}
                 </div>
                 <div>
                   <div className="flex gap-1 mb-1" style={{ color: "var(--gold)" }}>
                     {[1,2,3,4,5].map((i) => (
-                      <StarFilled key={i} filled={i <= Math.round(room.rating)} />
+                      <StarFilled key={i} filled={i <= Math.round(room.rating ?? 0)} />
                     ))}
                   </div>
                   <div className="text-[10px] tracking-wider uppercase" style={{ color: "var(--muted)" }}>
                     {room.reviews.length} guest review{room.reviews.length !== 1 ? "s" : ""}
                   </div>
                 </div>
-              </div>
+              </div>}
+              {room.reviews.length === 0 && <div className="p-5" style={{ border: "1px solid var(--border)", background: "var(--bg2)" }}><h2 className="font-display text-2xl mb-3" style={{ color: "var(--fg)" }}>Guest Reviews</h2><p className="text-sm" style={{ color: "var(--muted)" }}>Guest reviews are not available for this room type yet.</p></div>}
               {room.reviews.map((rev, i) => (
                 <div
                   key={i}
@@ -396,21 +396,21 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
           <div className="lg:sticky lg:top-[64px] lg:max-h-[calc(100vh-64px)] lg:overflow-y-auto" style={{ scrollbarWidth: "none" }}>
             <div className="p-6 space-y-5">
 
-              {/* price + discount badge */}
-              <div className="flex items-baseline justify-between">
+              {/* Base price */}
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div>
-                  <span className="font-display text-4xl" style={{ color: "var(--fg)" }}>
-                    ${room.price}
+                  <span className="font-display text-3xl" style={{ color: "var(--fg)" }}>
+                    {formatCurrency(room.price, room.currency)}
                   </span>
                   <span className="text-sm ml-2" style={{ color: "var(--muted)" }}>
-                    / Night
+                    / night
                   </span>
                 </div>
                 <span
                   className="text-[10px] tracking-[0.12em] uppercase px-3 py-1.5 rounded-full font-medium"
                   style={{ background: "var(--gold)", color: "var(--bg)" }}
                 >
-                  {room.discount}% OFF
+                  Base price
                 </span>
               </div>
 
@@ -433,7 +433,7 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
                   min={businessDate}
                   aria-invalid={!validDates}
                   value={checkIn}
-                  onChange={(e) => { const value = e.target.value; setCheckIn(value); if (value && value >= checkOut) setCheckOut(addIsoDays(value, 1)); }}
+                  onChange={(e) => { const value = e.target.value; setCheckIn(value); if (isCalendarDate(value) && value >= checkOut) setCheckOut(addIsoDays(value, 1)); }}
                   className="bg-transparent text-[11px] outline-none text-right"
                   style={{ color: "var(--fg)" }}
                 />
@@ -453,7 +453,7 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
                 <input
                   type="date"
                   aria-label="Check-out date"
-                  min={checkIn ? addIsoDays(checkIn, 1) : addIsoDays(businessDate, 1)}
+                  min={isCalendarDate(checkIn) ? addIsoDays(checkIn, 1) : addIsoDays(businessDate, 1)}
                   aria-invalid={!validDates}
                   value={checkOut}
                   onChange={(e) => setCheckOut(e.target.value)}
@@ -515,84 +515,27 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
                 <h4 className="text-[11px] font-medium tracking-[0.1em] uppercase mb-3" style={{ color: "var(--fg)" }}>
                   Extra Service
                 </h4>
-                <div className="space-y-3">
-                  {room.extraServices.map((svc) => (
-                    <label
-                      key={svc.id}
-                      className="flex items-center justify-between gap-3 cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3">
-                        {/* checkbox */}
-                        <span className="relative w-4 h-4 shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={extras[svc.id] ?? false}
-                          onChange={(event) => setExtras((current) => ({ ...current, [svc.id]: event.target.checked }))}
-                          className="appearance-none w-4 h-4 block cursor-pointer transition-all duration-200"
-                          style={{
-                            border: `1.5px solid ${extras[svc.id] ? "var(--gold)" : "var(--border-gold)"}`,
-                            background: extras[svc.id] ? "var(--gold)" : "transparent",
-                            color: "var(--bg)",
-                            borderRadius: "2px",
-                          }}
-                        />
-                          {extras[svc.id] && <span className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ color: "var(--bg)" }}><CheckIcon /></span>}
-                        </span>
-                        <span className="text-[11px]" style={{ color: extras[svc.id] ? "var(--fg)" : "var(--muted)" }}>
-                          {svc.label}
-                        </span>
-                      </div>
-                      <span className="text-[11px] shrink-0" style={{ color: svc.price === 0 ? "var(--muted)" : "var(--fg)" }}>
-                        {svc.price === 0
-                          ? `$0/${svc.unit}`
-                          : `$${svc.price}/${svc.unit}`}
-                        {svc.price > 0 && (
-                          <span style={{ color: "var(--dim)" }}> ↓</span>
-                        )}
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                <p className="text-[11px] leading-relaxed" style={{ color: "var(--muted)" }}>
+                  Additional services are not available for online booking.
+                </p>
               </div>
 
-              {/* Price breakdown */}
-              <div
-                className="p-4 space-y-2"
-                style={{
-                  background: "var(--bg3)",
-                  border: "1px solid var(--border)",
-                }}
-              >
-                <div className="flex justify-between text-[11px]">
-                  <span style={{ color: "var(--muted)" }}>{nights} Night{nights > 1 ? "s" : ""}</span>
-                  <span style={{ color: "var(--fg)" }}>${roomTotal.toLocaleString()}</span>
+              {/* Base-price estimate */}
+              <div className="p-4 space-y-3" style={{ background: "var(--bg3)", border: "1px solid var(--border)" }}>
+                <div className="flex justify-between gap-3 text-[11px]">
+                  <span style={{ color: "var(--muted)" }}>Base price / night</span>
+                  <span style={{ color: "var(--fg)" }}>{formatCurrency(room.price, room.currency)}</span>
                 </div>
-                {activeExtras.map((svc) => (
-                  <div key={svc.id} className="flex justify-between text-[11px]">
-                    <span style={{ color: "var(--muted)" }}>{svc.label}</span>
-                    <span style={{ color: "var(--fg)" }}>${(svc.price * nights).toLocaleString()}</span>
-                  </div>
-                ))}
-                <div className="flex justify-between text-[11px]">
-                  <span style={{ color: "var(--muted)" }}>Service fee</span>
-                  <span style={{ color: "var(--fg)" }}>${serviceFee}</span>
-                </div>
-                <div className="flex justify-between text-[11px]">
-                  <span style={{ color: "var(--muted)" }}>Discount</span>
-                  <span style={{ color: "var(--gold)" }}>{room.discount}%</span>
+                <div className="flex justify-between gap-3 text-[11px]">
+                  <span style={{ color: "var(--muted)" }}>Duration</span>
+                  <span style={{ color: "var(--fg)" }}>{validDates ? `${nights} night${nights === 1 ? "" : "s"}` : "Choose valid dates"}</span>
                 </div>
               </div>
-
-              {/* Total */}
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm font-medium" style={{ color: "var(--fg)" }}>
-                  Total Cost:
-                </span>
-                <span className="font-display text-3xl" style={{ color: "var(--fg)" }}>
-                  ${grandTotal.toLocaleString()}
-                </span>
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <span className="text-sm font-medium" style={{ color: "var(--fg)" }}>Base-price estimate</span>
+                <span className="font-display text-2xl" style={{ color: "var(--fg)" }}>{validDates ? formatCurrency(roomTotal, room.currency) : "—"}</span>
               </div>
-
+              <p className="text-[11px] leading-relaxed" style={{ color: "var(--muted)" }}>Your final price and available rooms depend on your stay dates. This estimate does not reserve a room or guarantee a price.</p>
               <div className="h-px" style={{ background: "var(--border)" }} />
 
               {/* Payment */}
@@ -602,7 +545,7 @@ export default function RoomDetailView({ room, businessDate }: { room: FigmaRoom
                   Payment is arranged after your reservation is confirmed. Continue to review your stay and guest details.
                 </div>
                 {!validDates && <p role="alert" className="text-[11px] mt-4" style={{ color: "var(--gold)" }}>Choose valid stay dates. Check-in must be on or after {businessDate}, and check-out must follow check-in.</p>}
-                <Link href={bookingHref} aria-disabled={!validDates} onClick={(event) => { if (!validDates) event.preventDefault(); }} className="block text-center w-full mt-5 py-3.5 text-[11px] tracking-[0.18em] uppercase font-medium transition-all duration-200" style={{ background: validDates ? "var(--gold)" : "var(--border-gold)", color: validDates ? "var(--bg)" : "var(--dim)", cursor: validDates ? "pointer" : "not-allowed" }}>Continue Reservation</Link>
+                <Link href={bookingHref} aria-disabled={!validDates} onClick={(event) => { if (!validDates) event.preventDefault(); }} className="block text-center w-full mt-5 py-3.5 text-[11px] tracking-[0.18em] uppercase font-medium transition-all duration-200" style={{ background: validDates ? "var(--gold)" : "var(--border-gold)", color: validDates ? "var(--bg)" : "var(--dim)", cursor: validDates ? "pointer" : "not-allowed" }}>Check final price and availability</Link>
               </div>
             </div>
           </div>

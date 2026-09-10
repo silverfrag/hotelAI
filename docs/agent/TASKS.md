@@ -26,15 +26,17 @@
 - [x] Production build and FIGMA_UI_MIGRATION_COMPLETE checkpoint.
 
 # Phases 9–13 — Real integration
-- [ ] Rooms list/detail use backend adapters and correct loading/error/empty states.
-- [ ] Booking uses existing quote/auth/booking API and actual confirmation.
-- [ ] Authentication/profile/history preserved and verified.
-- [ ] Relevant hotel management preserved and verified.
-- [ ] Pricing and unavailable handling verified through backend/AI.
-- [ ] Determine allocation/forecast support; document actual capability.
+- [x] Rooms list/detail use backend adapters; boundary/SSR/invalid-room checks pass.
+- [x] Booking uses existing quote/auth/booking API; live HTTP replay/cancel tests pass.
+- [x] Authentication/profile/history preserved; unit and live HTTP checks pass.
+- [x] Relevant hotel management preserved; lifecycle UI unit and backend admin suites pass.
+- [x] Pricing and unavailable handling verified through backend/AI and real-hook tests.
+- [x] Determine allocation/forecast support; document actual capability.
 
 # Final verification
-- [ ] Production build and relevant runtime tests pass.
-- [ ] Remove transactional mocks, misleading unsupported payment/extra claims.
-- [ ] Review secrets/environment and Git status.
+- [x] Production build and unit/backend/Next HTTP integration tests pass.
+- [x] Final browser booking/history/profile-read/mobile width and AI-outage/recovery checks.
+- [ ] Manual browser cancellation/profile-save/logout: IAB native confirmation stalled; API/unit coverage passed (see TEST_LOG).
+- [x] Remove transactional mocks, misleading unsupported payment/extra claims.
+- [x] Review secrets/environment and Git status.
 - [ ] Update runbook, all memory files, final meaningful checkpoint.
