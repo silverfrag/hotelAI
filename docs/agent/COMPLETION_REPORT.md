@@ -1,8 +1,8 @@
 # Completion Report
 
 Updated: 2026-09-10. The Figma migration and real backend/AI pricing integration
-are implemented and build successfully. The integration Git checkpoint is being
-completed; the evidence below distinguishes completed checks from browser-tool
+are implemented and build successfully. Integration checkpoint `1c1bcd4` is saved;
+the evidence below distinguishes completed checks from browser-tool
 verification limits. This is a development handoff, not a claim that
 the existing live deployment has been upgraded.
 
@@ -301,13 +301,18 @@ docker compose -f 1_infrastructure/operations/compose.test.yml stop
 - Branch: `v0/hotel-management-dashboard-513c8baf`.
 - Discovery checkpoint: `676e677 chore(agent): record migration architecture and baseline`.
 - Verified UI checkpoint: `76523f9 feat(frontend): migrate Figma public experience to App Router`.
-- Final integration checkpoint: pending the root task's reviewed commit; update
-  this entry and `STATE.md` when it is created.
+- Final integration checkpoint: `1c1bcd4 feat(frontend): connect Figma booking flow to core and AI pricing`.
+- The containing documentation handoff commit records this verified checkpoint;
+  run `git log -1 --oneline` for the latest documentation commit hash.
 
 The preexisting Git diff/status and frontend source snapshot are preserved
 privately under `E:\hotelAI\.git\agent-checkpoints\2026-09-06-figma`. Remaining
 unrelated work was not discarded or swept into task commits. Preserve that work
 alongside the migration checkpoints when transferring the complete workspace.
+The same private directory contains `frontend-final-20260910.zip` (124 frontend
+source/assets files), the final touched backend service and precommit status.
+The integration commit explicitly stages 61 changed paths; preserved earlier
+code within touched files is included, while unrelated files remain unstaged.
 The exact active runtime and next action belong in
 [STATE.md](E:/hotelAI/docs/agent/STATE.md); detailed restart and verification
 instructions are in [RUNBOOK.md](E:/hotelAI/docs/agent/RUNBOOK.md).

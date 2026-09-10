@@ -39,4 +39,4 @@
 - [ ] Manual browser cancellation/profile-save/logout: IAB native confirmation stalled; API/unit coverage passed (see TEST_LOG).
 - [x] Remove transactional mocks, misleading unsupported payment/extra claims.
 - [x] Review secrets/environment and Git status.
-- [ ] Update runbook, all memory files, final meaningful checkpoint.
+- [x] Update runbook, all memory files, completion report and final integration checkpoint 1c1bcd4.

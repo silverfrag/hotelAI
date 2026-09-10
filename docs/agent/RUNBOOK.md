@@ -116,6 +116,11 @@ sweep that work into a commit. A private baseline source archive, Git diff and
 status are retained under `.git/agent-checkpoints/2026-09-06-figma/`.
 Use the current workspace or preserve its remaining changes before expecting
 a fresh clone of only the migration checkpoints to reproduce the full app.
+The integration checkpoint is `1c1bcd4`; a final 124-file frontend source archive
+and the touched backend service are saved beside the baseline. The explicit
+checkpoint contains preserved earlier code inside touched files, while unrelated
+remaining backend/AI/infrastructure work was not staged. The completed report
+and final manual browser-verification limits are in `COMPLETION_REPORT.md`.
 
 From `4_frontend_nextjs`, the repeatable frontend verification commands are:
 

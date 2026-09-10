@@ -2,9 +2,9 @@
 
 Last updated: 2026-09-10
 Current branch: v0/hotel-management-dashboard-513c8baf
-Latest safe commit: 76523f9 feat(frontend): migrate Figma public experience to App Router
-Current phase: Implementation and verification complete; final checkpoint
-Status: CHECKPOINT_PENDING
+Latest implementation checkpoint: 1c1bcd4 feat(frontend): connect Figma booking flow to core and AI pricing
+Current phase: Development handoff complete
+Status: IMPLEMENTED_WITH_DOCUMENTED_BROWSER_VERIFICATION_LIMIT
 
 ## Scope and architecture
 
@@ -82,6 +82,13 @@ service. Some touched files include preserved earlier work. Unrelated changes
 remain uncommitted; a fresh clone of migration commits alone does not contain
 this entire app. See RUNBOOK.md for startup and preservation instructions.
 
+Final integration checkpoint 1c1bcd4 contains 61 intentional changed paths.
+Final private frontend archive: frontend-final-20260910.zip, 124 files,
+SHA256 5C16BFDFDF6914EC63285C7F59B3EE013E757BB13BD1B97B7D888460FB471891.
+The touched backend service and precommit status are saved beside it. The
+containing documentation handoff commit records this checkpoint and the remaining
+manual verification; use git log -1 for its own hash.
+
 ## Known product limits
 
 No online card gateway, AI room allocation or occupancy forecast API exists.
@@ -93,10 +100,9 @@ existing Google Fonts. No production deployment was performed.
 
 ## Next exact actions
 
-1. Create final explicit source checkpoint and record its hash here.
-2. On resume, read STATE, TEST_LOG and RUNBOOK and verify runtime health. Only
+1. On resume, read STATE, TEST_LOG and RUNBOOK and verify runtime health. Only
    outstanding verification: manual browser cancellation/profile-save/logout
    after closing the stuck in-app browser session. Do not repeat all mutation
    suites or alter the live database for this.
-3. Additional content/provider/AI features or production release need their real
+2. Additional content/provider/AI features or production release need their real
    configuration and existing release procedure; do not fabricate them.
