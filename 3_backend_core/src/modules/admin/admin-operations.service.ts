@@ -5,6 +5,14 @@ import { BookingWorkflowService } from '../booking-workflow/booking-workflow.ser
 import { OutboxService } from '../../infrastructure/outbox.service';
 import { AdminPricingService, PricingSettingView } from './admin-pricing.service';
 import { AdminBookingsQueryDto, AdminBookingStatus } from './dto/admin-bookings.dto';
+import {
+  TapeChartBookingSlot,
+  TapeChartDayColumn,
+  TapeChartMetrics,
+  TapeChartQueryDto,
+  TapeChartRoomRow,
+  TapeChartView,
+} from './dto/tape-chart.dto';
 
 export type AdminBookingView = {
   booking_id: string;
@@ -808,6 +816,216 @@ export class AdminOperationsService {
     return result.length;
   }
 
+  async getTapeChart(query: TapeChartQueryDto): Promise<TapeChartView> {
+    const businessDate = this.getBusinessDate();
+    const startDate = query.startDate || businessDate;
+    const days = query.days || 14;
+
+    const timeline: TapeChartDayColumn[] = [];
+    for (let i = 0; i < days; i++) {
+      const date = this.addDays(startDate, i);
+      const dayOfWeek = this.getDayOfWeek(date);
+      timeline.push({
+        date,
+        dayOfWeek,
+        isToday: date === businessDate,
+        isWeekend: dayOfWeek === 'CN' || dayOfWeek === 'T7',
+      });
+    }
+
+    const endDateExclusive = this.addDays(startDate, days);
+    const endDate = timeline[timeline.length - 1].date;
+
+    const roomParams: unknown[] = [];
+    let roomWhere = 'WHERE 1=1';
+    if (query.roomTypeId) {
+      roomParams.push(query.roomTypeId);
+      roomWhere += ` AND room.type_id = $${roomParams.length}`;
+    }
+    if (query.floor) {
+      roomParams.push(query.floor);
+      roomWhere += ` AND (CASE WHEN room.room_number ~ '^[0-9]+$' AND length(room.room_number) >= 3 THEN SUBSTRING(room.room_number FROM 1 FOR length(room.room_number) - 2)::int ELSE 1 END) = $${roomParams.length}`;
+    }
+
+    const roomRows = await this.dataSource.query(
+      `SELECT room.room_id,
+              room.room_number,
+              (CASE WHEN room.room_number ~ '^[0-9]+$' AND length(room.room_number) >= 3 THEN SUBSTRING(room.room_number FROM 1 FOR length(room.room_number) - 2)::int ELSE 1 END) AS floor,
+              room.type_id AS room_type_id,
+              room_type.name AS room_type_name,
+              room_type.base_price,
+              room.current_status,
+              room.housekeeping_status,
+              room.housekeeping_version,
+              room.occupancy_booking_id
+       FROM rooms room
+       INNER JOIN room_types room_type ON room_type.type_id = room.type_id
+       ${roomWhere}
+       ORDER BY (CASE WHEN room.room_number ~ '^[0-9]+$' AND length(room.room_number) >= 3 THEN SUBSTRING(room.room_number FROM 1 FOR length(room.room_number) - 2)::int ELSE 1 END) ASC, room.room_number ASC`,
+      roomParams,
+    );
+
+
+    const bookingRows = await this.dataSource.query(
+      `SELECT booking.booking_id,
+              booking.customer_id,
+              customer.full_name AS customer_name,
+              customer.phone AS customer_phone,
+              customer.email AS customer_email,
+              booking.status,
+              booking.check_in_date::text AS check_in_date,
+              booking.check_out_date::text AS check_out_date,
+              (booking.check_out_date - booking.check_in_date) AS nights,
+              detail.applied_price,
+              detail.room_id,
+              detail.room_assignment_version,
+              (booking.status = 'Confirmed' 
+                AND booking.check_in_date <= $3::date 
+                AND booking.check_out_date > $3::date 
+                AND room.housekeeping_status = 'Ready' 
+                AND room.current_status = 'Available' 
+                AND room.occupancy_booking_id IS NULL) AS can_check_in,
+              (booking.status = 'CheckedIn') AS can_check_out
+       FROM bookings booking
+       INNER JOIN customers customer ON customer.customer_id = booking.customer_id
+       INNER JOIN booking_details detail ON detail.booking_id = booking.booking_id
+       INNER JOIN rooms room ON room.room_id = detail.room_id
+       WHERE booking.status IN ('Confirmed', 'CheckedIn', 'Completed')
+         AND booking.check_in_date < $2::date
+         AND booking.check_out_date > $1::date
+       ORDER BY booking.check_in_date ASC`,
+      [startDate, endDateExclusive, businessDate],
+    );
+
+
+    const bookingsByRoom = new Map<number, Array<Record<string, unknown>>>();
+    for (const row of bookingRows) {
+      const rId = Number(row.room_id);
+      if (!bookingsByRoom.has(rId)) {
+        bookingsByRoom.set(rId, []);
+      }
+      bookingsByRoom.get(rId)!.push(row);
+    }
+
+    const rooms: TapeChartRoomRow[] = roomRows.map((room: Record<string, unknown>) => {
+      const rId = Number(room.room_id);
+      const roomBookings = bookingsByRoom.get(rId) || [];
+      const slots: Record<string, TapeChartBookingSlot | null> = {};
+
+      for (const day of timeline) {
+        const d = day.date;
+        const activeBooking = roomBookings.find(
+          (b) => String(b.check_in_date) <= d && String(b.check_out_date) > d,
+        );
+
+        if (activeBooking) {
+          const isStart = d === String(activeBooking.check_in_date);
+          const isEnd = d === this.addDays(String(activeBooking.check_out_date), -1);
+          slots[d] = {
+            bookingId: String(activeBooking.booking_id),
+            customerId: String(activeBooking.customer_id),
+            customerName: String(activeBooking.customer_name),
+            customerPhone: String(activeBooking.customer_phone || ''),
+            customerEmail: String(activeBooking.customer_email || ''),
+            status: activeBooking.status as AdminBookingStatus,
+            checkInDate: String(activeBooking.check_in_date),
+            checkOutDate: String(activeBooking.check_out_date),
+            nights: Number(activeBooking.nights),
+            appliedPrice: Number(activeBooking.applied_price),
+            isStart,
+            isEnd,
+            isSpan: true,
+            roomAssignmentVersion: Number(activeBooking.room_assignment_version),
+            canCheckIn: Boolean(activeBooking.can_check_in),
+            canCheckOut: Boolean(activeBooking.can_check_out),
+          };
+        } else {
+          slots[d] = null;
+        }
+      }
+
+      return {
+        roomId: rId,
+        roomNumber: String(room.room_number),
+        floor: Number(room.floor),
+        roomTypeId: Number(room.room_type_id),
+        roomTypeName: String(room.room_type_name),
+        basePrice: Number(room.base_price),
+        currentStatus: room.current_status as 'Available' | 'Occupied' | 'Maintenance',
+        housekeepingStatus: room.housekeeping_status as 'Ready' | 'Dirty' | 'Cleaning' | 'Inspected' | 'Maintenance',
+        housekeepingVersion: Number(room.housekeeping_version),
+        occupancyBookingId: room.occupancy_booking_id ? String(room.occupancy_booking_id) : null,
+        slots,
+      };
+    });
+
+    let occupiedRoomsToday = 0;
+    let readyRooms = 0;
+    let dirtyRooms = 0;
+    let cleaningRooms = 0;
+    let maintenanceRooms = 0;
+
+    for (const r of roomRows) {
+      if (r.current_status === 'Occupied' || r.occupancy_booking_id) {
+        occupiedRoomsToday++;
+      }
+      if (r.housekeeping_status === 'Ready') readyRooms++;
+      else if (r.housekeeping_status === 'Dirty') dirtyRooms++;
+      else if (r.housekeeping_status === 'Cleaning') cleaningRooms++;
+      else if (r.housekeeping_status === 'Maintenance' || r.current_status === 'Maintenance') maintenanceRooms++;
+    }
+
+    let arrivalsToday = 0;
+    let departuresToday = 0;
+    for (const b of bookingRows) {
+      if (b.check_in_date === businessDate && b.status === 'Confirmed') {
+        arrivalsToday++;
+      }
+      if (b.check_out_date === businessDate && (b.status === 'CheckedIn' || b.status === 'Completed')) {
+        departuresToday++;
+      }
+    }
+
+    const totalRooms = roomRows.length;
+    const occupancyRateToday = totalRooms > 0 ? Math.round((occupiedRoomsToday / totalRooms) * 100) : 0;
+
+    const metrics: TapeChartMetrics = {
+      totalRooms,
+      occupiedRoomsToday,
+      occupancyRateToday,
+      arrivalsToday,
+      departuresToday,
+      readyRooms,
+      dirtyRooms,
+      cleaningRooms,
+      maintenanceRooms,
+    };
+
+    return {
+      businessDate,
+      startDate,
+      endDate,
+      days,
+      timeline,
+      metrics,
+      rooms,
+    };
+  }
+
+  private addDays(dateStr: string, days: number): string {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(Date.UTC(y, m - 1, d));
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  }
+
+  private getDayOfWeek(dateStr: string): string {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(Date.UTC(y, m - 1, d));
+    const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    return days[date.getUTCDay()];
+  }
+
   private getTimezone(): string {
     return this.configService.get<string>('HOTEL_TIMEZONE', 'Asia/Bangkok');
   }
@@ -823,3 +1041,4 @@ export class AdminOperationsService {
     return `${values.year}-${values.month}-${values.day}`;
   }
 }
+

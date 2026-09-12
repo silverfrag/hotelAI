@@ -6,6 +6,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { AdminOperationsService } from './admin-operations.service';
 import { AdminBookingsQueryDto } from './dto/admin-bookings.dto';
 import { AdminDashboardQueryDto } from './dto/admin-dashboard.dto';
+import { TapeChartQueryDto } from './dto/tape-chart.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -13,8 +14,17 @@ import { AdminDashboardQueryDto } from './dto/admin-dashboard.dto';
 export class AdminOperationsController {
   constructor(private readonly adminOperations: AdminOperationsService) {}
 
+  @Get('tape-chart')
+  async getTapeChart(@Query() query: TapeChartQueryDto) {
+    return {
+      status: 'success',
+      data: await this.adminOperations.getTapeChart(query),
+    };
+  }
+
   @Get('dashboard')
   async getDashboard(@Query() query: AdminDashboardQueryDto) {
+
     return {
       status: 'success',
       data: await this.adminOperations.getDashboard(query.months),

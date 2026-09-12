@@ -38,9 +38,11 @@ import type {
   RefundPaymentInput,
   RoomTypeInput,
   SmartUpgradeRecommendation,
+  TapeChartView,
   UpdateHousekeepingStatusInput,
   UpdateRoomInput,
 } from '@/types/admin.type';
+
 import type { BookingFinancialStatus, BookingPaymentSummary, BookingSummary, PaymentMethod, PaymentTransactionType } from '@/types/booking.type';
 import type { User } from '@/types/user.type';
 
@@ -259,6 +261,23 @@ export async function executeAdminUpgrade(
   );
   return response.data;
 }
+
+export async function getAdminTapeChart(
+  accessToken: string,
+  params?: { startDate?: string; days?: number; roomTypeId?: number; floor?: number },
+): Promise<TapeChartView> {
+  const search = new URLSearchParams();
+  if (params?.startDate) search.set('startDate', params.startDate);
+  if (params?.days) search.set('days', String(params.days));
+  if (params?.roomTypeId) search.set('roomTypeId', String(params.roomTypeId));
+  if (params?.floor) search.set('floor', String(params.floor));
+
+  const queryStr = search.toString();
+  const path = `/tape-chart${queryStr ? `?${queryStr}` : ''}`;
+  const response = await adminRequest<DataResponse<TapeChartView>>(path, accessToken);
+  return response.data;
+}
+
 
 export async function getAdminRoomTypes(accessToken: string): Promise<AdminRoomType[]> {
   const response = await adminRequest<ListResponse<AdminRoomType>>('/room-types', accessToken);

@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { BedDouble, CalendarCheck2, HandCoins, LayoutDashboard, LineChart, Sparkles, UsersRound } from 'lucide-react';
+import { BedDouble, CalendarCheck2, CalendarDays, HandCoins, LayoutDashboard, LineChart, Sparkles, UsersRound } from 'lucide-react';
 
 export interface AdminNavItem {
   label: string;
@@ -22,6 +22,7 @@ export const adminNav: AdminNavSection[] = [
   {
     heading: 'Vận hành',
     items: [
+      { label: 'Sơ đồ phòng (Rack)', href: '/admin/tape-chart', icon: CalendarDays, badge: 'Live' },
       { label: 'Bookings', href: '/admin/bookings', icon: CalendarCheck2 },
       { label: 'Thanh toán', href: '/admin/payments', icon: HandCoins },
       { label: 'Phòng', href: '/admin/rooms', icon: BedDouble },
@@ -29,6 +30,7 @@ export const adminNav: AdminNavSection[] = [
       { label: 'Người dùng', href: '/admin/users', icon: UsersRound },
     ],
   },
+
   {
     heading: 'Định giá',
     items: [{ label: 'AI Pricing', href: '/admin/pricing', icon: LineChart }],
