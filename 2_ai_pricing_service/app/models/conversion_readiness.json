@@ -1,0 +1,324 @@
+{
+  "artifact_path": "E:\\hotelAI\\2_ai_pricing_service\\app\\models\\conversion_challenger_v1.pkl",
+  "causality_warning": "This model learns observational conversion associations. Its offered-price coefficient is not a causal price-elasticity estimate and must not be used for autonomous price optimization without a controlled experiment.",
+  "created_at_utc": "2026-09-10T17:54:55.618723+00:00",
+  "data_quality": {
+    "checks": {
+      "minimum_eligible_rows": true,
+      "minimum_exposure_days": true,
+      "minimum_negative_labels": true,
+      "minimum_positive_labels": true,
+      "no_duplicate_quotes": true,
+      "no_invalid_feature_rows": true
+    },
+    "confirmed_exposure_rows": 3027,
+    "disposition_conflict_rows": 0,
+    "distinct_exposure_days": 66,
+    "duplicate_quote_rows": 0,
+    "eligible_rows": 3027,
+    "filter": "exposure_confirmed = true AND acceptance_label IS NOT NULL AND inventory_snapshot_consistent = true AND has_disposition_conflict = false AND quote_id is unique",
+    "generated_proxy_or_unconfirmed_rows": 7,
+    "invalid_feature_rows": 0,
+    "missing_or_inconsistent_inventory_rows": 0,
+    "missing_or_invalid_date_rows": 0,
+    "negative_labels": 1777,
+    "open_or_unmatured_label_rows": 0,
+    "passes_readiness_gate": true,
+    "positive_labels": 1250,
+    "room_type_counts": {
+      "Deluxe King": {
+        "negative": 225,
+        "positive": 181,
+        "rows": 406
+      },
+      "Executive Ocean Suite": {
+        "negative": 218,
+        "positive": 148,
+        "rows": 366
+      },
+      "Family Suite": {
+        "negative": 251,
+        "positive": 163,
+        "rows": 414
+      },
+      "Panoramic Sunrise Suite": {
+        "negative": 207,
+        "positive": 182,
+        "rows": 389
+      },
+      "Premier Twin Retreat": {
+        "negative": 169,
+        "positive": 205,
+        "rows": 374
+      },
+      "Presidential Beachfront Villa": {
+        "negative": 228,
+        "positive": 102,
+        "rows": 330
+      },
+      "Royal Penthouse Suite": {
+        "negative": 275,
+        "positive": 129,
+        "rows": 404
+      },
+      "Wellness & Spa Villa": {
+        "negative": 204,
+        "positive": 140,
+        "rows": 344
+      }
+    },
+    "source_rows": 3034,
+    "status": "ready",
+    "thresholds": {
+      "minimum_eligible_rows": 2000,
+      "minimum_exposure_days": 28,
+      "minimum_negative_labels": 200,
+      "minimum_positive_labels": 200
+    }
+  },
+  "evaluation": {
+    "baseline": {
+      "brier_score": 0.242639,
+      "log_loss": 0.678353,
+      "probability": 0.412639,
+      "strategy": "constant training-partition conversion rate"
+    },
+    "brier_score_improvement": 0.028212,
+    "candidate": {
+      "brier_score": 0.214427,
+      "calibration": [
+        {
+          "bin": 0,
+          "mean_predicted_probability": 0.038784,
+          "observed_conversion_rate": 0.0,
+          "rows": 9
+        },
+        {
+          "bin": 1,
+          "mean_predicted_probability": 0.152187,
+          "observed_conversion_rate": 0.04,
+          "rows": 25
+        },
+        {
+          "bin": 2,
+          "mean_predicted_probability": 0.257708,
+          "observed_conversion_rate": 0.225352,
+          "rows": 71
+        },
+        {
+          "bin": 3,
+          "mean_predicted_probability": 0.34986,
+          "observed_conversion_rate": 0.252874,
+          "rows": 87
+        },
+        {
+          "bin": 4,
+          "mean_predicted_probability": 0.448035,
+          "observed_conversion_rate": 0.404959,
+          "rows": 121
+        },
+        {
+          "bin": 5,
+          "mean_predicted_probability": 0.550764,
+          "observed_conversion_rate": 0.433628,
+          "rows": 113
+        },
+        {
+          "bin": 6,
+          "mean_predicted_probability": 0.647559,
+          "observed_conversion_rate": 0.53125,
+          "rows": 96
+        },
+        {
+          "bin": 7,
+          "mean_predicted_probability": 0.7427,
+          "observed_conversion_rate": 0.766667,
+          "rows": 60
+        },
+        {
+          "bin": 8,
+          "mean_predicted_probability": 0.832772,
+          "observed_conversion_rate": 0.708333,
+          "rows": 24
+        }
+      ],
+      "log_loss": 0.615219,
+      "pr_auc": 0.638936,
+      "roc_auc": 0.715706,
+      "slices": {
+        "by_price_band": {
+          "(0.799, 0.994]": {
+            "brier_score": 0.21798,
+            "log_loss": 0.61949,
+            "positive_labels": 88,
+            "rows": 155
+          },
+          "(0.994, 1.081]": {
+            "brier_score": 0.239607,
+            "log_loss": 0.671446,
+            "positive_labels": 68,
+            "rows": 148
+          },
+          "(1.081, 1.185]": {
+            "brier_score": 0.225144,
+            "log_loss": 0.642212,
+            "positive_labels": 56,
+            "rows": 151
+          },
+          "(1.185, 1.58]": {
+            "brier_score": 0.17564,
+            "log_loss": 0.529303,
+            "positive_labels": 39,
+            "rows": 152
+          }
+        },
+        "by_room_type": {
+          "Deluxe King": {
+            "brier_score": 0.204579,
+            "log_loss": 0.593866,
+            "positive_labels": 33,
+            "rows": 79
+          },
+          "Executive Ocean Suite": {
+            "brier_score": 0.228252,
+            "log_loss": 0.646454,
+            "positive_labels": 30,
+            "rows": 65
+          },
+          "Family Suite": {
+            "brier_score": 0.193904,
+            "log_loss": 0.562012,
+            "positive_labels": 27,
+            "rows": 80
+          },
+          "Panoramic Sunrise Suite": {
+            "brier_score": 0.262957,
+            "log_loss": 0.722967,
+            "positive_labels": 36,
+            "rows": 72
+          },
+          "Premier Twin Retreat": {
+            "brier_score": 0.216898,
+            "log_loss": 0.621622,
+            "positive_labels": 52,
+            "rows": 88
+          },
+          "Presidential Beachfront Villa": {
+            "brier_score": 0.202801,
+            "log_loss": 0.59257,
+            "positive_labels": 18,
+            "rows": 61
+          },
+          "Royal Penthouse Suite": {
+            "brier_score": 0.203795,
+            "log_loss": 0.590432,
+            "positive_labels": 25,
+            "rows": 85
+          },
+          "Wellness & Spa Villa": {
+            "brier_score": 0.206827,
+            "log_loss": 0.603124,
+            "positive_labels": 30,
+            "rows": 76
+          }
+        }
+      }
+    },
+    "causality_warning": "This model learns observational conversion associations. Its offered-price coefficient is not a causal price-elasticity estimate and must not be used for autonomous price optimization without a controlled experiment.",
+    "log_loss_improvement": 0.063133,
+    "passes_performance_gate": true,
+    "split": {
+      "cutoff_at": "2026-08-15T10:46:10.355000+00:00",
+      "holdout_classes": [
+        0,
+        1
+      ],
+      "holdout_range": [
+        "2026-08-15T10:46:10.355000+00:00",
+        "2026-09-10T16:35:50.809000+00:00"
+      ],
+      "holdout_rows": 606,
+      "strategy": "chronological_by_exposure_at",
+      "training_classes": [
+        0,
+        1
+      ],
+      "training_range": [
+        "2026-06-27T18:41:34.518000+00:00",
+        "2026-08-15T10:34:46.135000+00:00"
+      ],
+      "training_rows": 2421
+    }
+  },
+  "feature_contract": {
+    "categorical_features": [
+      "room_type_name",
+      "currency",
+      "pricing_source"
+    ],
+    "causality_warning": "This model learns observational conversion associations. Its offered-price coefficient is not a causal price-elasticity estimate and must not be used for autonomous price optimization without a controlled experiment.",
+    "excluded_as_leakage": [
+      "booking_id",
+      "accepted_at",
+      "rejected_at",
+      "latest_outcome",
+      "quote_disposition",
+      "acceptance_label_available_at",
+      "paid_amount",
+      "refunded_amount"
+    ],
+    "feature_order": [
+      "lead_time",
+      "arrival_month_sin",
+      "arrival_month_cos",
+      "arrival_weekday_sin",
+      "arrival_weekday_cos",
+      "stay_nights",
+      "weekend_nights",
+      "weekend_share",
+      "guest_count",
+      "capacity_snapshot",
+      "rooms_available",
+      "rooms_sellable_snapshot",
+      "rooms_booked_snapshot",
+      "occupancy_ratio_snapshot",
+      "base_price",
+      "offered_nightly_price",
+      "offered_price_ratio",
+      "room_type_name",
+      "currency",
+      "pricing_source"
+    ],
+    "numeric_features": [
+      "lead_time",
+      "arrival_month_sin",
+      "arrival_month_cos",
+      "arrival_weekday_sin",
+      "arrival_weekday_cos",
+      "stay_nights",
+      "weekend_nights",
+      "weekend_share",
+      "guest_count",
+      "capacity_snapshot",
+      "rooms_available",
+      "rooms_sellable_snapshot",
+      "rooms_booked_snapshot",
+      "occupancy_ratio_snapshot",
+      "base_price",
+      "offered_nightly_price",
+      "offered_price_ratio"
+    ],
+    "observation_unit": "one immutable pricing quote",
+    "price_feature": {
+      "definition": "offered_nightly_price / base_price at quote time",
+      "name": "offered_price_ratio"
+    },
+    "source_view": "pricing_quote_training_dataset_v1",
+    "target": "acceptance_label for an explicitly exposed, resolved quote",
+    "version": "1.0.0"
+  },
+  "model_version": "conversion_challenger_v1",
+  "pipeline": "conversion_challenger",
+  "status": "artifact_written",
+  "training_run_id": "13e9fefdc4657b69"
+}

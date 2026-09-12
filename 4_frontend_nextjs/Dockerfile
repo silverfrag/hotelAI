@@ -12,7 +12,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/package*.json ./
 RUN npm ci --omit=dev
-COPY --from=build /app/.next ./.next
-COPY --from=build /app/public ./public
+COPY --chown=node:node --from=build /app/.next ./.next
+COPY --chown=node:node --from=build /app/public ./public
+USER node
 EXPOSE 3000
 CMD ["npm", "run", "start"]

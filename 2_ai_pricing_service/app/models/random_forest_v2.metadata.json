@@ -1,0 +1,168 @@
+{
+  "artifact_schema_version": "1.0.0",
+  "created_at_utc": "2026-09-04T08:51:25.400319+00:00",
+  "data": {
+    "filter": "hotel == City Hotel AND is_canceled == 0 AND adr > 0 AND stay_nights > 0 AND guest_count > 0",
+    "filtered_city_hotel_rows": 46228,
+    "invalid_quote_context_rows_removed": 30,
+    "sha256": "7c2ae42a7353905ea136e5c2287f17c92c5435826598bfbb8491c6f0c7b1fc06",
+    "source_file": "hotel_bookings.csv",
+    "source_rows": 119390,
+    "training_candidate_rows": 45119
+  },
+  "evaluation": {
+    "adr_mae_improvement_over_baseline": 0.044534,
+    "adr_metrics": {
+      "mae": 26.564856,
+      "mape": 0.214552,
+      "r2": 0.302843,
+      "rmse": 33.676213
+    },
+    "baseline": {
+      "adr_mae": 27.803039,
+      "adr_r2": 0.209129,
+      "adr_rmse": 35.868291,
+      "fallback": "training_month_median_then_training_global_median",
+      "global_fallbacks": 0,
+      "global_median": 1.0,
+      "group_matches": 9029,
+      "mae": 0.274912,
+      "month_fallbacks": 0,
+      "strategy": "training_month_and_arrival_weekday_median"
+    },
+    "feature_importance": {
+      "arrival_month_cos": 0.305013,
+      "arrival_month_sin": 0.077169,
+      "arrival_weekday_cos": 0.037754,
+      "arrival_weekday_sin": 0.052949,
+      "guest_count": 0.144391,
+      "lead_time": 0.27894,
+      "stay_nights": 0.058865,
+      "weekend_nights": 0.011858,
+      "weekend_share": 0.033061
+    },
+    "holdout_rows": 9029,
+    "mae": 0.26484,
+    "mae_improvement_over_baseline": 0.036636,
+    "mape": 0.194685,
+    "passes_baseline_gate": true,
+    "r2": -0.32253,
+    "rmse": 0.333672,
+    "split": {
+      "actual_holdout_fraction": 0.200115,
+      "cutoff_date": "2017-04-25",
+      "holdout_date_range": [
+        "2017-04-25",
+        "2017-08-31"
+      ],
+      "requested_holdout_fraction": 0.2,
+      "strategy": "chronological_by_arrival_date",
+      "training_date_range": [
+        "2015-07-01",
+        "2017-04-24"
+      ]
+    },
+    "target_base_adr": 95.0,
+    "target_reference": {
+      "global_fallback_base_adr": 95.0,
+      "room_type_base_adr": {
+        "A": 90.0,
+        "B": 85.5,
+        "C": 110.0,
+        "D": 121.5,
+        "E": 146.145,
+        "F": 181.16,
+        "G": 216.0
+      },
+      "strategy": "training_reserved_room_type_median_adr",
+      "unknown_holdout_room_types": []
+    },
+    "training_rows": 36090
+  },
+  "feature_contract": {
+    "cyclic_encoding": "sin/cos with month zero-based over 12 and Monday zero-based over 7",
+    "excluded_user_controlled_features": [
+      "total_of_special_requests"
+    ],
+    "feature_order": [
+      "lead_time",
+      "arrival_month_sin",
+      "arrival_month_cos",
+      "arrival_weekday_sin",
+      "arrival_weekday_cos",
+      "stay_nights",
+      "weekend_nights",
+      "weekend_share",
+      "guest_count"
+    ],
+    "stay_interval": "check-in inclusive, check-out exclusive",
+    "target_reference": "ADR divided by the training median ADR of reserved room type",
+    "version": "2.0.0",
+    "weekend_days": [
+      "Saturday",
+      "Sunday"
+    ],
+    "weekend_definition": "1 when at least one occupied night in [check_in_date, check_out_date) starts on Saturday or Sunday; otherwise 0"
+  },
+  "model_version": "random_forest_v2",
+  "runtime": {
+    "joblib": "1.5.3",
+    "pandas": "3.0.5",
+    "python": "3.12.14",
+    "scikit_learn": "1.9.0"
+  },
+  "target": {
+    "clip_range": [
+      0.5,
+      3.0
+    ],
+    "definition": "ADR / median ADR for reserved room type in the chronological training partition",
+    "name": "price_multiplier",
+    "reference": {
+      "global_fallback_base_adr": 95.0,
+      "room_type_base_adr": {
+        "A": 90.0,
+        "B": 85.5,
+        "C": 110.0,
+        "D": 121.5,
+        "E": 146.145,
+        "F": 181.16,
+        "G": 216.0
+      },
+      "strategy": "training_reserved_room_type_median_adr",
+      "unknown_holdout_room_types": []
+    }
+  },
+  "training": {
+    "config": {
+      "max_depth": 10,
+      "n_estimators": 100,
+      "n_jobs": 1,
+      "random_seed": 42,
+      "test_size": 0.2
+    },
+    "estimator": "RandomForestRegressor",
+    "estimator_parameters": {
+      "bootstrap": true,
+      "ccp_alpha": 0.0,
+      "criterion": "squared_error",
+      "max_depth": 10,
+      "max_features": 1.0,
+      "max_leaf_nodes": null,
+      "max_samples": null,
+      "min_impurity_decrease": 0.0,
+      "min_samples_leaf": 1,
+      "min_samples_split": 2,
+      "min_weight_fraction_leaf": 0.0,
+      "monotonic_cst": null,
+      "n_estimators": 100,
+      "n_jobs": 1,
+      "oob_score": false,
+      "random_state": 42,
+      "verbose": 0,
+      "warm_start": false
+    },
+    "script_sha256": "1990340d7b27aac01f547049a4ad2ce8695652eb536f0164786b54d474d5d178"
+  },
+  "training_run_id": "dc2e163f5cd9b29d"
+}

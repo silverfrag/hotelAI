@@ -12,8 +12,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <select
           ref={ref}
           className={cn(
-            'h-9 w-full appearance-none rounded-md border border-input bg-card pl-3 pr-9 text-sm text-foreground shadow-sm transition-colors',
-            'focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30',
+            'h-10 w-full appearance-none rounded-xl border border-[rgba(196,153,90,0.2)] bg-[#140f0a]/90 pl-3.5 pr-10 text-sm text-[#f0e8db] shadow-sm transition-all',
+            'focus-visible:outline-none focus-visible:border-[#c4995a] focus-visible:ring-2 focus-visible:ring-[#c4995a]/25',
             'disabled:cursor-not-allowed disabled:opacity-50',
             className,
           )}
@@ -22,7 +22,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           {children}
         </select>
         <ChevronDown
-          className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+          className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-[#8e775a]"
           aria-hidden="true"
         />
       </div>
@@ -30,3 +30,4 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   },
 );
 Select.displayName = 'Select';
+

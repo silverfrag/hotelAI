@@ -20,7 +20,13 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
+*.csv
+
+# Temporary and logs
+.tmp/
+*.log
 
 # OS
 .DS_Store
 Thumbs.db
+

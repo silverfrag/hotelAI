@@ -5,8 +5,8 @@ export class RoomType {
   @PrimaryGeneratedColumn({ name: 'type_id' })
   type_id: number;
 
-  @Column({ name: 'name', type: 'varchar' }) // <-- Đổi thành 'name' cho khớp DB
-  type_name: string; // Tên thuộc tính trong code vẫn giữ là type_name hoặc name tùy ý
+  @Column({ name: 'name', type: 'varchar' })
+  type_name: string;
 
   @Column({
     name: 'base_price',

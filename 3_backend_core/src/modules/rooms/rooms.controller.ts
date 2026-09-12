@@ -1,17 +1,26 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
+import { DatabaseIdPipe } from '../../common/pipes/database-id.pipe';
 import { RoomsService } from './rooms.service';
 
-@Controller('rooms') // <-- Đảm bảo chỗ này là 'rooms'
+@Controller('rooms')
 export class RoomsController {
   constructor(private readonly roomsService: RoomsService) {}
 
-  @Get() // <-- Đảm bảo hàm này mapping với phương thức GET gốc
+  @Get()
   async getAllRooms() {
     const rooms = await this.roomsService.findAllActiveRooms();
     return {
       status: 'success',
       count: rooms.length,
       data: rooms,
+    };
+  }
+
+  @Get(':typeId')
+  async getRoomType(@Param('typeId', DatabaseIdPipe) typeId: number) {
+    return {
+      status: 'success',
+      data: await this.roomsService.findRoomType(typeId),
     };
   }
 }

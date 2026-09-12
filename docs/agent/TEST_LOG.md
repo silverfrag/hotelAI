@@ -112,3 +112,23 @@
 - No application code changed after the passing final production build and unit
   checks. Full handoff and reproducible commands are in COMPLETION_REPORT.md and
   RUNBOOK.md. The final Git checkpoint is recorded in STATE.md.
+
+### 2026-09-10 — Auth alignment and AI training walkthrough
+
+- Login/register moved off legacy styles into AuthForm.module.css with Aurum
+  tokens/fonts, editorial desktop layout and mobile form. Same API/session
+  behavior retained. Auth-mode links preserve the safe return URL.
+- Final production build PASS after auth and admin-copy changes: 19 routes,
+  strict TypeScript. Existing auth-recovery and auth-session scripts PASS.
+- Generated login/register HTML includes Aurum copy, lang=vi, expected password
+  fields and scoped styles, and has no legacy-public wrapper. This is structural
+  validation only; the new visual layout is not yet browser-verified.
+- The source CSV SHA256 matches current Random Forest v2 metadata. Model metrics,
+  feature contract, conversion readiness and export gaps inspected without
+  training a replacement. AI_PRODUCT_AND_TRAINING.md records the evidence and
+  next-phase proposal. Primary scikit-learn guidance checked for leakage,
+  chronological evaluation and probability calibration.
+- Preview stopped across the session interruption. Automatic approval review
+  rejected both hidden and foreground loopback53100 startup, returning only
+  "blocked by policy". A user request contains explicit startup commands; final
+  browser verification waits on that external action. No startup bypass used.

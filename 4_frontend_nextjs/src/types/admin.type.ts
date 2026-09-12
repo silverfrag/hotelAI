@@ -306,3 +306,38 @@ export interface AdminUserAuditPage {
   limit: number;
   offset: number;
 }
+
+export interface SmartUpgradeRecommendation {
+  booking_id: string;
+  customer_name: string;
+  check_in_date: string;
+  check_out_date: string;
+  guest_count: number;
+  nights: number;
+  expected_assignment_version: number;
+  current_room: {
+    room_id: number;
+    room_number: string;
+    type_id: number;
+    type_name: string;
+    base_price: number;
+  };
+  recommended_room: {
+    room_id: number;
+    room_number: string;
+    type_id: number;
+    type_name: string;
+    base_price: number;
+  };
+  upgrade_delta_value: number;
+  occupancy_boost_reason: string;
+  confidence_score: number;
+}
+
+export interface ExecuteUpgradeInput {
+  booking_id: string;
+  target_room_id: number;
+  expected_assignment_version: number;
+  reason: string;
+}
+

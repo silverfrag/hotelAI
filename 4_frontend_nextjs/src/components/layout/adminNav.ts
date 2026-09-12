@@ -1,15 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import {
-  LayoutDashboard,
-  CalendarCheck,
-  BedDouble,
-  Users,
-  ClipboardList,
-  LineChart,
-  Sparkles,
-  FileBarChart,
-  Settings,
-} from 'lucide-react';
+import { BedDouble, CalendarCheck2, HandCoins, LayoutDashboard, LineChart, Sparkles, UsersRound } from 'lucide-react';
 
 export interface AdminNavItem {
   label: string;
@@ -24,35 +14,23 @@ export interface AdminNavSection {
   items: AdminNavItem[];
 }
 
-/**
- * Sidebar navigation model for the hotel operations console.
- * Routes are declared up-front so future feature pages can slot in
- * without changing the shell. Only Dashboard exists as a page today.
- */
 export const adminNav: AdminNavSection[] = [
   {
-    heading: 'Overview',
+    heading: 'Tổng quan',
     items: [{ label: 'Dashboard', href: '/admin', icon: LayoutDashboard }],
   },
   {
-    heading: 'Operations',
+    heading: 'Vận hành',
     items: [
-      { label: 'Reservations', href: '/admin/reservations', icon: CalendarCheck },
-      { label: 'Rooms', href: '/admin/rooms', icon: BedDouble },
-      { label: 'Guests', href: '/admin/guests', icon: Users },
-      { label: 'Operations', href: '/admin/operations', icon: ClipboardList },
+      { label: 'Bookings', href: '/admin/bookings', icon: CalendarCheck2 },
+      { label: 'Thanh toán', href: '/admin/payments', icon: HandCoins },
+      { label: 'Phòng', href: '/admin/rooms', icon: BedDouble },
+      { label: 'Buồng phòng & AI', href: '/admin/housekeeping', icon: Sparkles, badge: 'AI' },
+      { label: 'Người dùng', href: '/admin/users', icon: UsersRound },
     ],
   },
   {
-    heading: 'Revenue',
-    items: [
-      { label: 'Pricing & Revenue', href: '/admin/pricing', icon: LineChart },
-      { label: 'AI Optimization', href: '/admin/ai-optimization', icon: Sparkles, badge: 'Beta' },
-      { label: 'Reports', href: '/admin/reports', icon: FileBarChart },
-    ],
-  },
-  {
-    heading: 'System',
-    items: [{ label: 'Settings', href: '/admin/settings', icon: Settings }],
+    heading: 'Định giá',
+    items: [{ label: 'AI Pricing', href: '/admin/pricing', icon: LineChart }],
   },
 ];

@@ -1,102 +1,200 @@
 'use client';
 
-import Link from 'next/link';
+import { ArrowRight, CalendarDays, Sparkles, Users } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { createBooking } from '@/services/booking.service';
-import { BookingResult, RoomType } from '@/types/room.type';
+import { createQuoteSearchId } from '@/services/quote-telemetry';
+import { RoomType } from '@/types/room.type';
+import { useTranslation } from '@/contexts/LanguageContext';
 
-export function BookingForm({ roomTypes }: { roomTypes: RoomType[] }) {
-  const { accessToken, isAuthenticated, ready } = useAuth();
-  const [result, setResult] = useState<BookingResult>();
+function addDays(isoDate: string, days: number): string {
+  const date = new Date(`${isoDate}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+interface BookingFormProps {
+  roomTypes: RoomType[];
+  businessDate: string;
+  initialRoomTypeId?: number;
+  compact?: boolean;
+}
+
+export function BookingForm({
+  roomTypes,
+  businessDate,
+  initialRoomTypeId,
+  compact = false,
+}: BookingFormProps) {
+  const router = useRouter();
+  const { t } = useTranslation();
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const defaultRoomTypeId = roomTypes.some((room) => room.type_id === initialRoomTypeId)
+    ? initialRoomTypeId
+    : roomTypes[0]?.type_id;
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  const minCheckIn = businessDate;
+  const defaultCheckIn = businessDate;
+  const defaultCheckOut = addDays(businessDate, 2);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
-    setResult(undefined);
+    const values = new FormData(event.currentTarget);
+    const roomTypeId = Number(values.get('room_type_id'));
+    const checkInDate = String(values.get('check_in_date') ?? '');
+    const checkOutDate = String(values.get('check_out_date') ?? '');
+    const guestCount = Number(values.get('guest_count') ?? 1);
+    const requests = Number(values.get('requests') ?? 0);
 
-    if (!accessToken) {
-      setError('Bạn cần đăng nhập trước khi đặt phòng.');
+    if (!Number.isInteger(roomTypeId) || roomTypeId < 1) {
+      setError(t('search_validation_room'));
+      return;
+    }
+    if (checkInDate < businessDate) {
+      setError(t('search_validation_checkin'));
+      return;
+    }
+    if (checkOutDate <= checkInDate) {
+      setError(t('search_validation_checkout'));
+      return;
+    }
+    const selectedRoom = roomTypes.find((room) => room.type_id === roomTypeId);
+    if (!selectedRoom || !Number.isInteger(guestCount) || guestCount < 1 || guestCount > selectedRoom.capacity) {
+      setError(`Số khách phải từ 1 đến ${selectedRoom?.capacity ?? 1}.`);
       return;
     }
 
-    setLoading(true);
-    const values = new FormData(event.currentTarget);
-    const checkInDate = String(values.get('check_in_date') ?? '');
-    const checkOutDate = String(values.get('check_out_date') ?? '');
-
-    try {
-      if (checkOutDate <= checkInDate) {
-        throw new Error('Ngày trả phòng phải sau ngày nhận phòng.');
-      }
-      setResult(await createBooking({
-        room_type_id: Number(values.get('room_type_id')),
-        check_in_date: checkInDate,
-        check_out_date: checkOutDate,
-        total_of_special_requests: Number(values.get('requests')),
-      }, accessToken));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Đã có lỗi xảy ra.');
-    } finally {
-      setLoading(false);
-    }
+    const query = new URLSearchParams({
+      room_type_id: String(roomTypeId),
+      check_in_date: checkInDate,
+      check_out_date: checkOutDate,
+      guest_count: String(guestCount),
+      requests: String(requests),
+      search_id: createQuoteSearchId(),
+    });
+    router.push(`/checkout?${query.toString()}`);
   }
 
-  const totalPrice = result ? result.total_price ?? result.applied_price : 0;
-
   return (
-    <form className="booking-form" onSubmit={submit}>
-      <div>
-        <h2>Đặt phòng với giá động</h2>
-        {!ready && <p className="muted">Đang kiểm tra phiên đăng nhập...</p>}
-        {ready && !isAuthenticated && (
-          <p className="auth-notice">
-            <Link href="/login">Đăng nhập</Link> hoặc <Link href="/register">đăng ký</Link> để đặt phòng.
-          </p>
-        )}
-      </div>
-
-      <label>
-        Loại phòng
-        <select name="room_type_id" required>
-          {roomTypes.map((room) => (
-            <option key={room.type_id} value={room.type_id}>{room.type_name}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Ngày nhận phòng
-        <input name="check_in_date" type="date" required />
-      </label>
-      <label>
-        Ngày trả phòng
-        <input name="check_out_date" type="date" required />
-      </label>
-      <label>
-        Yêu cầu đặc biệt
-        <input name="requests" type="number" min="0" max="5" defaultValue="0" required />
-      </label>
-      <button disabled={loading || !ready || !isAuthenticated} type="submit">
-        {loading ? 'Đang tính giá...' : 'Xác nhận đặt phòng'}
-      </button>
-
-      {error && <p className="error" role="alert">{error}</p>}
-      {result && (
-        <div className="success" role="status">
-          <p>Đã giữ phòng {result.room_number}.</p>
-          <p>
-            Tổng tiền: {totalPrice.toLocaleString('vi-VN')} VND
-            {result.nights ? ` cho ${result.nights} đêm` : ''} (AI ×{result.ai_multiplier}).
-          </p>
-          {result.nightly_price !== undefined && (
-            <p className="price-breakdown">
-              {result.nightly_price.toLocaleString('vi-VN')} VND/đêm
-            </p>
+    <div className={`w-full max-w-6xl mx-auto ${compact ? '' : '-mt-16 sm:-mt-20 relative z-30 px-4'}`}>
+      <form
+        onSubmit={submit}
+        className="rounded-[32px] p-6 sm:p-8 bg-[var(--bg-glass-card)] border border-[var(--border-gold)] backdrop-blur-2xl shadow-2xl transition-all"
+      >
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-[var(--gold-light)] flex items-center justify-center text-[var(--gold-primary)]">
+              <Sparkles size={16} />
+            </div>
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--gold-primary)] block">
+                {t('search_badge')}
+              </span>
+              <h3 className="font-serif text-lg sm:text-xl font-bold text-[var(--text-primary)]">
+                {t('search_title')}
+              </h3>
+            </div>
+          </div>
+          {error && (
+            <div className="px-4 py-2 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-semibold">
+              {error}
+            </div>
           )}
         </div>
-      )}
-    </form>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          {/* Suite Category */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] block">
+              {t('search_room_type')}
+            </label>
+            <div className="relative">
+              <select
+                name="room_type_id"
+                defaultValue={defaultRoomTypeId}
+                required
+                disabled={roomTypes.length === 0}
+                className="w-full px-4 py-3.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-sm font-semibold focus:outline-none focus:border-[var(--gold-primary)] shadow-sm cursor-pointer appearance-none"
+              >
+                {roomTypes.map((room) => (
+                  <option key={room.type_id} value={room.type_id}>
+                    {room.type_name}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-muted)] text-xs">
+                ▼
+              </div>
+            </div>
+          </div>
+
+          {/* Check-In Date */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] block">
+              {t('search_check_in')}
+            </label>
+            <div className="relative">
+              <input
+                type="date"
+                name="check_in_date"
+                defaultValue={defaultCheckIn}
+                min={minCheckIn}
+                required
+                className="w-full px-4 py-3.5 pl-11 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-sm font-semibold focus:outline-none focus:border-[var(--gold-primary)] shadow-sm"
+              />
+              <CalendarDays size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--gold-primary)]" />
+            </div>
+          </div>
+
+          {/* Check-Out Date */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] block">
+              {t('search_check_out')}
+            </label>
+            <div className="relative">
+              <input
+                type="date"
+                name="check_out_date"
+                defaultValue={defaultCheckOut}
+                min={minCheckIn}
+                required
+                className="w-full px-4 py-3.5 pl-11 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-sm font-semibold focus:outline-none focus:border-[var(--gold-primary)] shadow-sm"
+              />
+              <CalendarDays size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--gold-primary)]" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] block">
+              {t('checkout_guest_count_label')}
+            </label>
+            <input
+              type="number"
+              name="guest_count"
+              defaultValue={1}
+              min={1}
+              max={roomTypes.find((room) => room.type_id === defaultRoomTypeId)?.capacity ?? 1}
+              required
+              className="w-full px-4 py-3.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-sm font-semibold focus:outline-none focus:border-[var(--gold-primary)] shadow-sm"
+            />
+          </div>
+
+          {/* Submit CTA */}
+          <div className="flex flex-col justify-end space-y-2">
+            <label className="hidden lg:block text-xs font-bold uppercase tracking-wider opacity-0">
+              Submit
+            </label>
+            <button
+              type="submit"
+              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-[var(--gold-primary)] to-[var(--gold-secondary)] text-white text-sm font-bold shadow-lg hover:shadow-xl hover:brightness-105 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>{t('search_submit')}</span>
+              <ArrowRight size={17} />
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
   );
 }

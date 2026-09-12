@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
+@import 'tailwindcss';
+
+/* ── Dark mode (default) ── */
+:root {
+  --bg:          #0c0905;
+  --bg2:         #0f0b07;
+  --bg3:         #13100b;
+  --fg:          #f0e8db;
+  --fg2:         #e8d4b0;
+  --muted:       #9a8060;
+  --dim:         #4a3820;
+  --dim2:        #2e1e0e;
+  --gold:        #c4995a;
+  --gold-hi:     #ddb06a;
+  --border:      rgba(196,153,90,0.10);
+  --border-gold: rgba(196,153,90,0.22);
+  --nav-bg:      rgba(12,9,5,0.88);
+  --card-hover:  rgba(196,153,90,0.04);
+  --overlay:     rgba(12,9,5,0.70);
+  --overlay-2:   rgba(12,9,5,0.45);
+}
+
+/* ── Light mode ── */
+html.light {
+  --bg:          #f5ede0;
+  --bg2:         #ede3d0;
+  --bg3:         #e4d8c4;
+  --fg:          #1a1008;
+  --fg2:         #2e1e0e;
+  --muted:       #7a6245;
+  --dim:         #b09870;
+  --dim2:        #d0bfa0;
+  --gold:        #8a5e1e;
+  --gold-hi:     #a87030;
+  --border:      rgba(140,100,50,0.14);
+  --border-gold: rgba(140,100,50,0.28);
+  --nav-bg:      rgba(245,237,224,0.92);
+  --card-hover:  rgba(140,100,50,0.05);
+  --overlay:     rgba(10,6,2,0.72);
+  --overlay-2:   rgba(10,6,2,0.42);
+}
+
+@theme {
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background-color: var(--bg);
+  color: var(--fg);
+  transition: background-color 0.35s ease, color 0.35s ease;
+}
+
+html {
+  scrollbar-width: none;
+}
+html::-webkit-scrollbar {
+  display: none;
+}
+
+input[type='date']::-webkit-calendar-picker-indicator {
+  filter: opacity(0.4);
+  cursor: pointer;
+}
+
+/* smooth theme transitions on key elements */
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.25s ease;
+}
+/* but not transforms / opacity / etc — reset those */
+*,
+*::before,
+*::after {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
+}

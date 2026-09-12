@@ -1,0 +1,179 @@
+{
+  "baseline": {
+    "fallback": "training_month_median_then_training_global_median",
+    "global_fallbacks": 0,
+    "global_median": 1.0,
+    "group_matches": 9029,
+    "metrics": {
+      "adr_mae": 34.665806,
+      "adr_mape": 0.251807,
+      "adr_r2": -0.42305,
+      "adr_rmse": 48.113623,
+      "multiplier_mae_on_clipped_target": 0.36283,
+      "multiplier_rmse_on_clipped_target": 0.499642
+    },
+    "month_fallbacks": 0,
+    "strategy": "training_month_and_arrival_weekday_median"
+  },
+  "candidates": [
+    {
+      "categorical_features": [],
+      "deployability": "production reference; special-request count is user-controlled",
+      "metrics": {
+        "adr_mae": 32.114784,
+        "adr_mape": 0.24317,
+        "adr_r2": -0.241446,
+        "adr_rmse": 44.938838,
+        "multiplier_mae_on_clipped_target": 0.335977,
+        "multiplier_rmse_on_clipped_target": 0.46583
+      },
+      "name": "v1_current",
+      "numeric_features": [
+        "lead_time",
+        "arrival_month",
+        "is_weekend",
+        "total_of_special_requests"
+      ],
+      "target_details": {
+        "global_training_median_adr": 95.0
+      },
+      "target_strategy": "global_median"
+    },
+    {
+      "categorical_features": [],
+      "deployability": "safe drop-in feature subset",
+      "metrics": {
+        "adr_mae": 32.822858,
+        "adr_mape": 0.247648,
+        "adr_r2": -0.257753,
+        "adr_rmse": 45.233023,
+        "multiplier_mae_on_clipped_target": 0.343431,
+        "multiplier_rmse_on_clipped_target": 0.469055
+      },
+      "name": "v1_without_special_requests",
+      "numeric_features": [
+        "lead_time",
+        "arrival_month",
+        "is_weekend"
+      ],
+      "target_details": {
+        "global_training_median_adr": 95.0
+      },
+      "target_strategy": "global_median"
+    },
+    {
+      "categorical_features": [],
+      "deployability": "recommended quote-time feature candidate",
+      "metrics": {
+        "adr_mae": 29.949079,
+        "adr_mape": 0.230388,
+        "adr_r2": 0.077877,
+        "adr_rmse": 38.730437,
+        "multiplier_mae_on_clipped_target": 0.313181,
+        "multiplier_rmse_on_clipped_target": 0.40124
+      },
+      "name": "v2_quote_context",
+      "numeric_features": [
+        "lead_time",
+        "arrival_month_sin",
+        "arrival_month_cos",
+        "arrival_weekday_sin",
+        "arrival_weekday_cos",
+        "stay_nights",
+        "weekend_nights",
+        "weekend_share",
+        "guest_count"
+      ],
+      "target_details": {
+        "global_training_median_adr": 95.0
+      },
+      "target_strategy": "global_median"
+    },
+    {
+      "categorical_features": [
+        "reserved_room_type"
+      ],
+      "deployability": "diagnostic upper bound only while serving multiplies a room-specific base price",
+      "metrics": {
+        "adr_mae": 27.490868,
+        "adr_mape": 0.217708,
+        "adr_r2": 0.269806,
+        "adr_rmse": 34.464897,
+        "multiplier_mae_on_clipped_target": 0.287305,
+        "multiplier_rmse_on_clipped_target": 0.356334
+      },
+      "name": "v2_quote_context_with_room_feature",
+      "numeric_features": [
+        "lead_time",
+        "arrival_month_sin",
+        "arrival_month_cos",
+        "arrival_weekday_sin",
+        "arrival_weekday_cos",
+        "stay_nights",
+        "weekend_nights",
+        "weekend_share",
+        "guest_count"
+      ],
+      "target_details": {
+        "global_training_median_adr": 95.0
+      },
+      "target_strategy": "global_median"
+    },
+    {
+      "categorical_features": [],
+      "deployability": "recommended target design after room-base calibration and contract versioning",
+      "metrics": {
+        "adr_mae": 26.553508,
+        "adr_mape": 0.214456,
+        "adr_r2": 0.302659,
+        "adr_rmse": 33.680657,
+        "multiplier_mae_on_clipped_target": 0.264695,
+        "multiplier_rmse_on_clipped_target": 0.333565
+      },
+      "name": "v2_room_normalized_multiplier",
+      "numeric_features": [
+        "lead_time",
+        "arrival_month_sin",
+        "arrival_month_cos",
+        "arrival_weekday_sin",
+        "arrival_weekday_cos",
+        "stay_nights",
+        "weekend_nights",
+        "weekend_share",
+        "guest_count"
+      ],
+      "target_details": {
+        "global_training_median_adr_fallback": 95.0,
+        "training_room_type_median_adr": {
+          "A": 90.0,
+          "B": 85.5,
+          "C": 110.0,
+          "D": 121.5,
+          "E": 146.145,
+          "F": 181.16,
+          "G": 216.0
+        },
+        "unknown_holdout_room_types": []
+      },
+      "target_strategy": "room_type_median"
+    }
+  ],
+  "data_quality": {
+    "comparison_population": "same valid rows for every candidate",
+    "invalid_quote_context_rows_excluded": 30
+  },
+  "purpose": "offline feature-v2 benchmark; no serving artifact is written",
+  "split": {
+    "holdout_date_range": [
+      "2017-04-25",
+      "2017-08-31"
+    ],
+    "holdout_rows": 9029,
+    "strategy": "chronological_by_arrival_date",
+    "training_date_range": [
+      "2015-07-01",
+      "2017-04-24"
+    ],
+    "training_rows": 36090
+  }
+}

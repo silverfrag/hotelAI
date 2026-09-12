@@ -11,9 +11,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         ref={ref}
         type={type}
         className={cn(
-          'flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-sm text-foreground shadow-sm transition-colors',
-          'placeholder:text-muted-foreground',
-          'focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30',
+          'flex h-10 w-full rounded-xl border border-[rgba(196,153,90,0.2)] bg-[#140f0a]/90 px-3.5 py-2 text-sm text-[#f0e8db] shadow-sm transition-all',
+          'placeholder:text-[#8e775a]',
+          'focus-visible:outline-none focus-visible:border-[#c4995a] focus-visible:ring-2 focus-visible:ring-[#c4995a]/25',
           'disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}
@@ -23,3 +23,4 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   },
 );
 Input.displayName = 'Input';
+

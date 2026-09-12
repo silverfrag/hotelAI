@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend build and audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 3_backend_core
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: 3_backend_core/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm audit --audit-level=high
+
+  backend-operations:
+    name: Backend and AI operational validation (no UI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [backend, ai]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: 3_backend_core/package-lock.json
+      - run: npm ci
+        working-directory: 3_backend_core
+      - run: node --test 1_infrastructure/operations/operations.test.mjs
+      - run: docker compose -f 1_infrastructure/operations/compose.test.yml up --build -d --wait
+      - name: SQL integrity regression
+        shell: bash
+        run: |
+          for test in 1_infrastructure/postgres/tests/*.sql; do
+            docker compose -f 1_infrastructure/operations/compose.test.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U hotel_validation -d hotel_validation < "$test"
+          done
+      - run: node 1_infrastructure/operations/run-validation.mjs
+      - name: Diagnostics on failure
+        if: failure()
+        run: docker compose -f 1_infrastructure/operations/compose.test.yml logs --no-color --tail=150
+      - name: Retain no CI services
+        if: always()
+        run: docker compose -f 1_infrastructure/operations/compose.test.yml down
+
+  frontend:
+    name: Frontend typecheck, build and audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 4_frontend_nextjs
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: 4_frontend_nextjs/package-lock.json
+      - run: npm ci
+      - run: npm exec tsc -- --noEmit
+      - run: npm run build
+      - run: npm audit --audit-level=high
+
+  ai:
+    name: AI image and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: docker build --target test -t hotelai-ai-test:ci 2_ai_pricing_service
+      - run: docker run --rm hotelai-ai-test:ci
+
+  integration:
+    name: Full-stack integration smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: [backend, frontend, ai]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: 3_backend_core/package-lock.json
+      - name: Create isolated CI environment
+        shell: bash
+        run: |
+          cp .env.example .env
+          sed -i 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci-only-password/' .env
+          sed -i 's/^JWT_SECRET=.*/JWT_SECRET=9d136fa7a8fc5cff944437ee9cfeb73b5d684f8297606e3b57697496df2b99e2/' .env
+      - run: npm ci
+        working-directory: 3_backend_core
+      - run: docker compose --env-file .env config --quiet
+      - run: docker compose --env-file .env up -d --build
+      - name: Run all integration and resilience suites
+        run: npm run test:all
+        working-directory: 3_backend_core
+      - name: Show service diagnostics on failure
+        if: failure()
+        run: |
+          docker compose --env-file .env ps
+          docker compose --env-file .env logs --no-color --tail=300
+      - name: Tear down integration stack
+        if: always()
+        run: docker compose --env-file .env down -v --remove-orphans

@@ -27,6 +27,7 @@ import type {
   AdminRoomReassignment,
   AdminRoomType,
   CreateRoomInput,
+  ExecuteUpgradeInput,
   HousekeepingStatus,
   PricingLog,
   PricingLogPage,
@@ -36,6 +37,7 @@ import type {
   ReassignRoomInput,
   RefundPaymentInput,
   RoomTypeInput,
+  SmartUpgradeRecommendation,
   UpdateHousekeepingStatusInput,
   UpdateRoomInput,
 } from '@/types/admin.type';
@@ -224,6 +226,33 @@ export async function updateAdminHousekeepingStatus(
     accessToken,
     {
       method: 'PATCH',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(input),
+    },
+  );
+  return response.data;
+}
+
+export async function getAdminUpgradeRecommendations(
+  accessToken: string,
+): Promise<SmartUpgradeRecommendation[]> {
+  const response = await adminRequest<ListResponse<SmartUpgradeRecommendation>>(
+    '/allocations/upgrade-recommendations',
+    accessToken,
+  );
+  return response.data;
+}
+
+export async function executeAdminUpgrade(
+  accessToken: string,
+  input: ExecuteUpgradeInput,
+  idempotencyKey: string,
+): Promise<AdminRoomReassignment> {
+  const response = await adminRequest<DataResponse<AdminRoomReassignment>>(
+    '/allocations/execute-upgrade',
+    accessToken,
+    {
+      method: 'POST',
       headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(input),
     },

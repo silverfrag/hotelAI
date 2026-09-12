@@ -40,3 +40,11 @@
 - [x] Remove transactional mocks, misleading unsupported payment/extra claims.
 - [x] Review secrets/environment and Git status.
 - [x] Update runbook, all memory files, completion report and final integration checkpoint 1c1bcd4.
+
+# Follow-up — auth alignment and AI explanation (2026-09-10)
+- [x] Align login/register with Aurum layout, tokens, typography and responsive design.
+- [x] Preserve validated booking return URL when switching auth mode.
+- [x] Correct admin AI capability and new-quote policy descriptions.
+- [x] Audit current model/data/metrics and document the next training/learning plan.
+- [x] Production build, existing auth checks and generated HTML structure verified.
+- [ ] Browser visual/auth interaction verification: preview startup blocked by automatic review; user asked to start it.

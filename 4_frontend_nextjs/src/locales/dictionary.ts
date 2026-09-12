@@ -1,0 +1,605 @@
+export type Language = 'vi' | 'en' | 'ru' | 'zh' | 'ja';
+
+export interface SupportedLanguageInfo {
+  code: Language;
+  label: string;
+  flag: string;
+  short: string;
+}
+
+export const SUPPORTED_LANGUAGES: readonly SupportedLanguageInfo[] = [
+  { code: 'vi', label: 'Tiếng Việt', flag: '🇻🇳', short: 'VI' },
+  { code: 'en', label: 'English', flag: '🇬🇧', short: 'EN' },
+  { code: 'ru', label: 'Русский', flag: '🇷🇺', short: 'RU' },
+  { code: 'zh', label: '中文', flag: '🇨🇳', short: 'ZH' },
+  { code: 'ja', label: '日本語', flag: '🇯🇵', short: 'JA' },
+] as const;
+
+export const dictionary = {
+  vi: {
+    // Navigation
+    nav_home: 'Trang chủ',
+    nav_destinations: 'Điểm đến',
+    nav_rooms: 'Phòng nghỉ',
+    nav_about: 'Về Aurum',
+    nav_quote: 'Báo giá AI',
+    nav_my_bookings: 'Đặt phòng của tôi',
+    nav_profile: 'Hồ sơ cá nhân',
+    nav_admin: 'Bảng quản trị',
+    nav_login: 'Đăng nhập',
+    nav_register: 'Đăng ký',
+    nav_logout: 'Đăng xuất',
+    nav_greeting: 'Xin chào',
+    nav_book_now: 'Đặt phòng ngay',
+    
+    // Theme & Lang
+    theme_light: 'Chế độ Sáng',
+    theme_dark: 'Chế độ Tối',
+    lang_switch: 'Ngôn ngữ',
+
+    // Hero Section
+    hero_eyebrow: "Khu nghỉ dưỡng đỉnh cao thế giới",
+    hero_title_1: "Nơi Thượng Lưu",
+    hero_title_2: "Gặp Gỡ",
+    hero_title_3: "Chân Trời",
+    hero_desc: "Lấy cảm hứng từ những điểm đến ngoạn mục nhất hành tinh. Từng chi tiết nhỏ được kiến tạo cho trải nghiệm phi thường.",
+    hero_stat_collection: "Bộ sưu tập",
+    hero_stat_stay: "Kỳ nghỉ của bạn",
+    hero_dest: "Điểm đến",
+    hero_where_to: "Bạn muốn đến đâu?",
+    hero_check_in: "Ngày nhận phòng",
+    hero_check_out: "Ngày trả phòng",
+    hero_guests: "Số khách",
+    hero_search: "Tìm kiếm",
+
+    // Destinations Section
+    dest_eyebrow: "Hành trình tuyển chọn",
+    dest_title: "Điểm đến mơ ước đang chờ đón bạn",
+    dest_filter_all: "Tất cả",
+    dest_filter_beach: "Bãi biển",
+    dest_filter_mountain: "Vùng núi",
+    dest_filter_city: "Thành phố",
+    dest_filter_island: "Hòn đảo",
+    dest_explore: "Khám phá",
+    dest_view_all: "Xem tất cả điểm đến",
+
+    // Rooms Section
+    rooms_eyebrow: "Không gian lưu trú",
+    rooms_title: "Không gian tinh tế, tiện nghi vô tận",
+    rooms_view_all: "Xem tất cả phòng",
+    rooms_max_guests: "khách tối đa",
+    rooms_available_now: "phòng trống hiện tại",
+    rooms_total_rooms: "tổng số phòng",
+    rooms_book: "Đặt phòng",
+    rooms_per_night: "/ đêm",
+    rooms_base_price: "Giá cơ sở",
+    rooms_search_placeholder: "Tìm kiếm hạng phòng…",
+    rooms_capacity_any: "Mọi sức chứa khách",
+    rooms_at_least: "Tối thiểu",
+    rooms_available_only: "Chỉ phòng còn trống",
+    rooms_checkin_label: "Ngày nhận phòng",
+    rooms_duration_label: "Thời gian lưu trú",
+    rooms_nights: "đêm",
+    rooms_guests_label: "Số khách",
+    rooms_estimate_title: "Ước tính giá cơ sở",
+    rooms_check_final_btn: "Kiểm tra giá chốt và phòng trống",
+    rooms_empty: "Hiện chưa có phòng nào trong danh mục này.",
+
+    // Why Aurum
+    why_eyebrow: "Vì sao chọn Aurum",
+    why_title: "Mỗi hành trình là một kiệt tác",
+    why_desc: "Chúng tôi tin du lịch là một loại hình nghệ thuật. Từ lượt tìm kiếm đầu tiên đến lúc chia tay, Aurum hòa quyện giữa sự chuẩn xác và niềm đam mê để kiến tạo trải nghiệm vượt ngoài mong đợi.",
+    why_story_btn: "Câu chuyện của chúng tôi",
+    why_stat_categories: "Hạng phòng",
+    why_stat_dates: "Lịch lưu trú",
+    why_stat_ai: "Định giá linh hoạt AI",
+    why_stat_reservations: "Đặt phòng đã lưu",
+
+    // Gallery Split & Testimonial
+    gallery_eyebrow: "Cảm hứng du lịch · Nghỉ dưỡng tinh hoa",
+    gallery_title_1: "Thế giới này",
+    gallery_title_2: "Là của bạn",
+    gallery_btn: "Khám phá tất cả điểm đến",
+    testimonial_quote: "Một kỳ nghỉ đáng nhớ khởi nguồn từ những chi tiết chu đáo và không gian để khám phá.",
+    testimonial_sub: "Triết lý nghỉ dưỡng tinh tế",
+
+    // CTA Banner
+    cta_eyebrow: "Bắt đầu hành trình của bạn",
+    cta_title: "Sẵn sàng khởi hành?",
+    cta_desc: "Kỳ nghỉ được tuyển chọn cho riêng bạn chỉ cách một bước chân.",
+    cta_explore_btn: "Khám phá tất cả kỳ nghỉ",
+    cta_plan_btn: "Lên kế hoạch kỳ nghỉ",
+
+    // Account & Checkout
+    account_menu: "Menu tài khoản",
+    account_loading: "Đang tải tài khoản…",
+    account_sign_in: "Đăng nhập",
+    account_create: "Tạo tài khoản",
+    account_my_profile: "Hồ sơ của tôi",
+    account_my_bookings: "Đặt phòng của tôi",
+    account_management: "Quản trị khách sạn",
+    account_price_quote: "Nhận báo giá AI",
+    account_sign_out: "Đăng xuất",
+    account_signing_out: "Đang đăng xuất…",
+
+    // Footer
+    footer_tagline: "Cảm hứng du lịch tinh tế, những căn phòng sang trọng và hành trình hoàn hảo cho kỳ nghỉ tiếp theo của bạn.",
+    footer_quick_links: "Liên kết nhanh",
+    footer_experience: "Trải nghiệm",
+    footer_legal: "Pháp lý & Điều khoản",
+    footer_privacy: "Chính sách bảo mật",
+    footer_terms: "Điều khoản dịch vụ",
+    footer_contact: "Liên hệ hỗ trợ",
+    footer_copyright: "© 2026 Aurum Hotel AI. Bản quyền đã được đăng ký bảo hộ.",
+  },
+
+  en: {
+    // Navigation
+    nav_home: 'Home',
+    nav_destinations: 'Destinations',
+    nav_rooms: 'Rooms',
+    nav_about: 'About',
+    nav_quote: 'AI Quote',
+    nav_my_bookings: 'My Bookings',
+    nav_profile: 'My Profile',
+    nav_admin: 'Admin Console',
+    nav_login: 'Sign In',
+    nav_register: 'Register',
+    nav_logout: 'Sign Out',
+    nav_greeting: 'Welcome',
+    nav_book_now: 'Book Now',
+    
+    // Theme & Lang
+    theme_light: 'Light Mode',
+    theme_dark: 'Dark Mode',
+    lang_switch: 'Language',
+
+    // Hero Section
+    hero_eyebrow: "World's Finest Retreats",
+    hero_title_1: "Where Luxury",
+    hero_title_2: "Meets",
+    hero_title_3: "Horizon",
+    hero_desc: "Inspired by the world's most breathtaking destinations. Every detail designed for the extraordinary.",
+    hero_stat_collection: "Room Collection",
+    hero_stat_stay: "Your Stay",
+    hero_dest: "Destination",
+    hero_where_to: "Where to?",
+    hero_check_in: "Check In",
+    hero_check_out: "Check Out",
+    hero_guests: "Guests",
+    hero_search: "Search",
+
+    // Destinations Section
+    dest_eyebrow: "Handpicked Escapes",
+    dest_title: "Your dream destination awaits",
+    dest_filter_all: "All",
+    dest_filter_beach: "Beach",
+    dest_filter_mountain: "Mountain",
+    dest_filter_city: "City",
+    dest_filter_island: "Island",
+    dest_explore: "Explore",
+    dest_view_all: "View All Destinations",
+
+    // Rooms Section
+    rooms_eyebrow: "Our Accommodations",
+    rooms_title: "Refined spaces, boundless comfort",
+    rooms_view_all: "View all rooms",
+    rooms_max_guests: "max guests",
+    rooms_available_now: "available now",
+    rooms_total_rooms: "total rooms",
+    rooms_book: "Book",
+    rooms_per_night: "/ night",
+    rooms_base_price: "Base price",
+    rooms_search_placeholder: "Search room types…",
+    rooms_capacity_any: "Any guest capacity",
+    rooms_at_least: "At least",
+    rooms_available_only: "Available now",
+    rooms_checkin_label: "Check-in Date",
+    rooms_duration_label: "Duration",
+    rooms_nights: "nights",
+    rooms_guests_label: "Guests",
+    rooms_estimate_title: "Base-price estimate",
+    rooms_check_final_btn: "Check final price and availability",
+    rooms_empty: "No rooms are currently listed. Please check back soon.",
+
+    // Why Aurum
+    why_eyebrow: "Why Aurum",
+    why_title: "Every journey, a masterpiece",
+    why_desc: "We believe travel is an art form. From the first search to the final farewell, Aurum orchestrates experiences that transcend the ordinary — where precision meets passion.",
+    why_story_btn: "Our Story",
+    why_stat_categories: "Room Categories",
+    why_stat_dates: "Your Dates",
+    why_stat_ai: "Dynamic Pricing",
+    why_stat_reservations: "Your Reservations",
+
+    // Gallery Split & Testimonial
+    gallery_eyebrow: "Travel Inspiration · Thoughtful Stays",
+    gallery_title_1: "The World",
+    gallery_title_2: "Is Yours",
+    gallery_btn: "Explore All Destinations",
+    testimonial_quote: "A memorable stay begins with thoughtful details and room to discover.",
+    testimonial_sub: "Our approach to thoughtful stays",
+
+    // CTA Banner
+    cta_eyebrow: "Begin Your Journey",
+    cta_title: "Ready to begin?",
+    cta_desc: "Your curated escape is one conversation away.",
+    cta_explore_btn: "Explore All Retreats",
+    cta_plan_btn: "Plan Your Stay",
+
+    // Account & Checkout
+    account_menu: "Account menu",
+    account_loading: "Loading account…",
+    account_sign_in: "Sign in",
+    account_create: "Create account",
+    account_my_profile: "My profile",
+    account_my_bookings: "My bookings",
+    account_management: "Hotel management",
+    account_price_quote: "Price quote",
+    account_sign_out: "Sign out",
+    account_signing_out: "Signing out…",
+
+    // Footer
+    footer_tagline: "Thoughtful travel inspiration, refined rooms and a clear path to your next stay.",
+    footer_quick_links: "Quick links",
+    footer_experience: "Experience",
+    footer_legal: "Legal & Policies",
+    footer_privacy: "Privacy Policy",
+    footer_terms: "Terms of Service",
+    footer_contact: "Concierge Contact",
+    footer_copyright: "© 2026 Aurum Hotel AI. All luxury rights reserved.",
+  },
+
+  ru: {
+    // Navigation
+    nav_home: 'Главная',
+    nav_destinations: 'Направления',
+    nav_rooms: 'Номера',
+    nav_about: 'О нас',
+    nav_quote: 'ИИ-расчет',
+    nav_my_bookings: 'Мои бронирования',
+    nav_profile: 'Мой профиль',
+    nav_admin: 'Управление',
+    nav_login: 'Войти',
+    nav_register: 'Регистрация',
+    nav_logout: 'Выйти',
+    nav_greeting: 'Добро пожаловать',
+    nav_book_now: 'Забронировать',
+    
+    // Theme & Lang
+    theme_light: 'Светлая тема',
+    theme_dark: 'Темная тема',
+    lang_switch: 'Язык',
+
+    // Hero Section
+    hero_eyebrow: "Лучшие курорты мира",
+    hero_title_1: "Где Роскошь",
+    hero_title_2: "Встречает",
+    hero_title_3: "Горизонт",
+    hero_desc: "Вдохновлено самыми захватывающими уголками планеты. Каждая деталь создана для исключительного отдыха.",
+    hero_stat_collection: "Коллекция номеров",
+    hero_stat_stay: "Ваш отдых",
+    hero_dest: "Направление",
+    hero_where_to: "Куда вы хотите?",
+    hero_check_in: "Заезд",
+    hero_check_out: "Выезд",
+    hero_guests: "Гости",
+    hero_search: "Поиск",
+
+    // Destinations Section
+    dest_eyebrow: "Избранные места",
+    dest_title: "Путешествие вашей мечты ждет вас",
+    dest_filter_all: "Все",
+    dest_filter_beach: "Пляж",
+    dest_filter_mountain: "Горы",
+    dest_filter_city: "Город",
+    dest_filter_island: "Остров",
+    dest_explore: "Исследовать",
+    dest_view_all: "Все направления",
+
+    // Rooms Section
+    rooms_eyebrow: "Наши номера",
+    rooms_title: "Изысканные пространства, безграничный комфорт",
+    rooms_view_all: "Все номера",
+    rooms_max_guests: "макс. гостей",
+    rooms_available_now: "свободно сейчас",
+    rooms_total_rooms: "всего номеров",
+    rooms_book: "Бронь",
+    rooms_per_night: "/ ночь",
+    rooms_base_price: "Базовая цена",
+    rooms_search_placeholder: "Поиск категорий номеров…",
+    rooms_capacity_any: "Любое количество гостей",
+    rooms_at_least: "Минимум",
+    rooms_available_only: "Только свободные",
+    rooms_checkin_label: "Дата заезда",
+    rooms_duration_label: "Длительность",
+    rooms_nights: "ночей",
+    rooms_guests_label: "Гости",
+    rooms_estimate_title: "Расчет базовой стоимости",
+    rooms_check_final_btn: "Проверить окончательную цену и наличие",
+    rooms_empty: "В настоящее время номера не найдены. Попробуйте позже.",
+
+    // Why Aurum
+    why_eyebrow: "Почему Aurum",
+    why_title: "Каждое путешествие — шедевр",
+    why_desc: "Мы верим, что путешествие — это искусство. От первого клика до теплого прощания Aurum создает впечатления, где точность встречается со страстью.",
+    why_story_btn: "Наша история",
+    why_stat_categories: "Категории номеров",
+    why_stat_dates: "Ваши даты",
+    why_stat_ai: "Динамические цены ИИ",
+    why_stat_reservations: "Ваши бронирования",
+
+    // Gallery Split & Testimonial
+    gallery_eyebrow: "Вдохновение для путешествий · Изысканный отдых",
+    gallery_title_1: "Весь мир",
+    gallery_title_2: "Принадлежит вам",
+    gallery_btn: "Смотреть все направления",
+    testimonial_quote: "Незабываемый отдых начинается с внимания к деталям и свободы открытий.",
+    testimonial_sub: "Наш подход к премиальному отдыху",
+
+    // CTA Banner
+    cta_eyebrow: "Начните свое путешествие",
+    cta_title: "Готовы отправиться в путь?",
+    cta_desc: "Ваш идеальный отдых находится на расстоянии одного клика.",
+    cta_explore_btn: "Все курорты",
+    cta_plan_btn: "Спланировать отдых",
+
+    // Account & Checkout
+    account_menu: "Меню аккаунта",
+    account_loading: "Загрузка профиля…",
+    account_sign_in: "Войти",
+    account_create: "Регистрация",
+    account_my_profile: "Мой профиль",
+    account_my_bookings: "Мои бронирования",
+    account_management: "Управление отелем",
+    account_price_quote: "Расчет цен",
+    account_sign_out: "Выйти",
+    account_signing_out: "Выход из системы…",
+
+    // Footer
+    footer_tagline: "Вдохновение для путешествий, изысканные номера и безупречный путь к вашему идеальному отдыху.",
+    footer_quick_links: "Быстрые ссылки",
+    footer_experience: "Впечатления",
+    footer_legal: "Правовая информация",
+    footer_privacy: "Конфиденциальность",
+    footer_terms: "Условия обслуживания",
+    footer_contact: "Служба консьержа",
+    footer_copyright: "© 2026 Aurum Hotel AI. Все права защищены.",
+  },
+
+  zh: {
+    // Navigation
+    nav_home: '首页',
+    nav_destinations: '目的地',
+    nav_rooms: '客房精选',
+    nav_about: '关于我们',
+    nav_quote: 'AI智能报价',
+    nav_my_bookings: '我的预订',
+    nav_profile: '个人中心',
+    nav_admin: '管理控制台',
+    nav_login: '登录',
+    nav_register: '注册',
+    nav_logout: '退出登录',
+    nav_greeting: '您好',
+    nav_book_now: '立即预订',
+    
+    // Theme & Lang
+    theme_light: '浅色模式',
+    theme_dark: '深色模式',
+    lang_switch: '语言',
+
+    // Hero Section
+    hero_eyebrow: "全球顶级隐逸之所",
+    hero_title_1: "奢华相遇",
+    hero_title_2: "漫漫",
+    hero_title_3: "天际",
+    hero_desc: "灵感源自全球最壮丽的度假胜地。每一个细节皆为非凡体验而精心雕琢。",
+    hero_stat_collection: "客房精选",
+    hero_stat_stay: "您的假期",
+    hero_dest: "目的地",
+    hero_where_to: "您想去哪里？",
+    hero_check_in: "入住日期",
+    hero_check_out: "退房日期",
+    hero_guests: "人数",
+    hero_search: "立即搜索",
+
+    // Destinations Section
+    dest_eyebrow: "精选度假胜地",
+    dest_title: "梦想目的地静候您的光临",
+    dest_filter_all: "全部",
+    dest_filter_beach: "海滨沙滩",
+    dest_filter_mountain: "崇山峻岭",
+    dest_filter_city: "繁华都市",
+    dest_filter_island: "秘境海岛",
+    dest_explore: "探索详情",
+    dest_view_all: "浏览全部目的地",
+
+    // Rooms Section
+    rooms_eyebrow: "尊贵下榻之所",
+    rooms_title: "精致空间，无限舒适",
+    rooms_view_all: "查看所有房型",
+    rooms_max_guests: "位客人上限",
+    rooms_available_now: "间即时可用",
+    rooms_total_rooms: "间客房总数",
+    rooms_book: "立即预订",
+    rooms_per_night: "/ 每晚",
+    rooms_base_price: "基础参考价",
+    rooms_search_placeholder: "搜索客房房型…",
+    rooms_capacity_any: "任意人数容纳",
+    rooms_at_least: "至少",
+    rooms_available_only: "仅显示有房",
+    rooms_checkin_label: "入住日期",
+    rooms_duration_label: "入住晚数",
+    rooms_nights: "晚",
+    rooms_guests_label: "入住人数",
+    rooms_estimate_title: "基准价格预估",
+    rooms_check_final_btn: "查询实时价格与房态",
+    rooms_empty: "暂无符合条件的客房，请稍后重试。",
+
+    // Why Aurum
+    why_eyebrow: "为何选择 Aurum",
+    why_title: "每一次旅程，皆为杰作",
+    why_desc: "我们坚信旅行是一门崇高的艺术。从初次搜索到依依惜别，Aurum 巧妙结合精准科技与温情服务，打造超越平凡的专属记忆。",
+    why_story_btn: "品牌传奇",
+    why_stat_categories: "客房类型",
+    why_stat_dates: "行程日期",
+    why_stat_ai: "AI 动态调价",
+    why_stat_reservations: "我的预留",
+
+    // Gallery Split & Testimonial
+    gallery_eyebrow: "旅行灵感 · 独具匠心",
+    gallery_title_1: "整个世界",
+    gallery_title_2: "尽在掌握",
+    gallery_btn: "探索全部目的地",
+    testimonial_quote: "一次难忘的停留，始于体贴入微的细节与探寻未知的空间。",
+    testimonial_sub: "我们的至臻款待哲学",
+
+    // CTA Banner
+    cta_eyebrow: "开启您的非凡之旅",
+    cta_title: "准备好启程了吗？",
+    cta_desc: "专属定制的奢华避世之所，触手可得。",
+    cta_explore_btn: "探索所有度假村",
+    cta_plan_btn: "规划您的假期",
+
+    // Account & Checkout
+    account_menu: "账户中心",
+    account_loading: "正在加载账户…",
+    account_sign_in: "登录",
+    account_create: "注册账户",
+    account_my_profile: "个人资料",
+    account_my_bookings: "我的预订记录",
+    account_management: "酒店管理后台",
+    account_price_quote: "实时价格查询",
+    account_sign_out: "退出登录",
+    account_signing_out: "正在安全登出…",
+
+    // Footer
+    footer_tagline: "以优雅的旅行灵感、精致的居所空间，引领您通往下一段难忘旅程。",
+    footer_quick_links: "快捷导航",
+    footer_experience: "奢华体验",
+    footer_legal: "法律与政策",
+    footer_privacy: "隐私保护协议",
+    footer_terms: "宾客服务条款",
+    footer_contact: "贵宾礼宾联系",
+    footer_copyright: "© 2026 Aurum Hotel AI. 保留所有权利。",
+  },
+
+  ja: {
+    // Navigation
+    nav_home: 'ホーム',
+    nav_destinations: '目的地',
+    nav_rooms: '客房一覧',
+    nav_about: 'ホテルについて',
+    nav_quote: 'AI宿泊見積り',
+    nav_my_bookings: '予約確認',
+    nav_profile: 'マイプロフィール',
+    nav_admin: '管理者画面',
+    nav_login: 'ログイン',
+    nav_register: '新規会員登録',
+    nav_logout: 'ログアウト',
+    nav_greeting: 'ようこそ',
+    nav_book_now: '宿泊予約',
+    
+    // Theme & Lang
+    theme_light: 'ライトモード',
+    theme_dark: 'ダークモード',
+    lang_switch: '言語選択',
+
+    // Hero Section
+    hero_eyebrow: "世界最高峰のリトリート",
+    hero_title_1: "贅沢が",
+    hero_title_2: "地平線と",
+    hero_title_3: "出逢う場所",
+    hero_desc: "息をのむほど美しい世界の絶景にインスパイアされた、比類なき至福のひとときをご体験ください。",
+    hero_stat_collection: "客室コレクション",
+    hero_stat_stay: "ご滞在プラン",
+    hero_dest: "目的地",
+    hero_where_to: "どちらへ行かれますか？",
+    hero_check_in: "チェックイン",
+    hero_check_out: "チェックアウト",
+    hero_guests: "宿泊人数",
+    hero_search: "検索する",
+
+    // Destinations Section
+    dest_eyebrow: "厳選された旅先",
+    dest_title: "憧れの目的地があなたを待っています",
+    dest_filter_all: "すべて",
+    dest_filter_beach: "ビーチ",
+    dest_filter_mountain: "マウンテン",
+    dest_filter_city: "シティ",
+    dest_filter_island: "アイランド",
+    dest_explore: "詳細を見る",
+    dest_view_all: "すべての目的地を見る",
+
+    // Rooms Section
+    rooms_eyebrow: "至高の客室",
+    rooms_title: "洗練された空間、心地よい安らぎ",
+    rooms_view_all: "すべての客室",
+    rooms_max_guests: "名様まで",
+    rooms_available_now: "室空室あり",
+    rooms_total_rooms: "客室総数",
+    rooms_book: "予約する",
+    rooms_per_night: "/ 泊",
+    rooms_base_price: "基本料金",
+    rooms_search_placeholder: "客室タイプを検索…",
+    rooms_capacity_any: "収容人数（指定なし）",
+    rooms_at_least: "最低",
+    rooms_available_only: "空室のみ表示",
+    rooms_checkin_label: "チェックイン日",
+    rooms_duration_label: "宿泊日数",
+    rooms_nights: "泊",
+    rooms_guests_label: "宿泊人数",
+    rooms_estimate_title: "基本料金のお見積もり",
+    rooms_check_final_btn: "最終料金と空室状況を確認",
+    rooms_empty: "現在表示可能な客室がございません。後ほどご確認ください。",
+
+    // Why Aurum
+    why_eyebrow: "Aurumが選ばれる理由",
+    why_title: "すべての旅を、至高の芸術へ",
+    why_desc: "旅とは芸術であると私たちは信じています。探求から出発、そしてお見送りまで、Aurumは心に刻まれる非凡な体験をお届けします。",
+    why_story_btn: "ブランドストーリー",
+    why_stat_categories: "客室カテゴリー",
+    why_stat_dates: "宿泊日程",
+    why_stat_ai: "AIダイナミックプライシング",
+    why_stat_reservations: "ご予約一覧",
+
+    // Gallery Split & Testimonial
+    gallery_eyebrow: "旅のインスピレーション · 上質なご滞在",
+    gallery_title_1: "世界は",
+    gallery_title_2: "あなたのもの",
+    gallery_btn: "すべての目的地を見る",
+    testimonial_quote: "忘れられないご滞在は、細やかな気配りと発見に満ちた空間から始まります。",
+    testimonial_sub: "上質な滞在へのこだわり",
+
+    // CTA Banner
+    cta_eyebrow: "旅の始まり",
+    cta_title: "贅沢な旅へ出かけませんか？",
+    cta_desc: "あなただけのためにキュレートされたリトリートが、ここにあります。",
+    cta_explore_btn: "すべてのリゾートを見る",
+    cta_plan_btn: "滞在を計画する",
+
+    // Account & Checkout
+    account_menu: "アカウントメニュー",
+    account_loading: "読み込み中…",
+    account_sign_in: "ログイン",
+    account_create: "会員登録",
+    account_my_profile: "マイプロフィール",
+    account_my_bookings: "予約履歴",
+    account_management: "ホテル管理画面",
+    account_price_quote: "AI料金見積り",
+    account_sign_out: "ログアウト",
+    account_signing_out: "ログアウト処理中…",
+
+    // Footer
+    footer_tagline: "心に残る旅のインスピレーション、洗練された客室、そして最高の滞在をご案内いたします。",
+    footer_quick_links: "クイックリンク",
+    footer_experience: "エクスペリエンス",
+    footer_legal: "規約・ポリシー",
+    footer_privacy: "プライバシーポリシー",
+    footer_terms: "宿泊約款・利用規約",
+    footer_contact: "コンシェルジュデスク",
+    footer_copyright: "© 2026 Aurum Hotel AI. All rights reserved.",
+  },
+} as const;
+
+export type TranslationKey = keyof typeof dictionary.vi;

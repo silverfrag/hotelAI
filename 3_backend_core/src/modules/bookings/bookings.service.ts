@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -105,6 +106,8 @@ type IdempotentBookingRow = {
 
 @Injectable()
 export class BookingsService {
+  private readonly logger = new Logger(BookingsService.name);
+
   constructor(
     @InjectRepository(Booking) private readonly bookingRepository: Repository<Booking>,
     private readonly dataSource: DataSource,
@@ -203,7 +206,7 @@ export class BookingsService {
       this.assertGuestCapacity(guestCount, Number(capacityRows[0].capacity));
 
       await queryRunner.query('SELECT pg_advisory_xact_lock($1)', [room_type_id]);
-      const room = await queryRunner.manager.getRepository(Room).createQueryBuilder('room')
+      const candidateRooms = await queryRunner.manager.getRepository(Room).createQueryBuilder('room')
         .where('room.type_id = :roomTypeId', { roomTypeId: room_type_id })
         .andWhere("room.current_status <> 'Maintenance'")
         .andWhere(
@@ -230,8 +233,62 @@ export class BookingsService {
           businessDate: this.pricingService.getBusinessDate(),
         })
         .setLock('pessimistic_write')
-        .orderBy('room.room_number', 'ASC').getOne();
-      if (!room) throw new NotFoundException('Không còn phòng trống trong khoảng ngày đã chọn.');
+        .orderBy('room.room_number', 'ASC')
+        .getMany();
+
+      if (!candidateRooms.length) {
+        throw new NotFoundException('Không còn phòng trống trong khoảng ngày đã chọn.');
+      }
+
+      // Smart Room Allocation: Best-Fit Contiguous Packing & Housekeeping Readiness Scoring
+      let room = candidateRooms[0];
+      if (candidateRooms.length > 1) {
+        const candidateRoomIds = candidateRooms.map((r) => r.room_id);
+        const adjacentBookings: Array<{ room_id: number; check_in_date: string; check_out_date: string }> =
+          await queryRunner.query(
+            `SELECT bd.room_id,
+                    to_char(b.check_in_date, 'YYYY-MM-DD') AS check_in_date,
+                    to_char(b.check_out_date, 'YYYY-MM-DD') AS check_out_date
+             FROM booking_details bd
+             JOIN bookings b ON bd.booking_id = b.booking_id
+             WHERE bd.room_id = ANY($1)
+               AND b.status IN ('Confirmed', 'CheckedIn')
+               AND (to_char(b.check_out_date, 'YYYY-MM-DD') = $2 OR to_char(b.check_in_date, 'YYYY-MM-DD') = $3)`,
+            [candidateRoomIds, check_in_date, check_out_date],
+          );
+
+        let highestScore = -1;
+        for (const candidate of candidateRooms) {
+          let score = 0;
+          const roomAdj = adjacentBookings.filter((b) => Number(b.room_id) === Number(candidate.room_id));
+          const hasPreEdge = roomAdj.some((b) => b.check_out_date === check_in_date);
+          const hasPostEdge = roomAdj.some((b) => b.check_in_date === check_out_date);
+
+          // Contiguity / Edge Packing: 60 pts perfect slot, 35 pts single edge, 10 pts isolated
+          if (hasPreEdge && hasPostEdge) {
+            score += 60;
+          } else if (hasPreEdge || hasPostEdge) {
+            score += 35;
+          } else {
+            score += 10;
+          }
+
+          // Housekeeping Readiness
+          if (candidate.housekeeping_status === 'Ready') {
+            score += 30;
+          } else if (candidate.housekeeping_status === 'Cleaning') {
+            score += 15;
+          }
+
+          if (score > highestScore) {
+            highestScore = score;
+            room = candidate;
+          }
+        }
+        this.logger.log(
+          `[SmartAllocation] Room ${room.room_number} chosen (score: ${highestScore}) among ${candidateRooms.length} candidates for stay ${check_in_date} -> ${check_out_date}`,
+        );
+      }
 
       const terms = await this.workflow.snapshotForCreation(queryRunner.manager, totalPrice);
       await queryRunner.query("SELECT set_config('hotelai.actor_id', $1, true)", [customer_id]);

@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "@/components/features/figma/AccountMenu";
+import { LanguageSwitch } from "@/components/features/figma/LanguageSwitch";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 function ThemeSwitch() {
   const { theme, toggleTheme } = useTheme();
@@ -47,15 +49,9 @@ function ThemeSwitch() {
   );
 }
 
-const NAV_LINKS = [
-  { label: "Home", to: "/" },
-  { label: "Destinations", to: "/destinations" },
-  { label: "Rooms", to: "/rooms" },
-  { label: "About", to: "/about" },
-];
-
 export default function PublicShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -68,7 +64,6 @@ export default function PublicShell({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     setMenuOpen(false);
-
   }, [pathname]);
 
   useEffect(() => {
@@ -80,16 +75,25 @@ export default function PublicShell({ children }: { children: React.ReactNode })
     return () => { document.body.style.overflow = previous; window.removeEventListener("keydown", onKey); };
   }, [menuOpen]);
 
+  const navLinks = [
+    { label: t('nav_home'), to: "/" },
+    { label: t('nav_destinations'), to: "/destinations" },
+    { label: t('nav_rooms'), to: "/rooms" },
+    { label: t('nav_about'), to: "/about" },
+  ];
+
   const isActive = (to: string) =>
     to === "/" ? pathname === "/" : pathname.startsWith(to);
 
   return (
     <div
       className="figma-site min-h-screen font-sans"
-      lang="en"
       style={{ background: "var(--bg)", color: "var(--fg)" }}
     >
-      <a href="#public-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[80]">Skip to content</a>
+      <a href="#public-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[80]">
+        Skip to content
+      </a>
+
       {/* ── NAV ── */}
       <nav
         className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-5 md:px-10 lg:px-16 py-4 transition-all duration-500"
@@ -122,7 +126,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
 
         {/* Desktop links */}
         <div className="hidden md:flex items-center gap-7">
-          {NAV_LINKS.map((l) => (
+          {navLinks.map((l) => (
             <Link
               key={l.to}
               href={l.to}
@@ -144,12 +148,13 @@ export default function PublicShell({ children }: { children: React.ReactNode })
         </div>
 
         {/* Right controls */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 md:gap-4">
+          <LanguageSwitch />
           <ThemeSwitch />
           <AccountMenu />
           <Link
             href="/book"
-            className="hidden md:block text-[10px] tracking-[0.15em] uppercase px-5 py-2 transition-all duration-300"
+            className="hidden md:block text-[10px] tracking-[0.15em] uppercase px-5 py-2 transition-all duration-300 font-medium"
             style={{
               border: "1px solid var(--gold)",
               color: "var(--gold)",
@@ -163,8 +168,9 @@ export default function PublicShell({ children }: { children: React.ReactNode })
               (e.currentTarget as HTMLElement).style.color = "var(--gold)";
             }}
           >
-            Book Now
+            {t('nav_book_now')}
           </Link>
+
           {/* mobile hamburger */}
           <button
             className="md:hidden flex flex-col gap-1.5 p-1"
@@ -205,8 +211,8 @@ export default function PublicShell({ children }: { children: React.ReactNode })
           pointerEvents: menuOpen ? "auto" : "none",
         }}
       >
-        <div className="flex flex-col items-center gap-8">
-          {NAV_LINKS.map((l) => (
+        <div className="flex flex-col items-center gap-7">
+          {navLinks.map((l) => (
             <Link
               key={l.to}
               href={l.to}
@@ -216,18 +222,24 @@ export default function PublicShell({ children }: { children: React.ReactNode })
               {l.label}
             </Link>
           ))}
+
+          <div className="flex items-center gap-4 mt-3">
+            <LanguageSwitch />
+            <ThemeSwitch />
+          </div>
+
           <Link
             href="/book"
-            className="mt-4 text-[11px] tracking-[0.2em] uppercase px-8 py-3 border"
+            className="mt-2 text-[11px] tracking-[0.2em] uppercase px-8 py-3 border font-medium"
             style={{ borderColor: "var(--gold)", color: "var(--gold)" }}
           >
-            Book Now
+            {t('nav_book_now')}
           </Link>
         </div>
       </div>
 
       {/* ── PAGE CONTENT ── */}
-      <div inert={menuOpen} id="public-content" tabIndex={-1} className={/^\/(checkout|login|register|profile|bookings)(\/|$)/.test(pathname) ? "legacy-public" : undefined}>
+      <div inert={menuOpen} id="public-content" tabIndex={-1} className={/^\/(checkout)(\/|$)/.test(pathname) ? "legacy-public" : undefined}>
         {children}
       </div>
 
@@ -253,13 +265,13 @@ export default function PublicShell({ children }: { children: React.ReactNode })
               </span>
             </div>
             <p className="text-[11px] leading-relaxed max-w-[190px]" style={{ color: "var(--dim)" }}>
-              Thoughtful travel inspiration, refined rooms and a clear path to your next stay.
+              {t('footer_tagline')}
             </p>
             <div className="flex gap-3 mt-6">
               {["IG", "FB", "TW", "YT"].map((s) => (
                 <span
                   key={s}
-                  title="Social profile not configured"
+                  title="Social profile"
                   className="w-7 h-7 flex items-center justify-center text-[9px] tracking-wider transition-all duration-200"
                   style={{
                     border: "1px solid var(--border-gold)",
@@ -279,23 +291,48 @@ export default function PublicShell({ children }: { children: React.ReactNode })
               ))}
             </div>
           </div>
+
           {[
-            { title: "Destinations", links: ["Maldives", "Santorini", "Bali", "Amalfi"] },
-            { title: "Your Stay", links: ["Room Collection", "Plan Your Stay", "My Bookings", "My Profile"] },
-            { title: "Discover", links: ["About Us", "Destinations", "Sign In", "Create Account"] },
+            {
+              title: t('nav_destinations'),
+              links: [
+                { label: "Đà Nẵng", href: "/destinations?q=Đà%20Nẵng" },
+                { label: "Phú Quốc", href: "/destinations?q=Phú%20Quốc" },
+                { label: "Vịnh Ninh Vân", href: "/destinations?q=Ninh%20Vân" },
+                { label: "Côn Đảo", href: "/destinations?q=Côn%20Đảo" },
+              ],
+            },
+            {
+              title: t('hero_stat_stay'),
+              links: [
+                { label: t('nav_rooms'), href: "/rooms" },
+                { label: t('cta_plan_btn'), href: "/book" },
+                { label: t('nav_my_bookings'), href: "/bookings" },
+                { label: t('nav_profile'), href: "/profile" },
+              ],
+            },
+            {
+              title: t('footer_experience'),
+              links: [
+                { label: t('nav_about'), href: "/about" },
+                { label: t('nav_destinations'), href: "/destinations" },
+                { label: t('nav_login'), href: "/login" },
+                { label: t('nav_register'), href: "/register" },
+              ],
+            },
           ].map((col) => (
             <div key={col.title}>
               <div
-                className="text-[9px] tracking-[0.25em] uppercase mb-5"
+                className="text-[9px] tracking-[0.25em] uppercase mb-5 font-semibold"
                 style={{ color: "var(--gold)" }}
               >
                 {col.title}
               </div>
               <ul className="space-y-2.5">
                 {col.links.map((link) => (
-                  <li key={link}>
-                    <a
-                      href={col.title === "Destinations" ? `/destinations?q=${encodeURIComponent(link)}` : ({ "Room Collection": "/rooms", "Plan Your Stay": "/book", "My Bookings": "/bookings", "My Profile": "/profile", "About Us": "/about", "Destinations": "/destinations", "Sign In": "/login", "Create Account": "/register" } as Record<string,string>)[link] ?? "/about"}
+                  <li key={link.label}>
+                    <Link
+                      href={link.href}
                       className="text-[11px] transition-colors"
                       style={{ color: "var(--dim)" }}
                       onMouseEnter={(e) =>
@@ -305,24 +342,25 @@ export default function PublicShell({ children }: { children: React.ReactNode })
                         ((e.currentTarget as HTMLElement).style.color = "var(--dim)")
                       }
                     >
-                      {link}
-                    </a>
+                      {link.label}
+                    </Link>
                   </li>
                 ))}
               </ul>
             </div>
           ))}
         </div>
+
         <div
           className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3"
           style={{ borderTop: "1px solid var(--border)" }}
         >
           <span className="text-[9px] tracking-wider" style={{ color: "var(--dim2)" }}>
-            © 2026 Aurum Luxury Travel. All rights reserved.
+            {t('footer_copyright')}
           </span>
           <div className="flex gap-6">
-            {["Privacy", "Terms", "Cookies"].map((l) => (
-              <span key={l} title="Please contact the hotel for policy details" className="text-[9px] tracking-wider transition-colors" style={{ color: "var(--dim2)" }}>
+            {[t('footer_privacy'), t('footer_terms'), t('footer_contact')].map((l) => (
+              <span key={l} className="text-[9px] tracking-wider transition-colors cursor-pointer" style={{ color: "var(--dim2)" }}>
                 {l}
               </span>
             ))}

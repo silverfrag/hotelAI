@@ -1,56 +1,44 @@
 from contextlib import asynccontextmanager
-from pathlib import Path
 
-import joblib
-import pandas as pd
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import FastAPI
 
-MODEL_PATH = Path(__file__).resolve().parent / "models" / "random_forest_v1.pkl"
-ml_model = None
-
-
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    global ml_model
-    try:
-        ml_model = joblib.load(MODEL_PATH)
-        print(f"Loaded pricing model from {MODEL_PATH}")
-    except Exception as error:
-        ml_model = None
-        print(f"Unable to load pricing model: {error}")
-    yield
+from app.api.endpoints.conversion import router as conversion_router
+from app.api.endpoints.pricing import router as pricing_router
+from app.core.config import APP_TITLE, APP_VERSION, Settings, configure_logging, load_settings
+from app.services.conversion_inference import ConversionInferenceService
+from app.services.inference import PricingInferenceService
 
 
-app = FastAPI(title="Hotel AI Pricing Service", version="1.0.0", lifespan=lifespan)
+def create_app(
+    settings: Settings | None = None,
+    inference_service: PricingInferenceService | None = None,
+    conversion_inference_service: ConversionInferenceService | None = None,
+) -> FastAPI:
+    app_settings = settings or load_settings()
+    service = inference_service or PricingInferenceService(app_settings.model_path)
+    conversion_service = conversion_inference_service or ConversionInferenceService(
+        app_settings.conversion_model_path
+    )
+    configure_logging(app_settings.log_level)
+
+    @asynccontextmanager
+    async def lifespan(application: FastAPI):
+        application.state.pricing_inference = service
+        application.state.conversion_inference = conversion_service
+        service.load()
+        conversion_service.load()
+        yield
+        conversion_service.unload()
+        service.unload()
+
+    application = FastAPI(
+        title=APP_TITLE,
+        version=APP_VERSION,
+        lifespan=lifespan,
+    )
+    application.include_router(pricing_router)
+    application.include_router(conversion_router)
+    return application
 
 
-class PricingRequest(BaseModel):
-    lead_time: int = Field(ge=0)
-    arrival_month: int = Field(ge=1, le=12)
-    is_weekend: int = Field(ge=0, le=1)
-    total_of_special_requests: int = Field(ge=0, le=5)
-
-
-class PricingResponse(BaseModel):
-    status: str = "success"
-    ai_multiplier: float
-    message: str = "Dynamic price multiplier calculated."
-
-
-@app.get('/health')
-@app.get('/api/v1/health')
-def health_check() -> dict[str, str]:
-    return {"status": "ok" if ml_model is not None else "model_unavailable"}
-
-
-@app.post('/api/v1/predict-price', response_model=PricingResponse)
-def predict_dynamic_price(request: PricingRequest) -> PricingResponse:
-    if ml_model is None:
-        raise HTTPException(status_code=503, detail="Pricing model is unavailable.")
-    frame = pd.DataFrame([request.model_dump()])
-    try:
-        multiplier = round(float(ml_model.predict(frame)[0]), 3)
-        return PricingResponse(ai_multiplier=multiplier)
-    except Exception as error:
-        raise HTTPException(status_code=500, detail="Pricing inference failed.") from error
+app = create_app()

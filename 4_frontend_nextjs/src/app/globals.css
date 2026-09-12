@@ -1,93 +1,174 @@
 @import "tailwindcss";
 
-/*
-  Hotel Operations Dashboard — theme foundation.
-  Enterprise SaaS look: light content surface, dark navy sidebar,
-  slate neutrals, a confident blue primary, and clear status colors.
-  Keep this file limited to global theme tokens + truly global base rules.
-*/
-
 @theme {
-  /* Typography */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-serif: var(--font-fraunces), Georgia, serif;
 
-  /* Radius scale */
-  --radius: 0.625rem;
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-arch: 2.75rem;
 
-  /* Neutrals / surfaces */
-  --color-background: #f4f6fa;
-  --color-foreground: #0f172a;
-  --color-card: #ffffff;
-  --color-card-foreground: #0f172a;
-  --color-popover: #ffffff;
-  --color-popover-foreground: #0f172a;
-  --color-muted: #f1f5f9;
-  --color-muted-foreground: #64748b;
-  --color-border: #e2e8f0;
-  --color-input: #e2e8f0;
-  --color-ring: #2563eb;
+  --color-background: #090b11;
+  --color-foreground: #f8fafc;
 
-  /* Brand primary */
-  --color-primary: #1d4ed8;
-  --color-primary-foreground: #ffffff;
-  --color-primary-muted: #eff4ff;
-
-  /* Secondary / subtle accents */
-  --color-secondary: #f1f5f9;
-  --color-secondary-foreground: #0f172a;
-  --color-accent: #eef2ff;
-  --color-accent-foreground: #1e293b;
-
-  /* Sidebar (dark navy) */
-  --color-sidebar: #0e1729;
-  --color-sidebar-foreground: #94a3b8;
+  --color-sidebar: #0d1117;
+  --color-sidebar-foreground: #f8fafc;
+  --color-sidebar-border: rgba(255, 255, 255, 0.08);
+  --color-sidebar-active: rgba(245, 158, 11, 0.12);
+  --color-sidebar-active-foreground: #fbbf24;
   --color-sidebar-heading: #64748b;
-  --color-sidebar-item: #cbd5e1;
-  --color-sidebar-hover: #1c2740;
-  --color-sidebar-active: #1d4ed8;
-  --color-sidebar-active-foreground: #ffffff;
-  --color-sidebar-border: #1e293b;
+  --color-sidebar-item: #94a3b8;
+  --color-sidebar-hover: rgba(255, 255, 255, 0.05);
 
-  /* Status colors */
-  --color-success: #16a34a;
-  --color-success-foreground: #ffffff;
-  --color-success-muted: #ecfdf3;
-  --color-warning: #d97706;
-  --color-warning-foreground: #ffffff;
-  --color-warning-muted: #fffbeb;
-  --color-danger: #dc2626;
-  --color-danger-foreground: #ffffff;
-  --color-danger-muted: #fef2f2;
-  --color-info: #2563eb;
-  --color-info-foreground: #ffffff;
-  --color-info-muted: #eff6ff;
+  --color-card: #131823;
+  --color-card-foreground: #f8fafc;
+
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-input: rgba(255, 255, 255, 0.12);
+  --color-ring: #f59e0b;
+
+  --color-muted: rgba(255, 255, 255, 0.05);
+  --color-muted-foreground: #94a3b8;
+
+  --color-primary: #f59e0b;
+  --color-primary-foreground: #090b11;
+  --color-primary-muted: rgba(245, 158, 11, 0.12);
+
+  --color-secondary: #1a202c;
+  --color-secondary-foreground: #e2e8f0;
+
+  --color-success: #10b981;
+  --color-success-foreground: #022c22;
+  --color-success-muted: rgba(16, 185, 129, 0.12);
+
+  --color-warning: #f59e0b;
+  --color-warning-foreground: #451a03;
+  --color-warning-muted: rgba(245, 158, 11, 0.12);
+
+  --color-danger: #ef4444;
+  --color-danger-foreground: #450a0a;
+  --color-danger-muted: rgba(239, 68, 68, 0.12);
+
+  --color-info: #38bdf8;
+  --color-info-foreground: #082f49;
+  --color-info-muted: rgba(56, 189, 248, 0.12);
+}
+
+:root {
+  color-scheme: dark;
+  --bg-primary: #0c0905;
+  --bg-surface: #0f0b07;
+  --bg-surface-elevated: #13100b;
+  --bg-glass: rgba(12, 9, 5, 0.78);
+  --bg-glass-card: rgba(19, 15, 10, 0.82);
+  --border-subtle: rgba(196, 153, 90, 0.10);
+  --border-gold: rgba(196, 153, 90, 0.22);
+  --border-glass: rgba(196, 153, 90, 0.16);
+  --text-primary: #f0e8db;
+  --text-secondary: #b9a68d;
+  --text-muted: #9a8060;
+  --gold-primary: #c4995a;
+  --gold-secondary: #ddb06a;
+  --gold-light: rgba(196, 153, 90, 0.10);
+  --gold-glow: rgba(196, 153, 90, 0.18);
+  --card-shadow: 0 24px 60px -15px rgba(0, 0, 0, 0.65), 0 0 1px rgba(196, 153, 90, 0.2);
+  --hero-gradient: linear-gradient(135deg, #0c0905 0%, #13100b 60%, #20170d 100%);
+  --navbar-bg: rgba(12, 9, 5, 0.88);
+}
+
+.dark, [data-theme='dark'] {
+  color-scheme: dark;
+  --bg-primary: #090b10;
+  --bg-surface: #12151e;
+  --bg-surface-elevated: #1a1e2a;
+  --bg-glass: rgba(18, 21, 30, 0.78);
+  --bg-glass-card: rgba(20, 24, 34, 0.86);
+  --border-subtle: rgba(255, 255, 255, 0.09);
+  --border-gold: rgba(226, 192, 141, 0.32);
+  --border-glass: rgba(255, 255, 255, 0.12);
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --gold-primary: #e2c08d;
+  --gold-secondary: #f3d9a8;
+  --gold-light: rgba(226, 192, 141, 0.08);
+  --gold-glow: rgba(226, 192, 141, 0.18);
+  --card-shadow: 0 24px 60px -15px rgba(0, 0, 0, 0.65), 0 0 1px rgba(226, 192, 141, 0.25);
+  --hero-gradient: linear-gradient(135deg, #07090e 0%, #0d121c 55%, #151d2c 100%);
+  --navbar-bg: rgba(9, 11, 16, 0.82);
 }
 
 @layer base {
   * {
-    border-color: var(--color-border);
+    box-sizing: border-box;
   }
 
   html {
-    -webkit-text-size-adjust: 100%;
-    color-scheme: light;
+    scroll-behavior: smooth;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
     font-family: var(--font-sans);
+    margin: 0;
+    padding: 0;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    min-height: 100vh;
   }
 
-  /* Tabular figures for data-dense numeric cells */
-  .tabular-nums {
-    font-variant-numeric: tabular-nums;
+  h1, h2, h3, .font-serif {
+    font-family: var(--font-serif);
+    letter-spacing: -0.015em;
+  }
+
+  /* Custom luxury scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-subtle);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--gold-secondary);
   }
 }
+
+/* The public experience owns the prototype layout. Keep legacy dashboard
+   styles available for its components, but prevent their global defaults from
+   constraining the public shell. */
+.public-site {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.public-site main {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.public-site a {
+  color: inherit;
+}
+
+/* Clean Modern Operations Console Utilities */
+.console-card {
+  background-color: #131823;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+  transition: border-color 0.15s ease;
+}
+
+.console-card:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+

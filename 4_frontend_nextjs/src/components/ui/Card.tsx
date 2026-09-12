@@ -7,7 +7,7 @@ export const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
     <div
       ref={ref}
       className={cn(
-        'rounded-xl border border-border bg-card text-card-foreground shadow-sm',
+        'rounded-xl border border-white/[0.08] bg-[#131823] text-slate-100 shadow-sm transition-colors hover:border-white/[0.14]',
         className,
       )}
       {...props}
@@ -31,7 +31,7 @@ export const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadi
   ({ className, ...props }, ref) => (
     <h3
       ref={ref}
-      className={cn('text-base font-semibold leading-tight tracking-tight', className)}
+      className={cn('text-base font-semibold leading-tight tracking-tight text-slate-100', className)}
       {...props}
     />
   ),
@@ -40,7 +40,7 @@ CardTitle.displayName = 'CardTitle';
 
 export const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
   ({ className, ...props }, ref) => (
-    <p ref={ref} className={cn('text-sm text-muted-foreground', className)} {...props} />
+    <p ref={ref} className={cn('text-xs text-slate-400 leading-relaxed', className)} {...props} />
   ),
 );
 CardDescription.displayName = 'CardDescription';
@@ -56,9 +56,11 @@ export const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEleme
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('flex items-center gap-2 px-5 py-4 border-t border-border', className)}
+      className={cn('flex items-center gap-2 px-5 py-3.5 border-t border-white/[0.06] bg-white/[0.01] rounded-b-xl', className)}
       {...props}
     />
   ),
 );
 CardFooter.displayName = 'CardFooter';
+
+

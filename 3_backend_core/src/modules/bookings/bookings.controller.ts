@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingsService } from './bookings.service';
@@ -6,8 +6,16 @@ import { BookingsService } from './bookings.service';
 export class BookingsController {
   constructor(private readonly bookings: BookingsService) {}
   @Post() @UseGuards(JwtAuthGuard)
-  async create(@Body() dto: CreateBookingDto, @Req() request: { user: { sub: string } }) {
-    return { status: 'success', message: 'Đặt phòng và tính giá động thành công!', data: await this.bookings.create(dto, request.user.sub) };
+  async create(
+    @Body() dto: CreateBookingDto,
+    @Req() request: { user: { sub: string } },
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return {
+      status: 'success',
+      message: 'Đặt phòng và tính giá động thành công!',
+      data: await this.bookings.create(dto, request.user.sub, idempotencyKey),
+    };
   }
   @Get() @UseGuards(JwtAuthGuard)
   async findAll(@Req() request: { user: { sub: string; role: string } }) {

@@ -1,0 +1,160 @@
+# Disposable validation stack only. These credentials must never be reused for deployment.
+# Always invoke this file explicitly; it contains no frontend and shares no live volumes.
+name: hotelai-ops-validation
+
+x-backend-build: &backend-build
+  context: ../../3_backend_core
+
+x-database: &database
+  DB_HOST: postgres
+  DB_PORT: 5432
+  DB_USER: hotel_validation
+  DB_PASSWORD: ops-validation-only-password
+  DB_NAME: ${VALIDATION_DB_NAME:-hotel_validation}
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: hotel_validation
+      POSTGRES_PASSWORD: ops-validation-only-password
+      POSTGRES_DB: hotel_validation
+    ports:
+      - "127.0.0.1:55442:5432"
+    volumes:
+      - validation_pg_data:/var/lib/postgresql/data
+      - ../postgres/init_schema.sql:/docker-entrypoint-initdb.d/01-init-schema.sql:ro
+      - ../postgres/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - ./init-migration-history.sql:/docker-entrypoint-initdb.d/03-migration-history.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hotel_validation -d hotel_validation"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:56380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  kafka_volume_init:
+    image: apache/kafka:3.7.0
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command: ["chown 1000:1000 /validation-kafka"]
+    volumes:
+      - validation_kafka_data:/validation-kafka
+
+  kafka:
+    image: apache/kafka:3.7.0
+    ports:
+      - "127.0.0.1:59093:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://127.0.0.1:59093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    volumes:
+      - validation_kafka_data:/tmp/kafka-logs
+    depends_on:
+      kafka_volume_init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
+
+  ai_service:
+    build:
+      context: ../../2_ai_pricing_service
+      target: production
+    init: true
+    ports:
+      - "127.0.0.1:58000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  db_migrations:
+    build: *backend-build
+    image: hotelai-ops-validation-backend:local
+    working_dir: /app
+    environment:
+      <<: *database
+      MIGRATIONS_DIR: /migrations
+    volumes:
+      - ./migrate.mjs:/operations/migrate.mjs:ro
+      - ../postgres/migrations:/migrations:ro
+    command: ["node", "/operations/migrate.mjs", "--apply"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend_core:
+    build: *backend-build
+    image: hotelai-ops-validation-backend:local
+    init: true
+    environment:
+      <<: *database
+      JWT_SECRET: validation-only-jwt-never-deploy-this-development-stack-2026
+      DB_USER: ${VALIDATION_APP_USER:-hotel_validation}
+      DB_PASSWORD: ${VALIDATION_APP_PASSWORD:-ops-validation-only-password}
+      HOTEL_TIMEZONE: Asia/Bangkok
+      CORS_ORIGINS: http://localhost:53002,http://127.0.0.1:53002
+      COOKIE_SECURE: "false"
+      AI_SERVICE_URL: http://ai_service:8000/api/v1/predict-price
+      AI_SHADOW_OPTIMIZER_URL: http://ai_service:8000/api/v1/optimize-price-shadow
+      AI_SERVICE_TIMEOUT_MS: 5000
+      AI_SHADOW_TIMEOUT_MS: 750
+      PRICING_QUOTE_TTL_SECONDS: 900
+      REDIS_URL: redis://redis:6379
+      REDIS_CONNECT_TIMEOUT_MS: 1500
+      ROOM_CATALOG_CACHE_TTL_SECONDS: 300
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_CLIENT_ID: hotel-validation-backend
+      KAFKA_DOMAIN_EVENTS_TOPIC: hotel.validation.domain-events.v1
+      KAFKA_TOPIC_PARTITIONS: 1
+      KAFKA_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONNECTION_TIMEOUT_MS: 2000
+      KAFKA_REQUEST_TIMEOUT_MS: 5000
+      OUTBOX_POLL_INTERVAL_MS: 500
+      OUTBOX_BATCH_SIZE: 20
+      BOOKING_EXPIRY_POLL_MS: 1000
+    ports:
+      - "127.0.0.1:53002:3000"
+    depends_on:
+      db_migrations:
+        condition: service_completed_successfully
+      ai_service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/v1/core/health/ready',{signal:AbortSignal.timeout(3000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+volumes:
+  validation_pg_data:
+  validation_kafka_data:

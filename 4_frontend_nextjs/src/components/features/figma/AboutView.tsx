@@ -113,13 +113,13 @@ export default function AboutView() {
             </h2>
             <div className="space-y-5 text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
               <p>
-                When you stand at the edge of the Maldivian atoll at 5:47am, before the world wakes — that is not a room you booked. That is a moment that rewrites something in you.
+                When you stand at the edge of the Son Tra peninsula or Ninh Van bay at 5:47am, before the world wakes — that is not just a room you booked. That is a timeless moment that rewrites something within you.
               </p>
               <p>
-                HotelAI helps you turn the idea of a stay into a clear plan. Explore our hotel's rooms, compare the details, and find the space that feels right for you.
+                HotelAI brings world-class AI precision and Vietnamese warmth together. Explore our flagship resort rooms, compare the bespoke details, and find the sanctuary that feels right for you.
               </p>
               <p>
-                The destinations and travel imagery on this site are editorial inspiration. Reservations are available from our hotel's room collection; check your dates to see current availability and pricing.
+                The destinations and travel imagery on this site are editorial inspiration celebrating Vietnam's most iconic landscapes. Reservations are available directly from our resort's room collection; check your dates to see current availability and dynamic pricing.
               </p>
             </div>
           </div>
@@ -130,8 +130,8 @@ export default function AboutView() {
               style={{ borderRadius: "9999px 9999px 6px 6px" }}
             >
               <img
-                src="https://images.unsplash.com/photo-1586861642026-74a6da22a3cd?w=700&h=875&fit=crop&auto=format"
-                alt="Maldives overwater view"
+                src="https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=700&h=875&fit=crop&auto=format"
+                alt="Vietnam coastal luxury view"
                 className="w-full h-full object-cover"
               />
             </div>

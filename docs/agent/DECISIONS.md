@@ -57,3 +57,16 @@ outage/recovery were observed. The in-app browser stalled at the existing native
 cancellation confirmation and did not expose a dismissible dialog. Cancellation,
 profile update and logout have passing API/unit coverage; their remaining final
 browser interactions are documented as a tool limitation, not claimed as passed.
+
+## ADR-010 — Auth belongs to the Aurum public design
+
+Login/register use the public design tokens in an isolated CSS module and leave
+the legacy wrapper. Preserve Vietnamese form labels, cookie auth and safe return
+navigation. Mode-switch links carry the validated booking destination. The
+original legacy CSS remains available to account/history/checkout.
+
+AI product copy must distinguish historical-price prediction from demonstrated
+revenue optimization. Describe actual v2 inputs, new-quote policy semantics and
+offline retraining. Keep model improvement/training proposals in the source-backed
+AI_PRODUCT_AND_TRAINING.md; no speculative training job or model promotion runs
+as part of an authentication UI correction.

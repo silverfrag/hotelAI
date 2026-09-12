@@ -1,0 +1,115 @@
+{
+  "artifact_schema_version": "1.0.0",
+  "created_at_utc": "2026-09-04T01:32:53.513948+00:00",
+  "data": {
+    "filter": "hotel == City Hotel AND is_canceled == 0 AND adr > 0",
+    "filtered_city_hotel_rows": 46228,
+    "sha256": "7c2ae42a7353905ea136e5c2287f17c92c5435826598bfbb8491c6f0c7b1fc06",
+    "source_file": "hotel_bookings.csv",
+    "source_rows": 119390,
+    "training_candidate_rows": 45149
+  },
+  "evaluation": {
+    "baseline": {
+      "fallback": "training_month_median_then_training_global_median",
+      "global_fallbacks": 0,
+      "global_median": 1.0,
+      "group_matches": 9034,
+      "mae": 0.363054,
+      "month_fallbacks": 0,
+      "strategy": "training_month_and_arrival_weekday_median"
+    },
+    "feature_importance": {
+      "arrival_month": 0.395344,
+      "is_weekend": 0.036286,
+      "lead_time": 0.365974,
+      "total_of_special_requests": 0.202395
+    },
+    "holdout_rows": 9034,
+    "mae": 0.336386,
+    "mae_improvement_over_baseline": 0.073453,
+    "mape": 0.225899,
+    "passes_baseline_gate": true,
+    "r2": -0.249962,
+    "rmse": 0.465875,
+    "split": {
+      "actual_holdout_fraction": 0.200093,
+      "cutoff_date": "2017-04-25",
+      "holdout_date_range": [
+        "2017-04-25",
+        "2017-08-31"
+      ],
+      "requested_holdout_fraction": 0.2,
+      "strategy": "chronological_by_arrival_date",
+      "training_date_range": [
+        "2015-07-01",
+        "2017-04-24"
+      ]
+    },
+    "target_base_adr": 95.0,
+    "training_rows": 36115
+  },
+  "feature_contract": {
+    "feature_order": [
+      "lead_time",
+      "arrival_month",
+      "is_weekend",
+      "total_of_special_requests"
+    ],
+    "stay_interval": "check-in inclusive, check-out exclusive",
+    "version": "1.0.0",
+    "weekend_days": [
+      "Saturday",
+      "Sunday"
+    ],
+    "weekend_definition": "1 when at least one occupied night in [check_in_date, check_out_date) starts on Saturday or Sunday; otherwise 0"
+  },
+  "model_version": "random_forest_v1",
+  "runtime": {
+    "joblib": "1.5.3",
+    "pandas": "3.0.5",
+    "python": "3.12.14",
+    "scikit_learn": "1.9.0"
+  },
+  "target": {
+    "base_adr": 95.0,
+    "clip_range": [
+      0.5,
+      3.0
+    ],
+    "definition": "ADR / median positive ADR from the chronological training partition",
+    "name": "price_multiplier"
+  },
+  "training": {
+    "config": {
+      "max_depth": 10,
+      "n_estimators": 100,
+      "n_jobs": 1,
+      "random_seed": 42,
+      "test_size": 0.2
+    },
+    "estimator": "RandomForestRegressor",
+    "estimator_parameters": {
+      "bootstrap": true,
+      "ccp_alpha": 0.0,
+      "criterion": "squared_error",
+      "max_depth": 10,
+      "max_features": 1.0,
+      "max_leaf_nodes": null,
+      "max_samples": null,
+      "min_impurity_decrease": 0.0,
+      "min_samples_leaf": 1,
+      "min_samples_split": 2,
+      "min_weight_fraction_leaf": 0.0,
+      "monotonic_cst": null,
+      "n_estimators": 100,
+      "n_jobs": 1,
+      "oob_score": false,
+      "random_state": 42,
+      "verbose": 0,
+      "warm_start": false
+    },
+    "script_sha256": "276102fcad0ee6d417df6e090cd1021603c7957614da2ca099a20ad04abace6b"
+  },
+  "training_run_id": "e4357b2c68279af4"
+}

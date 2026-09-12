@@ -1,10 +1,73 @@
 # Current State
 
-Last updated: 2026-09-10
+Last updated: 2026-09-12
 Current branch: v0/hotel-management-dashboard-513c8baf
-Latest implementation checkpoint: 1c1bcd4 feat(frontend): connect Figma booking flow to core and AI pricing
-Current phase: Development handoff complete
-Status: IMPLEMENTED_WITH_DOCUMENTED_BROWSER_VERIFICATION_LIMIT
+Latest implementation checkpoint: feat(hotel-ai): expand 98-room inventory, smart allocation, ai upgrade engine & housekeeping dispatcher
+Current phase: Production-ready baseline commit & future roadmap deduction
+Status: READY_FOR_GIT_PUSH_AND_ROADMAP
+
+## Latest milestone — 2026-09-12 (Base Release)
+
+1. **98-Room Physical Inventory Expansion**:
+   - Expanded PostgreSQL seed and live database from 7 rooms to 98 physical rooms across 8 luxury room types (Deluxe King, Twin, Family Suite, Ocean Suite, Sunrise Suite, Spa Villas, Penthouse, Presidential Villa).
+   - Flushed and synchronized Redis caches; verified catalog and inventory integrity across frontend & backend.
+
+2. **Smart Contiguity & Turnover Room Allocation Engine**:
+   - Upgraded allocation in `3_backend_core/src/modules/bookings/bookings.service.ts` from naive `ORDER BY room_number ASC` to interval bin-packing (+60 pts dual-edge contiguity, +35 pts single-edge, +30 pts Ready status, deterministic tie-breaker).
+
+3. **AI Conversion Model Retraining (Challenger v1)**:
+   - Exported 3,034 quotes across the 98-room distribution.
+   - Retrained `conversion_challenger_v1.pkl` (`ROC AUC = 0.7157`, `log_loss_improvement = +0.0631`, passing performance & readiness gates).
+
+4. **Smart Room Upgrade & Rebalancing Engine**:
+   - Added DB migration `016_smart_room_upgrades.sql` with controlled bypass flag `hotelai.allow_room_upgrade = 'on'`.
+   - Built upgrade evaluation algorithms and transactional execution in `admin-room-turnover.service.ts` and `admin-room-turnover.controller.ts`.
+
+5. **Housekeeping Dispatcher Operations Dashboard**:
+   - Implemented `4_frontend_nextjs/src/app/admin/housekeeping/page.tsx` & `HousekeepingOperationsManager.tsx`.
+   - Integrated AI-driven upgrade recommendations, one-click upgrade execution, room cleaning status updates, and dispatch inspection.
+
+6. **End-to-End Validation**:
+   - Next.js production build cleanly compiled (20/20 routes).
+   - Smoke tests (`test:public-journey-smoke` & `test:api-contract-smoke`) passed 100%.
+
+
+User reported authentication UI inconsistent with the public design and asked
+where AI appears, how it works and what to learn/train next. Login/register now
+use a dedicated CSS module with Aurum tokens/fonts, editorial split layout,
+mobile layout and Vietnamese labels. They no longer inherit legacy-public CSS.
+Password visibility and accessible pending/error states are retained; switching
+login/register preserves the validated return-to-booking URL. Existing auth API
+and cookie/session behavior remain unchanged. Metadata uses Aurum branding.
+
+Admin Pricing copy now describes historical-price prediction and actual v2
+inputs. It no longer claims revenue optimization or use of special requests;
+the switch affects new quotes, preserving valid quotes and stored booking prices.
+This file was preexisting/untracked; its earlier implementation is preserved.
+
+AI_PRODUCT_AND_TRAINING.md contains the source-backed Vietnamese walkthrough,
+model/data metrics, missing capabilities, next dataset/evaluation work and a
+learning roadmap. No new model training or artifact replacement was performed.
+
+Validation: final Next production build PASS,19 routes/strict TypeScript;
+auth-recovery and auth-session scripts PASS. Built login/register HTML confirms
+Aurum, Vietnamese page language, scoped CSS, password fields and no legacy
+wrapper. This is structural verification, not visual browser verification.
+
+Preview runtime changed: old PID17448 is no longer running and port53100 is down.
+The user closed browser windows after the earlier modal stall, but CUA inventory
+still reports old tabs2/3. Automatic approval review rejected both hidden
+Start-Process and foreground npm start on loopback53100 with only "blocked by
+policy". Do not repeat alternate startup mechanisms to bypass this rejection.
+A user-input request supplies the exact startup commands and asks the user to
+start the preview. Once running, open a fresh localhost login/register tab (the
+127.0.0.1 synthetic cookie may still be signed in), then verify desktop/mobile,
+theme, password visibility, errors and auth-mode return URL. Never use real guest
+credentials or run mutation tests against the default live stack.
+
+The runtime bullets later in this file describe the preceding migration session;
+the preview status immediately above supersedes them. Training is a proposed
+next phase, not an automatically started task.
 
 ## Scope and architecture
 

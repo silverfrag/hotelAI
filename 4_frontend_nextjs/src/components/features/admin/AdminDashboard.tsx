@@ -72,9 +72,9 @@ const roomStatusLabel: Record<RoomStatus, string> = {
 };
 
 const roomStatusColor: Record<RoomStatus, string> = {
-  Available: 'bg-success',
-  Occupied: 'bg-info',
-  Maintenance: 'bg-warning',
+  Available: 'bg-emerald-500',
+  Occupied: 'bg-amber-500',
+  Maintenance: 'bg-slate-600',
 };
 
 function asNumber(value: number): number {
@@ -122,17 +122,17 @@ interface MetricCardProps {
   tone?: string;
 }
 
-function MetricCard({ label, value, helper, icon: Icon, tone = 'text-primary' }: MetricCardProps) {
+function MetricCard({ label, value, helper, icon: Icon, tone = 'text-amber-400' }: MetricCardProps) {
   return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        <span className={cn('flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted', tone)}>
-          <Icon className="size-[18px]" aria-hidden="true" />
+    <Card className="p-5 transition-all duration-150 hover:border-white/[0.15]">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+        <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-800/80 border border-white/5', tone)}>
+          <Icon className="size-4" aria-hidden="true" />
         </span>
       </div>
-      <p className="mt-3 text-2xl font-semibold tracking-tight text-foreground tabular-nums">{value}</p>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">{helper}</p>
+      <p className="mt-3 text-2xl font-bold tracking-tight text-white tabular-nums sm:text-3xl">{value}</p>
+      <p className="mt-1.5 text-xs text-slate-400 leading-relaxed">{helper}</p>
     </Card>
   );
 }
@@ -163,10 +163,10 @@ function BookingValueChart({ data }: { data: AdminMonthlyBookingValue[] }) {
 
   if (data.length === 0) {
     return (
-      <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border border-dashed border-border px-6 text-center">
-        <CircleDollarSign className="size-8 text-muted-foreground" aria-hidden="true" />
-        <p className="mt-3 font-medium">Chưa có dữ liệu giá trị booking</p>
-        <p className="mt-1 text-sm text-muted-foreground">Biểu đồ sẽ xuất hiện khi hệ thống có booking.</p>
+      <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/[0.01] px-6 text-center">
+        <CircleDollarSign className="size-8 text-slate-500" aria-hidden="true" />
+        <p className="mt-3 font-semibold text-slate-200">Chưa có dữ liệu giá trị booking</p>
+        <p className="mt-1 text-xs text-slate-400">Biểu đồ sẽ xuất hiện khi hệ thống có booking.</p>
       </div>
     );
   }
@@ -185,29 +185,29 @@ function BookingValueChart({ data }: { data: AdminMonthlyBookingValue[] }) {
         </desc>
         <defs>
           <linearGradient id="booking-value-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#2563eb" stopOpacity="0.22" />
-            <stop offset="100%" stopColor="#2563eb" stopOpacity="0.02" />
+            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.00" />
           </linearGradient>
         </defs>
         {gridValues.map((ratio) => {
           const y = top + plotHeight - ratio * plotHeight;
           return (
             <g key={ratio}>
-              <line x1={left} y1={y} x2={width - right} y2={y} stroke="#e2e8f0" strokeDasharray="4 4" />
-              <text x={left - 10} y={y + 4} textAnchor="end" fill="#64748b" fontSize="11">
+              <line x1={left} y1={y} x2={width - right} y2={y} stroke="rgba(255, 255, 255, 0.06)" strokeDasharray="3 3" />
+              <text x={left - 12} y={y + 4} textAnchor="end" fill="#64748b" fontSize="11" fontFamily="inherit" fontWeight="500">
                 {compactCurrency(maximum * ratio)}
               </text>
             </g>
           );
         })}
         {area && <path d={area} fill="url(#booking-value-area)" />}
-        {line && <path d={line} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
+        {line && <path d={line} fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
         {points.map(({ x, y, item }) => (
           <g key={item.month}>
-            <circle cx={x} cy={y} r="5" fill="#ffffff" stroke="#2563eb" strokeWidth="3">
+            <circle cx={x} cy={y} r="4.5" fill="#090b11" stroke="#f59e0b" strokeWidth="2">
               <title>{formatMonth(item.month)}: {formatCurrency(asNumber(item.booking_value))}, {item.booking_count} booking</title>
             </circle>
-            <text x={x} y={height - 20} textAnchor="middle" fill="#64748b" fontSize="11">
+            <text x={x} y={height - 20} textAnchor="middle" fill="#94a3b8" fontSize="11" fontWeight="500">
               {formatMonth(item.month)}
             </text>
           </g>
@@ -227,7 +227,7 @@ function RoomStatusPanel({ dashboard }: { dashboard: AdminDashboardData }) {
   const total = items.reduce((sum, item) => sum + Number(item.room_count), 0);
 
   return (
-    <Card>
+    <Card className="flex flex-col justify-between">
       <CardHeader>
         <CardTitle>Trạng thái phòng</CardTitle>
         <CardDescription>Ảnh chụp vận hành của {total} phòng vật lý</CardDescription>
@@ -235,36 +235,36 @@ function RoomStatusPanel({ dashboard }: { dashboard: AdminDashboardData }) {
       <CardContent>
         {items.length === 0 || total === 0 ? (
           <div className="py-10 text-center">
-            <BedDouble className="mx-auto size-8 text-muted-foreground" aria-hidden="true" />
-            <p className="mt-3 font-medium">Chưa có phòng</p>
-            <Link href="/admin/rooms" className="mt-2 inline-block text-sm font-medium text-primary hover:underline">
+            <BedDouble className="mx-auto size-8 text-slate-500" aria-hidden="true" />
+            <p className="mt-3 font-semibold text-slate-200">Chưa có phòng</p>
+            <Link href="/admin/rooms" className="mt-2 inline-block text-xs font-semibold text-amber-400 hover:underline">
               Quản lý kho phòng
             </Link>
           </div>
         ) : (
           <>
             <div
-              className="flex h-3 overflow-hidden rounded-full bg-muted"
+              className="flex h-2.5 overflow-hidden rounded-full bg-slate-800 p-0.5 border border-white/[0.06]"
               role="img"
               aria-label={items.map((item) => `${roomStatusLabel[item.status]}: ${item.room_count}`).join(', ')}
             >
               {items.map((item) => (
                 <span
                   key={item.status}
-                  className={cn('h-full', roomStatusColor[item.status])}
+                  className={cn('h-full first:rounded-l-full last:rounded-r-full', roomStatusColor[item.status])}
                   style={{ width: `${(Number(item.room_count) / total) * 100}%` }}
                   aria-hidden="true"
                 />
               ))}
             </div>
-            <ul className="mt-4 divide-y divide-border">
+            <ul className="mt-5 divide-y divide-white/[0.06]">
               {items.map((item) => (
-                <li key={item.status} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-                  <span className="flex items-center gap-2.5 text-sm">
-                    <span className={cn('size-2.5 rounded-full', roomStatusColor[item.status])} aria-hidden="true" />
+                <li key={item.status} className="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
+                  <span className="flex items-center gap-2.5 text-sm text-slate-300">
+                    <span className={cn('size-2 rounded-full', roomStatusColor[item.status])} aria-hidden="true" />
                     {roomStatusLabel[item.status]}
                   </span>
-                  <span className="text-sm font-semibold tabular-nums">{item.room_count}</span>
+                  <span className="text-sm font-semibold tabular-nums text-slate-100">{item.room_count}</span>
                 </li>
               ))}
             </ul>
@@ -278,23 +278,23 @@ function RoomStatusPanel({ dashboard }: { dashboard: AdminDashboardData }) {
 function RecentBookings({ bookings }: { bookings: AdminBooking[] }) {
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="flex-row items-start justify-between gap-4">
+      <CardHeader className="flex-row items-start justify-between gap-4 border-b border-white/[0.08] pb-4">
         <div>
           <CardTitle>Booking gần đây</CardTitle>
           <CardDescription>Hoạt động đặt phòng mới nhất trên hệ thống</CardDescription>
         </div>
         <Link
           href="/admin/bookings"
-          className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex h-8 items-center rounded-lg border border-white/10 bg-slate-800/80 px-3 text-xs font-medium text-slate-200 transition-colors hover:bg-slate-700 hover:text-white"
         >
           Xem tất cả
         </Link>
       </CardHeader>
       {bookings.length === 0 ? (
         <CardContent className="py-12 text-center">
-          <CalendarCheck2 className="mx-auto size-8 text-muted-foreground" aria-hidden="true" />
-          <p className="mt-3 font-medium">Chưa có booking</p>
-          <p className="mt-1 text-sm text-muted-foreground">Booking mới sẽ xuất hiện tại đây.</p>
+          <CalendarCheck2 className="mx-auto size-8 text-slate-500" aria-hidden="true" />
+          <p className="mt-3 font-semibold text-slate-200">Chưa có booking</p>
+          <p className="mt-1 text-sm text-slate-400">Booking mới sẽ xuất hiện tại đây.</p>
         </CardContent>
       ) : (
         <Table>
@@ -311,18 +311,18 @@ function RecentBookings({ bookings }: { bookings: AdminBooking[] }) {
             {bookings.map((booking) => (
               <TableRow key={booking.booking_id}>
                 <TableCell>
-                  <span className="block max-w-48 truncate font-medium">{booking.customer_name}</span>
-                  <span className="block max-w-48 truncate text-xs text-muted-foreground">{booking.customer_email}</span>
+                  <span className="block max-w-48 truncate font-medium text-slate-100">{booking.customer_name}</span>
+                  <span className="block max-w-48 truncate text-xs text-slate-400">{booking.customer_email}</span>
                 </TableCell>
                 <TableCell>
-                  <span className="font-medium">{booking.room_number_snapshot}</span>
-                  <span className="block text-xs text-muted-foreground">{booking.room_type_name_snapshot}</span>
+                  <span className="font-semibold text-slate-200">{booking.room_number_snapshot}</span>
+                  <span className="block text-xs text-slate-400">{booking.room_type_name_snapshot}</span>
                 </TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">
+                <TableCell className="whitespace-nowrap text-slate-300 text-xs">
                   {formatDate(booking.check_in_date)} – {formatDate(booking.check_out_date)}
-                  <span className="block text-xs">{booking.nights} đêm</span>
+                  <span className="block text-slate-400">{booking.nights} đêm</span>
                 </TableCell>
-                <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
+                <TableCell className="whitespace-nowrap text-right font-mono font-semibold text-amber-400 tabular-nums">
                   {formatCurrency(asNumber(booking.total_price))}
                 </TableCell>
                 <TableCell><StatusBadge status={booking.status} /></TableCell>
@@ -468,26 +468,26 @@ export function AdminDashboard() {
               <RoomStatusPanel dashboard={dashboard} />
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Bot className="size-5 text-primary" /> Định giá AI</CardTitle>
+                  <CardTitle className="flex items-center gap-2"><Bot className="size-5 text-amber-400" /> Định giá AI</CardTitle>
                   <CardDescription>Chính sách đang áp dụng cho booking mới</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between gap-4 rounded-lg bg-muted p-4">
+                  <div className="flex items-center justify-between gap-4 rounded-xl bg-slate-900/60 border border-white/[0.06] p-4">
                     <div>
-                      <p className="font-medium">{dashboard.pricing_setting.ai_enabled ? 'Đang bật' : 'Đang tắt'}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Phiên bản {dashboard.pricing_setting.version}</p>
+                      <p className="font-semibold text-slate-200">{dashboard.pricing_setting.ai_enabled ? 'Đang hoạt động' : 'Tạm dừng'}</p>
+                      <p className="mt-0.5 text-xs text-slate-400 font-mono">Phiên bản v{dashboard.pricing_setting.version}</p>
                     </div>
                     <Badge variant={dashboard.pricing_setting.ai_enabled ? 'success' : 'neutral'} dot>
                       {dashboard.pricing_setting.ai_enabled ? 'AI hoạt động' : 'Giá cơ sở'}
                     </Badge>
                   </div>
-                  <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                  <p className="mt-3 text-xs leading-5 text-slate-400">
                     Cập nhật gần nhất: {dashboard.pricing_setting.updated_at
                       ? formatDateTime(dashboard.pricing_setting.updated_at)
                       : 'Chưa có'}
                   </p>
-                  <Link href="/admin/pricing" className="mt-4 inline-flex text-sm font-medium text-primary hover:underline">
-                    Mở quản lý định giá
+                  <Link href="/admin/pricing" className="mt-4 inline-flex text-sm font-medium text-amber-400 hover:text-amber-300 transition-colors">
+                    Mở quản lý định giá →
                   </Link>
                 </CardContent>
               </Card>
@@ -496,13 +496,13 @@ export function AdminDashboard() {
 
           <RecentBookings bookings={dashboard.recent_bookings} />
 
-          <p className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" />
+          <p className="flex items-start gap-2 text-xs leading-5 text-slate-400">
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-400" aria-hidden="true" />
             Tất cả chỉ số trên trang được lấy trực tiếp từ hệ thống tại thời điểm tải dữ liệu.
           </p>
         </div>
       ) : !error ? (
-        <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
+        <div className="rounded-xl border border-dashed border-white/10 bg-slate-900/40 p-10 text-center text-sm text-slate-400">
           Chưa có dữ liệu tổng quan.
         </div>
       ) : null}

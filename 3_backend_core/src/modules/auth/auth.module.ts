@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { Customer } from './entities/customer.entity';
@@ -40,7 +41,7 @@ import { Customer } from './entities/customer.entity';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, ThrottlerGuard],
-  exports: [JwtModule, JwtAuthGuard],
+  providers: [AuthService, JwtAuthGuard, RolesGuard, ThrottlerGuard],
+  exports: [TypeOrmModule, JwtModule, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

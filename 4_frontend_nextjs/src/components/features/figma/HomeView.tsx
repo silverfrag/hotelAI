@@ -5,6 +5,7 @@ import Link from "next/link";
 import { destinations } from "@/data/travel-inspiration";
 import type { RoomPresentation } from "@/types/room-presentation.type";
 import { addIsoDays } from "@/utils/businessDate";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 const HERO_BG =
   "https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b?w=1920&h=1080&fit=crop&auto=format";
@@ -16,6 +17,13 @@ const GALLERY_RIGHT =
   "https://images.unsplash.com/photo-1725140310293-21e9d923f2f3?w=900&h=600&fit=crop&auto=format";
 
 const FILTERS = ["All", "Beach", "Mountain", "City", "Island"];
+const FILTER_KEY_MAP: Record<string, string> = {
+  All: "dest_filter_all",
+  Beach: "dest_filter_beach",
+  Mountain: "dest_filter_mountain",
+  City: "dest_filter_city",
+  Island: "dest_filter_island",
+};
 
 function ArrowRight() {
   return (
@@ -34,6 +42,7 @@ function StarIcon() {
 }
 
 export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentation[]; businessDate: string }) {
+  const { t, formatPrice } = useTranslation();
   const [activeFilter, setActiveFilter] = useState("All");
   const [destination, setDestination] = useState("");
   const [checkIn, setCheckIn] = useState(businessDate);
@@ -84,8 +93,8 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
         {/* floating stats */}
         <div className="absolute top-32 right-16 lg:right-28 hidden lg:flex flex-col gap-3">
           {[
-            { label: "Room Collection", value: "Discover" },
-            { label: "Your Stay", value: "Plan" },
+            { label: t("hero_stat_collection"), value: "Discover" },
+            { label: t("hero_stat_stay"), value: "Plan" },
           ].map((s) => (
             <div
               key={s.label}
@@ -115,20 +124,19 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
                 className="text-[10px] tracking-[0.28em] uppercase"
                 style={{ color: "var(--gold)" }}
               >
-                World's Finest Retreats
+                {t("hero_eyebrow")}
               </span>
             </div>
             <h1 className="font-display leading-[0.93] text-white mb-6 text-5xl md:text-7xl lg:text-[5.5rem]">
-              Where Luxury
+              {t("hero_title_1")}
               <br />
               <em className="not-italic" style={{ color: "var(--gold)" }}>
-                Meets
+                {t("hero_title_2")}
               </em>{" "}
-              Horizon
+              {t("hero_title_3")}
             </h1>
             <p className="text-sm text-[rgba(255,255,255,0.6)] max-w-sm leading-relaxed mb-10">
-              Inspired by the world's most breathtaking destinations.
-              Every detail designed for the extraordinary.
+              {t("hero_desc")}
             </p>
           </div>
         </div>
@@ -147,11 +155,11 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-0 lg:divide-x divide-[rgba(196,153,90,0.12)]">
                 <div className="lg:pr-7">
                   <label className="block text-[9px] tracking-[0.22em] uppercase mb-2" style={{ color: "var(--gold)" }}>
-                    Destination
+                    {t("hero_dest")}
                   </label>
                   <input
                     type="text"
-                    placeholder="Where to?"
+                    placeholder={t("hero_where_to")}
                     aria-label="Destination inspiration"
                     value={destination}
                     onChange={(e) => setDestination(e.target.value)}
@@ -161,7 +169,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
                 </div>
                 <div className="lg:px-7">
                   <label className="block text-[9px] tracking-[0.22em] uppercase mb-2" style={{ color: "var(--gold)" }}>
-                    Check In
+                    {t("hero_check_in")}
                   </label>
                   <input
                     type="date"
@@ -175,7 +183,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
                 </div>
                 <div className="lg:px-7">
                   <label className="block text-[9px] tracking-[0.22em] uppercase mb-2" style={{ color: "var(--gold)" }}>
-                    Check Out
+                    {t("hero_check_out")}
                   </label>
                   <input
                     type="date"
@@ -190,7 +198,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
                 <div className="lg:pl-7 flex items-end gap-4">
                   <div className="flex-1">
                     <label className="block text-[9px] tracking-[0.22em] uppercase mb-2" style={{ color: "var(--gold)" }}>
-                      Guests
+                      {t("hero_guests")}
                     </label>
                     <div className="flex items-center gap-3 pb-3" style={{ borderBottom: "1px solid rgba(196,153,90,0.18)" }}>
                       <button aria-label="Fewer guests" onClick={() => setGuests((g) => Math.max(1, g - 1))} className="text-lg leading-none w-5 text-center" style={{ color: "var(--gold)" }}>−</button>
@@ -211,7 +219,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
                       ((e.currentTarget as HTMLElement).style.background = "var(--gold)")
                     }
                   >
-                    Search <ArrowRight />
+                    {t("hero_search")} <ArrowRight />
                   </Link>
                 </div>
               </div>
@@ -231,11 +239,11 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
             <div className="flex items-center gap-3 mb-4">
               <div className="h-px w-8" style={{ background: "var(--gold)" }} />
               <span className="text-[9px] tracking-[0.28em] uppercase" style={{ color: "var(--gold)" }}>
-                Handpicked Escapes
+                {t("dest_eyebrow")}
               </span>
             </div>
             <h2 className="font-display text-4xl md:text-5xl leading-[1.0]" style={{ color: "var(--fg)" }}>
-              Your dream<br />destination awaits
+              {t("dest_title")}
             </h2>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -250,7 +258,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
                   color: activeFilter === f ? "var(--gold)" : "var(--muted)",
                 }}
               >
-                {f}
+                {t(FILTER_KEY_MAP[f] ?? f)}
               </button>
             ))}
           </div>
@@ -293,7 +301,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
                       <span className="text-white/90 font-medium">Travel inspiration</span>
                     </span>
                     <span className="text-[9px] text-white/30 uppercase tracking-wider">
-                      Explore
+                      {t("dest_explore")}
                     </span>
                   </div>
                 </div>
@@ -303,7 +311,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
                   className="text-[10px] tracking-[0.16em] uppercase flex items-center gap-1.5 transition-all duration-200"
                   style={{ color: "var(--gold)" }}
                 >
-                  Explore <ArrowRight />
+                  {t("dest_explore")} <ArrowRight />
                 </span>
               </div>
             </Link>
@@ -324,7 +332,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
               (e.currentTarget as HTMLElement).style.color = "var(--muted)";
             }}
           >
-            View All Destinations
+            {t("dest_view_all")}
           </Link>
         </div>
       </section>
@@ -338,19 +346,19 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
           <div className="flex items-center gap-3 mb-4">
             <div className="h-px w-8" style={{ background: "var(--gold)" }} />
             <span className="text-[9px] tracking-[0.28em] uppercase" style={{ color: "var(--gold)" }}>
-              Our Accommodations
+              {t("rooms_eyebrow")}
             </span>
           </div>
           <div className="flex items-end justify-between">
             <h2 className="font-display text-4xl md:text-5xl leading-[1.0]" style={{ color: "var(--fg)" }}>
-              Refined spaces,<br />boundless comfort
+              {t("rooms_title")}
             </h2>
             <Link
               href="/rooms"
               className="hidden md:block text-[10px] tracking-[0.14em] uppercase transition-colors underline underline-offset-4"
               style={{ color: "var(--muted)" }}
             >
-              View all rooms
+              {t("rooms_view_all")}
             </Link>
           </div>
         </div>
@@ -359,7 +367,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
           className="mx-5 md:mx-10 lg:mx-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px"
           style={{ background: "var(--border)" }}
         >
-          {!featuredRooms.length && <p className="p-8 text-sm" style={{color:"var(--muted)"}}>No rooms are currently listed. Please check back soon.</p>}
+          {!featuredRooms.length && <p className="p-8 text-sm" style={{color:"var(--muted)"}}>{t("rooms_empty")}</p>}
           {featuredRooms.map((room) => (
             <Link
               key={room.id}
@@ -381,7 +389,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
                 <h3 className="font-display text-lg mb-3" style={{ color: "var(--fg)" }}>
                   {room.name}
                 </h3>
-                <div className="text-[10px] mb-3" style={{ color: "var(--dim)" }}>{room.guests} max guests · {room.availableNow} available</div>
+                <div className="text-[10px] mb-3" style={{ color: "var(--dim)" }}>{room.guests} {t("rooms_max_guests")} · {room.availableNow} {t("rooms_available_now")}</div>
                 <div className="flex flex-wrap gap-1.5 mb-5">
                   {room.features.slice(0, 3).map((f) => (
                     <span
@@ -399,12 +407,12 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
                 >
                   <div>
                     <span className="font-display text-lg" style={{ color: "var(--gold)" }}>
-                      {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(room.price)}
+                      {formatPrice(room.price)}
                     </span>
-                    <span className="text-[10px] ml-1" style={{ color: "var(--dim)" }}>/night</span>
+                    <span className="text-[10px] ml-1" style={{ color: "var(--dim)" }}>{t("rooms_per_night")}</span>
                   </div>
                   <span className="text-[9px] tracking-[0.18em] uppercase flex items-center gap-1" style={{ color: "var(--gold)" }}>
-                    Book <ArrowRight />
+                    {t("rooms_book")} <ArrowRight />
                   </span>
                 </div>
               </div>
@@ -420,14 +428,14 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
             <div className="flex items-center gap-3 mb-6">
               <div className="h-px w-8" style={{ background: "var(--gold)" }} />
               <span className="text-[9px] tracking-[0.28em] uppercase" style={{ color: "var(--gold)" }}>
-                Why Aurum
+                {t("why_eyebrow")}
               </span>
             </div>
             <h2 className="font-display text-4xl md:text-5xl leading-[1.0] mb-8" style={{ color: "var(--fg)" }}>
-              Every journey,<br />a masterpiece
+              {t("why_title")}
             </h2>
             <p className="leading-relaxed text-sm mb-10 max-w-md" style={{ color: "var(--muted)" }}>
-              We believe travel is an art form. From the first search to the final farewell, Aurum orchestrates experiences that transcend the ordinary — where precision meets passion.
+              {t("why_desc")}
             </p>
             <Link
               href="/about"
@@ -442,15 +450,15 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
                 (e.currentTarget as HTMLElement).style.color = "var(--gold)";
               }}
             >
-              Our Story <ArrowRight />
+              {t("why_story_btn")} <ArrowRight />
             </Link>
           </div>
           <div className="grid grid-cols-2 gap-4">
             {[
-              { value: String(rooms.length), label: "Room Categories", sub: "Explore the collection" },
-              { value: "Plan", label: "Your Dates", sub: "Check availability" },
-              { value: "AI", label: "Dynamic Pricing", sub: "A quote for your dates" },
-              { value: "Stay", label: "Your Reservations", sub: "Saved to your account" },
+              { value: String(rooms.length), label: t("why_stat_categories"), sub: "Collection" },
+              { value: "Plan", label: t("why_stat_dates"), sub: "Availability" },
+              { value: "AI", label: t("why_stat_ai"), sub: "Dynamic" },
+              { value: "Stay", label: t("why_stat_reservations"), sub: "Account" },
             ].map((stat, i) => (
               <div
                 key={i}
@@ -490,18 +498,18 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
         <div className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-[rgba(0,0,0,0.55)] to-transparent" />
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
           <div className="text-[9px] tracking-[0.3em] uppercase mb-5" style={{ color: "var(--gold)" }}>
-            Travel Inspiration · Thoughtful Stays
+            {t("gallery_eyebrow")}
           </div>
           <h2 className="font-display text-4xl md:text-6xl lg:text-7xl text-white leading-[0.95]">
-            The World<br />
-            <em className="not-italic" style={{ color: "var(--gold)" }}>Is Yours</em>
+            {t("gallery_title_1")}<br />
+            <em className="not-italic" style={{ color: "var(--gold)" }}>{t("gallery_title_2")}</em>
           </h2>
           <Link
             href="/destinations"
             className="mt-8 text-[10px] tracking-[0.18em] uppercase px-8 py-3 transition-all duration-300"
             style={{ border: "1px solid rgba(196,153,90,0.5)", color: "var(--gold)" }}
           >
-            Explore All Destinations
+            {t("gallery_btn")}
           </Link>
         </div>
       </section>
@@ -516,13 +524,13 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
             className="font-display text-8xl leading-none mb-2 select-none"
             style={{ color: "rgba(196,153,90,0.1)" }}
           >
-            "
+            &ldquo;
           </div>
           <blockquote
             className="font-display text-2xl md:text-3xl leading-snug mb-10 italic -mt-6"
             style={{ color: "var(--fg)" }}
           >
-            A memorable stay begins with thoughtful details and room to discover.
+            {t("testimonial_quote")}
           </blockquote>
           <div className="flex items-center justify-center gap-4">
             <img
@@ -534,7 +542,7 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
             <div className="text-left">
               <div className="text-sm font-medium" style={{ color: "var(--fg2)" }}>Aurum Travel Notes</div>
               <div className="text-[9px] tracking-[0.2em] uppercase mt-0.5" style={{ color: "var(--dim)" }}>
-                Our approach to thoughtful stays
+                {t("testimonial_sub")}
               </div>
             </div>
           </div>
@@ -558,14 +566,14 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
             <div className="flex items-center gap-3 mb-4">
               <div className="h-px w-6" style={{ background: "var(--gold)" }} />
               <span className="text-[9px] tracking-[0.28em] uppercase" style={{ color: "var(--gold)" }}>
-                Begin Your Journey
+                {t("cta_eyebrow")}
               </span>
             </div>
             <h3 className="font-display text-3xl md:text-4xl text-white mb-2 leading-tight">
-              Ready to begin?
+              {t("cta_title")}
             </h3>
             <p className="text-sm text-white/50">
-              Your curated escape is one conversation away.
+              {t("cta_desc")}
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 shrink-0">
@@ -576,14 +584,14 @@ export default function HomeView({ rooms, businessDate }: { rooms: RoomPresentat
               onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--gold-hi)")}
               onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--gold)")}
             >
-              Explore All Retreats
+              {t("cta_explore_btn")}
             </Link>
             <Link
               href="/book"
               className="text-[10px] tracking-[0.16em] uppercase px-8 py-3 whitespace-nowrap transition-all duration-300"
               style={{ border: "1px solid rgba(196,153,90,0.4)", color: "var(--gold)" }}
             >
-              Plan Your Stay
+              {t("cta_plan_btn")}
             </Link>
           </div>
         </div>
