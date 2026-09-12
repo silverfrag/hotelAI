@@ -11,6 +11,7 @@ import { PricingModule } from './modules/pricing/pricing.module';
 import { UsersModule } from './modules/users/users.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { BookingWorkflowModule } from './modules/booking-workflow/booking-workflow.module';
+import { ChatModule } from './modules/chat/chat.module';
 import { InfrastructureModule } from './infrastructure/infrastructure.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
@@ -20,7 +21,7 @@ import { ApiResponseInterceptor } from './common/interceptors/api-response.inter
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     TypeOrmModule.forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (config: ConfigService) => ({ type: 'postgres', host: config.getOrThrow('DB_HOST'), port: config.getOrThrow<number>('DB_PORT'), username: config.getOrThrow('DB_USER'), password: config.getOrThrow('DB_PASSWORD'), database: config.getOrThrow('DB_NAME'), autoLoadEntities: true, synchronize: false }) }),
     InfrastructureModule,
-    AuthModule, UsersModule, RoomsModule, PricingModule, BookingsModule, PaymentsModule, AdminModule, BookingWorkflowModule,
+    AuthModule, UsersModule, RoomsModule, PricingModule, BookingsModule, PaymentsModule, AdminModule, BookingWorkflowModule, ChatModule,
   ],
   controllers: [HealthController],
   providers: [

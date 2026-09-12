@@ -38,6 +38,7 @@ export type CreatedBooking = {
   payment_status: string;
   paid_amount: number;
   balance_due: number;
+  rooms?: { room_id: number; room_number: string; room_type_id: number; applied_price: number }[];
 };
 
 export type BookingSummary = {
@@ -123,11 +124,22 @@ export class BookingsService {
   ): Promise<CreatedBooking> {
     const idempotencyKey = this.normalizeIdempotencyKey(rawIdempotencyKey);
     const requestHash = idempotencyKey ? this.hashCreateRequest(dto) : null;
-    const guestCount = dto.guest_count ?? 1;
-    const { room_type_id, check_in_date, check_out_date, total_of_special_requests } = dto;
+    const { check_in_date, check_out_date, total_of_special_requests } = dto;
 
-    // A committed replay can return before another AI inference. The lookup is
-    // repeated under the transaction-scoped advisory lock below to cover races.
+    const roomsInput = dto.rooms?.length
+      ? dto.rooms
+      : [
+          {
+            room_type_id: dto.room_type_id,
+            guest_count: dto.guest_count ?? 1,
+            quote_id: dto.quote_id,
+          },
+        ];
+
+    if (!roomsInput.length || !roomsInput[0].room_type_id) {
+      throw new BadRequestException('Phải chọn ít nhất một phòng.');
+    }
+
     if (idempotencyKey && requestHash) {
       const replay = await this.findIdempotentBooking(
         this.dataSource.manager,
@@ -140,15 +152,6 @@ export class BookingsService {
       }
     }
 
-    // A persisted quote is the source of truth for the accepted price. Legacy
-    // clients without quote_id keep the old calculation path until the UI
-    // redesign adopts the quote contract.
-    const calculatedPricing = dto.quote_id
-      ? null
-      : await this.pricingService.calculate(dto);
-    if (calculatedPricing) {
-      this.assertGuestCapacity(guestCount, calculatedPricing.roomType.capacity);
-    }
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -168,9 +171,6 @@ export class BookingsService {
         }
       }
 
-      // Serialize booking creation with suspension/deactivation. The guard
-      // checks the account before entering the service, but lifecycle state
-      // may change while pricing is being calculated.
       const customerRows = await queryRunner.query(
         `SELECT account_status
          FROM customers
@@ -182,148 +182,184 @@ export class BookingsService {
         throw new ForbiddenException('Tài khoản hiện không hoạt động nên không thể tạo booking.');
       }
 
-      const pricing = dto.quote_id
-        ? await this.pricingService.lockQuoteForBooking(queryRunner.manager, dto.quote_id, dto)
-        : calculatedPricing;
-      if (!pricing) {
-        throw new ConflictException('Không thể xác định giá cho booking.');
-      }
-      const { roomType, checkIn, leadTime, nights, nightlyPrice, totalPrice } = pricing;
-      this.assertGuestCapacity(guestCount, roomType.capacity);
+      let grandTotalPrice = 0;
+      let totalGuestCount = 0;
+      const allocatedRooms = [];
+      const usedRoomIds = new Set<number>();
 
-      // Keep capacity stable until the booking and its detail are committed.
-      // This closes the race with an admin reducing the room-type capacity.
-      const capacityRows = await queryRunner.query(
-        `SELECT capacity
-         FROM room_types
-         WHERE type_id = $1
-         FOR SHARE`,
-        [room_type_id],
-      ) as Array<{ capacity: number | string }>;
-      if (!capacityRows[0]) {
-        throw new NotFoundException(`Không tìm thấy loại phòng với ID: ${room_type_id}.`);
-      }
-      this.assertGuestCapacity(guestCount, Number(capacityRows[0].capacity));
+      for (const roomInput of roomsInput) {
+        const calculatedPricing = roomInput.quote_id
+          ? null
+          : await this.pricingService.calculate({
+              room_type_id: roomInput.room_type_id,
+              check_in_date,
+              check_out_date,
+              total_of_special_requests,
+              guest_count: roomInput.guest_count,
+            } as any);
 
-      await queryRunner.query('SELECT pg_advisory_xact_lock($1)', [room_type_id]);
-      const candidateRooms = await queryRunner.manager.getRepository(Room).createQueryBuilder('room')
-        .where('room.type_id = :roomTypeId', { roomTypeId: room_type_id })
-        .andWhere("room.current_status <> 'Maintenance'")
-        .andWhere(
-          `(CAST(:checkInDate AS date) > CAST(:businessDate AS date)
-            OR (
-              room.current_status = 'Available'
-              AND room.occupancy_booking_id IS NULL
-              AND room.housekeeping_status = 'Ready'
-            ))`,
-        )
-        .andWhere((builder) => {
-          const unavailable = builder.subQuery().select('1').from(BookingDetail, 'detail')
-            .innerJoin(Booking, 'existingBooking', 'existingBooking.booking_id = detail.booking_id')
-            .where('detail.room_id = room.room_id')
-            .andWhere(`(existingBooking.status IN ('Confirmed', 'CheckedIn')
-              OR (existingBooking.status = 'Pending' AND existingBooking.pending_expires_at > clock_timestamp()))`)
-            .andWhere('existingBooking.check_in_date < :checkOutDate')
-            .andWhere('existingBooking.check_out_date > :checkInDate').getQuery();
-          return `NOT EXISTS ${unavailable}`;
-        })
-        .setParameters({
-          checkInDate: check_in_date,
-          checkOutDate: check_out_date,
-          businessDate: this.pricingService.getBusinessDate(),
-        })
-        .setLock('pessimistic_write')
-        .orderBy('room.room_number', 'ASC')
-        .getMany();
+        const pricing = roomInput.quote_id
+          ? await this.pricingService.lockQuoteForBooking(queryRunner.manager, roomInput.quote_id, {
+              ...dto,
+              room_type_id: roomInput.room_type_id,
+              guest_count: roomInput.guest_count,
+              quote_id: roomInput.quote_id,
+            } as any)
+          : calculatedPricing;
 
-      if (!candidateRooms.length) {
-        throw new NotFoundException('Không còn phòng trống trong khoảng ngày đã chọn.');
-      }
+        if (!pricing) {
+          throw new ConflictException('Không thể xác định giá cho booking.');
+        }
 
-      // Smart Room Allocation: Best-Fit Contiguous Packing & Housekeeping Readiness Scoring
-      let room = candidateRooms[0];
-      if (candidateRooms.length > 1) {
-        const candidateRoomIds = candidateRooms.map((r) => r.room_id);
-        const adjacentBookings: Array<{ room_id: number; check_in_date: string; check_out_date: string }> =
-          await queryRunner.query(
-            `SELECT bd.room_id,
-                    to_char(b.check_in_date, 'YYYY-MM-DD') AS check_in_date,
-                    to_char(b.check_out_date, 'YYYY-MM-DD') AS check_out_date
-             FROM booking_details bd
-             JOIN bookings b ON bd.booking_id = b.booking_id
-             WHERE bd.room_id = ANY($1)
-               AND b.status IN ('Confirmed', 'CheckedIn')
-               AND (to_char(b.check_out_date, 'YYYY-MM-DD') = $2 OR to_char(b.check_in_date, 'YYYY-MM-DD') = $3)`,
-            [candidateRoomIds, check_in_date, check_out_date],
-          );
+        const { roomType, leadTime, nights, nightlyPrice, totalPrice } = pricing;
+        this.assertGuestCapacity(roomInput.guest_count, roomType.capacity);
 
-        let highestScore = -1;
-        for (const candidate of candidateRooms) {
-          let score = 0;
-          const roomAdj = adjacentBookings.filter((b) => Number(b.room_id) === Number(candidate.room_id));
-          const hasPreEdge = roomAdj.some((b) => b.check_out_date === check_in_date);
-          const hasPostEdge = roomAdj.some((b) => b.check_in_date === check_out_date);
+        const capacityRows = await queryRunner.query(
+          `SELECT capacity
+           FROM room_types
+           WHERE type_id = $1
+           FOR SHARE`,
+          [roomInput.room_type_id],
+        ) as Array<{ capacity: number | string }>;
+        if (!capacityRows[0]) {
+          throw new NotFoundException(`Không tìm thấy loại phòng với ID: ${roomInput.room_type_id}.`);
+        }
+        this.assertGuestCapacity(roomInput.guest_count, Number(capacityRows[0].capacity));
 
-          // Contiguity / Edge Packing: 60 pts perfect slot, 35 pts single edge, 10 pts isolated
-          if (hasPreEdge && hasPostEdge) {
-            score += 60;
-          } else if (hasPreEdge || hasPostEdge) {
-            score += 35;
-          } else {
-            score += 10;
-          }
+        await queryRunner.query('SELECT pg_advisory_xact_lock($1)', [roomInput.room_type_id]);
+        
+        let candidateRoomsQuery = queryRunner.manager.getRepository(Room).createQueryBuilder('room')
+          .where('room.type_id = :roomTypeId', { roomTypeId: roomInput.room_type_id })
+          .andWhere("room.current_status <> 'Maintenance'")
+          .andWhere(
+            `(CAST(:checkInDate AS date) > CAST(:businessDate AS date)
+              OR (
+                room.current_status = 'Available'
+                AND room.occupancy_booking_id IS NULL
+                AND room.housekeeping_status = 'Ready'
+              ))`,
+          )
+          .andWhere((builder) => {
+            const unavailable = builder.subQuery().select('1').from(BookingDetail, 'detail')
+              .innerJoin(Booking, 'existingBooking', 'existingBooking.booking_id = detail.booking_id')
+              .where('detail.room_id = room.room_id')
+              .andWhere(`(existingBooking.status IN ('Confirmed', 'CheckedIn')
+                OR (existingBooking.status = 'Pending' AND existingBooking.pending_expires_at > clock_timestamp()))`)
+              .andWhere('existingBooking.check_in_date < :checkOutDate')
+              .andWhere('existingBooking.check_out_date > :checkInDate').getQuery();
+            return `NOT EXISTS ${unavailable}`;
+          })
+          .setParameters({
+            checkInDate: check_in_date,
+            checkOutDate: check_out_date,
+            businessDate: this.pricingService.getBusinessDate(),
+          })
+          .setLock('pessimistic_write')
+          .orderBy('room.room_number', 'ASC');
 
-          // Housekeeping Readiness
-          if (candidate.housekeeping_status === 'Ready') {
-            score += 30;
-          } else if (candidate.housekeeping_status === 'Cleaning') {
-            score += 15;
-          }
+        const fetchedRooms = await candidateRoomsQuery.getMany();
+        const candidateRooms = fetchedRooms.filter(r => !usedRoomIds.has(r.room_id));
 
-          if (score > highestScore) {
-            highestScore = score;
-            room = candidate;
+        if (!candidateRooms.length) {
+          throw new NotFoundException('Không còn phòng trống trong khoảng ngày đã chọn.');
+        }
+
+        let room = candidateRooms[0];
+        if (candidateRooms.length > 1) {
+          const candidateRoomIds = candidateRooms.map((r) => r.room_id);
+          const adjacentBookings: Array<{ room_id: number; check_in_date: string; check_out_date: string }> =
+            await queryRunner.query(
+              `SELECT bd.room_id,
+                      to_char(b.check_in_date, 'YYYY-MM-DD') AS check_in_date,
+                      to_char(b.check_out_date, 'YYYY-MM-DD') AS check_out_date
+               FROM booking_details bd
+               JOIN bookings b ON bd.booking_id = b.booking_id
+               WHERE bd.room_id = ANY($1)
+                 AND b.status IN ('Confirmed', 'CheckedIn')
+                 AND (to_char(b.check_out_date, 'YYYY-MM-DD') = $2 OR to_char(b.check_in_date, 'YYYY-MM-DD') = $3)`,
+              [candidateRoomIds, check_in_date, check_out_date],
+            );
+
+          let highestScore = -1;
+          for (const candidate of candidateRooms) {
+            let score = 0;
+            const roomAdj = adjacentBookings.filter((b) => Number(b.room_id) === Number(candidate.room_id));
+            const hasPreEdge = roomAdj.some((b) => b.check_out_date === check_in_date);
+            const hasPostEdge = roomAdj.some((b) => b.check_in_date === check_out_date);
+
+            if (hasPreEdge && hasPostEdge) {
+              score += 60;
+            } else if (hasPreEdge || hasPostEdge) {
+              score += 35;
+            } else {
+              score += 10;
+            }
+
+            if (candidate.housekeeping_status === 'Ready') {
+              score += 30;
+            } else if (candidate.housekeeping_status === 'Cleaning') {
+              score += 15;
+            }
+
+            if (score > highestScore) {
+              highestScore = score;
+              room = candidate;
+            }
           }
         }
-        this.logger.log(
-          `[SmartAllocation] Room ${room.room_number} chosen (score: ${highestScore}) among ${candidateRooms.length} candidates for stay ${check_in_date} -> ${check_out_date}`,
-        );
+        
+        usedRoomIds.add(room.room_id);
+        allocatedRooms.push({ room, pricing, roomInput, nightlyPrice, totalPrice, nights, leadTime, roomType });
+        grandTotalPrice += totalPrice;
+        totalGuestCount += roomInput.guest_count;
       }
 
-      const terms = await this.workflow.snapshotForCreation(queryRunner.manager, totalPrice);
+      const terms = await this.workflow.snapshotForCreation(queryRunner.manager, grandTotalPrice);
       await queryRunner.query("SELECT set_config('hotelai.actor_id', $1, true)", [customer_id]);
       const booking = await queryRunner.manager.save(Booking, {
         customer_id,
         check_in_date,
         check_out_date,
-        guest_count: guestCount,
+        guest_count: totalGuestCount,
         ...terms,
       });
-      await queryRunner.manager.save(BookingDetail, {
-        booking_id: booking.booking_id,
-        room_id: room.room_id,
-        applied_price: nightlyPrice,
-        room_number_snapshot: room.room_number,
-        room_type_name_snapshot: roomType.type_name,
-      });
-      await queryRunner.manager.save(DailyPricingLog, {
-        booking_id: booking.booking_id,
-        type_id: room_type_id,
-        target_date: check_in_date,
-        lead_time: leadTime,
-        is_weekend: pricing.isWeekend,
-        total_of_special_requests,
-        ai_multiplier: pricing.multiplier,
-        base_price: roomType.base_price,
-        final_price: nightlyPrice,
-        pricing_source: pricing.source,
-        settings_version: pricing.settingsVersion,
-        ai_enabled: pricing.aiEnabled,
-        ai_model_version: pricing.aiModelVersion,
-        ai_training_run_id: pricing.aiTrainingRunId,
-        ai_feature_contract_version: pricing.aiFeatureContractVersion,
-        room_type_name_snapshot: roomType.type_name,
-      });
+
+      for (const allocated of allocatedRooms) {
+        await queryRunner.manager.save(BookingDetail, {
+          booking_id: booking.booking_id,
+          room_id: allocated.room.room_id,
+          applied_price: allocated.nightlyPrice,
+          room_number_snapshot: allocated.room.room_number,
+          room_type_name_snapshot: allocated.roomType.type_name,
+        });
+        await queryRunner.manager.save(DailyPricingLog, {
+          booking_id: booking.booking_id,
+          type_id: allocated.roomInput.room_type_id,
+          target_date: check_in_date,
+          lead_time: allocated.leadTime,
+          is_weekend: allocated.pricing.isWeekend,
+          total_of_special_requests,
+          ai_multiplier: allocated.pricing.multiplier,
+          base_price: allocated.roomType.base_price,
+          final_price: allocated.nightlyPrice,
+          pricing_source: allocated.pricing.source,
+          settings_version: allocated.pricing.settingsVersion,
+          ai_enabled: allocated.pricing.aiEnabled,
+          ai_model_version: allocated.pricing.aiModelVersion,
+          ai_training_run_id: allocated.pricing.aiTrainingRunId,
+          ai_feature_contract_version: allocated.pricing.aiFeatureContractVersion,
+          room_type_name_snapshot: allocated.roomType.type_name,
+        });
+        if (allocated.roomInput.quote_id) {
+          await this.pricingService.acceptQuote(
+            queryRunner.manager,
+            allocated.roomInput.quote_id,
+            booking.booking_id,
+            customer_id,
+          );
+        }
+      }
+
       if (idempotencyKey && requestHash) {
         await queryRunner.manager.insert(BookingCreateRequest, {
           customer_id,
@@ -332,6 +368,8 @@ export class BookingsService {
           booking_id: booking.booking_id,
         });
       }
+
+      const primary = allocatedRooms[0];
       await this.outbox.enqueue(queryRunner.manager, {
         aggregateType: 'booking',
         aggregateId: booking.booking_id,
@@ -339,54 +377,54 @@ export class BookingsService {
         payload: {
           booking_id: booking.booking_id,
           customer_id,
-          room_id: room.room_id,
-          room_type_id,
+          room_id: primary.room.room_id,
+          room_type_id: primary.roomInput.room_type_id,
           check_in_date,
           check_out_date,
-          guest_count: guestCount,
-          quote_id: dto.quote_id ?? null,
-          nights,
-          total_price: totalPrice,
+          guest_count: totalGuestCount,
+          quote_id: primary.roomInput.quote_id ?? null,
+          nights: primary.nights,
+          total_price: grandTotalPrice,
           booking_status: booking.status,
           policy_version: terms.policy_version,
           deposit_required: terms.deposit_required,
           pending_expires_at: terms.pending_expires_at,
-          pricing_source: pricing.source,
-          settings_version: pricing.settingsVersion,
-          ai_model_version: pricing.aiModelVersion,
-          ai_training_run_id: pricing.aiTrainingRunId,
-          ai_feature_contract_version: pricing.aiFeatureContractVersion,
+          pricing_source: primary.pricing.source,
+          settings_version: primary.pricing.settingsVersion,
+          ai_model_version: primary.pricing.aiModelVersion,
+          ai_training_run_id: primary.pricing.aiTrainingRunId,
+          ai_feature_contract_version: primary.pricing.aiFeatureContractVersion,
         },
       });
-      if (dto.quote_id) {
-        await this.pricingService.acceptQuote(
-          queryRunner.manager,
-          dto.quote_id,
-          booking.booking_id,
-          customer_id,
-        );
-      }
+
       await queryRunner.commitTransaction();
+      
+      const mappedRooms = allocatedRooms.map(a => ({
+        room_id: a.room.room_id,
+        room_number: a.room.room_number,
+        room_type_id: a.roomInput.room_type_id,
+        applied_price: a.nightlyPrice,
+      }));
+
       return {
-        // PostgreSQL numeric columns hydrate as strings. Match the monetary
-        // contract already used by booking replay, history and cancellation.
         booking: { ...booking, deposit_required: Number(booking.deposit_required) },
         quote_id: dto.quote_id ?? null,
-        room_id: room.room_id,
-        room_number: room.room_number,
-        applied_price: nightlyPrice,
-        nightly_price: nightlyPrice,
-        nights,
-        total_price: totalPrice,
-        ai_multiplier: pricing.multiplier,
-        ai_model_version: pricing.aiModelVersion,
-        ai_training_run_id: pricing.aiTrainingRunId,
-        ai_feature_contract_version: pricing.aiFeatureContractVersion,
-        pricing_source: pricing.source,
-        settings_version: pricing.settingsVersion,
+        room_id: primary.room.room_id,
+        room_number: mappedRooms.map(r => r.room_number).join(', '),
+        applied_price: primary.nightlyPrice,
+        nightly_price: primary.nightlyPrice,
+        nights: primary.nights,
+        total_price: grandTotalPrice,
+        ai_multiplier: primary.pricing.multiplier,
+        ai_model_version: primary.pricing.aiModelVersion,
+        ai_training_run_id: primary.pricing.aiTrainingRunId,
+        ai_feature_contract_version: primary.pricing.aiFeatureContractVersion,
+        pricing_source: primary.pricing.source,
+        settings_version: primary.pricing.settingsVersion,
         payment_status: 'Unpaid',
         paid_amount: 0,
-        balance_due: totalPrice,
+        balance_due: grandTotalPrice,
+        rooms: mappedRooms,
       };
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -399,9 +437,18 @@ export class BookingsService {
   async findAll(customerId: string, role: string): Promise<BookingSummary[]> {
     const businessDate = this.pricingService.getBusinessDate();
     const query = this.bookingRepository.createQueryBuilder('booking')
-      .innerJoin(BookingDetail, 'detail', 'detail.booking_id = booking.booking_id')
-      .innerJoin(Room, 'room', 'room.room_id = detail.room_id')
-      .innerJoin(RoomType, 'roomType', 'roomType.type_id = room.type_id')
+      .innerJoin(
+        (qb) => qb.select('detail.booking_id', 'booking_id')
+                  .addSelect("string_agg(detail.room_number_snapshot, ', ')", 'room_number_snapshot')
+                  .addSelect("string_agg(DISTINCT detail.room_type_name_snapshot, ', ')", 'room_type_name_snapshot')
+                  .addSelect('SUM(detail.applied_price)', 'applied_price')
+                  .from(BookingDetail, 'detail')
+                  .groupBy('detail.booking_id'),
+        'detail',
+        'detail.booking_id = booking.booking_id'
+      )
+      // innerJoin Room removed
+      // innerJoin RoomType removed
       .leftJoin(
         (builder) => builder
           .select('payment.booking_id', 'booking_id')
@@ -556,15 +603,20 @@ export class BookingsService {
                   WHERE booking_id = booking.booking_id AND transaction_type = 'Payment'), 0) AS paid_amount,
                 COALESCE((SELECT SUM(amount) FROM payment_transactions
                   WHERE booking_id = booking.booking_id AND transaction_type = 'Refund'), 0) AS refunded_amount,
-                detail.room_number_snapshot AS room_number,
-                detail.room_type_name_snapshot AS room_type,
-                detail.applied_price AS nightly_price,
+                detail.room_number AS room_number,
+                detail.room_type AS room_type,
+                detail.total_nightly_price AS nightly_price,
                 (booking.check_out_date - booking.check_in_date) AS nights,
-                detail.applied_price * (booking.check_out_date - booking.check_in_date) AS total_price
+                detail.total_nightly_price * (booking.check_out_date - booking.check_in_date) AS total_price
          FROM bookings booking
-         INNER JOIN booking_details detail ON detail.booking_id = booking.booking_id
-         INNER JOIN rooms room ON room.room_id = detail.room_id
-         INNER JOIN room_types room_type ON room_type.type_id = room.type_id
+         INNER JOIN (
+            SELECT booking_id,
+                   string_agg(room_number_snapshot, ', ') AS room_number,
+                   string_agg(DISTINCT room_type_name_snapshot, ', ') AS room_type,
+                   SUM(applied_price) AS total_nightly_price
+            FROM booking_details
+            GROUP BY booking_id
+         ) detail ON detail.booking_id = booking.booking_id
          WHERE booking.booking_id = $1::uuid`,
         [bookingId],
       );

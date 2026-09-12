@@ -10,6 +10,10 @@ export interface User {
 }
 
 export interface UserProfile extends User {
+  loyalty_tier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+  loyalty_points: number;
+  total_stays: number;
+  total_spent: number;
   created_at: string;
   updated_at: string;
 }

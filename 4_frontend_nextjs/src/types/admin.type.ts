@@ -232,6 +232,9 @@ export interface AdminDashboardSummary {
   booking_value: number;
   customer_count: number;
   room_count: number;
+  revpar: number;
+  occupancy_rate: number;
+  forecasted_demand: number;
 }
 
 export interface AdminMonthlyBookingValue {

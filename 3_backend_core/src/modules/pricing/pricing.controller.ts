@@ -1,11 +1,21 @@
-import { Body, Controller, Headers, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { PriceQuoteDto } from './dto/price-quote.dto';
 import { RecordQuoteEventDto } from './dto/record-quote-event.dto';
+import { CalendarQueryDto } from './dto/calendar-query.dto';
 import { PricingService } from './pricing.service';
 
 @Controller('pricing')
 export class PricingController {
   constructor(private readonly pricing: PricingService) {}
+
+  @Get('calendar')
+  async getCalendar(@Query() dto: CalendarQueryDto) {
+    return {
+      status: 'success',
+      message: 'Pricing calendar retrieved.',
+      data: await this.pricing.getCalendarPricing(dto),
+    };
+  }
 
   @Post('quote')
   async quote(@Body() dto: PriceQuoteDto) {

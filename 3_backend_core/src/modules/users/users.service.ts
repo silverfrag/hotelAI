@@ -18,6 +18,10 @@ export type UserProfileView = {
   role: 'customer' | 'admin';
   account_status: 'Active' | 'Suspended' | 'Deactivated';
   version: number;
+  loyalty_tier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+  loyalty_points: number;
+  total_stays: number;
+  total_spent: number;
   created_at: Date;
   updated_at: Date;
 };
@@ -33,6 +37,10 @@ type CustomerRow = {
   account_status: 'Active' | 'Suspended' | 'Deactivated';
   version: number;
   auth_version: number;
+  loyalty_tier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+  loyalty_points: number;
+  total_stays?: number;
+  total_spent?: number;
   created_at: Date;
   updated_at: Date;
 };
@@ -47,10 +55,16 @@ export class UsersService {
   async getProfile(customerId: string, manager?: EntityManager): Promise<UserProfileView> {
     const runner = manager ?? this.dataSource;
     const rows = await runner.query(
-      `SELECT customer_id, full_name, email, phone, nationality, role,
-              account_status, version, created_at, updated_at
-       FROM customers
-       WHERE customer_id = $1::uuid`,
+      `SELECT c.customer_id, c.full_name, c.email, c.phone, c.nationality, c.role,
+              c.account_status, c.version, c.loyalty_tier, c.loyalty_points, c.created_at, c.updated_at,
+              COALESCE(COUNT(b.booking_id), 0) AS total_stays,
+              COALESCE(SUM(p.amount), 0) AS total_spent
+       FROM customers c
+       LEFT JOIN bookings b ON c.customer_id = b.customer_id AND b.status IN ('Completed', 'CheckedIn')
+       LEFT JOIN payments p ON b.booking_id = p.booking_id AND p.status = 'Completed'
+       WHERE c.customer_id = $1::uuid
+       GROUP BY c.customer_id`,
+
       [customerId],
     );
     if (!rows.length) throw new NotFoundException('Không tìm thấy tài khoản.');
@@ -92,7 +106,8 @@ export class UsersService {
              updated_at = CURRENT_TIMESTAMP
          WHERE customer_id = $1::uuid
          RETURNING customer_id, full_name, email, phone, nationality, role,
-                   account_status, version, auth_version, created_at, updated_at`,
+                   account_status, version, auth_version, loyalty_tier, loyalty_points, created_at, updated_at`,
+
         [customerId, next.full_name, next.phone, next.nationality],
       );
       const updated = updatedRows[0] as CustomerRow;
@@ -293,6 +308,10 @@ export class UsersService {
       role: row.role,
       account_status: row.account_status,
       version: Number(row.version),
+      loyalty_tier: row.loyalty_tier,
+      loyalty_points: row.loyalty_points,
+      total_stays: Number(row.total_stays || 0),
+      total_spent: Number(row.total_spent || 0),
       created_at: row.created_at,
       updated_at: row.updated_at,
     };

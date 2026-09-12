@@ -12,6 +12,7 @@ import axios from 'axios';
 import { DataSource, EntityManager } from 'typeorm';
 import { PriceQuoteDto } from './dto/price-quote.dto';
 import { RecordQuoteEventDto } from './dto/record-quote-event.dto';
+import { CalendarQueryDto } from './dto/calendar-query.dto';
 import { AiShadowService } from './ai-shadow.service';
 
 type AiPricingResponse = {
@@ -205,6 +206,129 @@ export class PricingService {
     private readonly configService: ConfigService,
     private readonly aiShadow: AiShadowService,
   ) {}
+
+  async getCalendarPricing(input: CalendarQueryDto): Promise<Array<{
+    date: string;
+    nightly_price: number;
+    available: number;
+  }>> {
+    const businessDate = this.getBusinessDate();
+    const today = new Date(`${businessDate}T00:00:00.000Z`);
+    const start = new Date(`${input.start_date}T00:00:00.000Z`);
+    const end = new Date(`${input.end_date}T00:00:00.000Z`);
+
+    if (end < start) {
+      throw new BadRequestException('Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.');
+    }
+
+    const rows = await this.dataSource.query(
+      `SELECT room_type.type_id,
+              room_type.name AS type_name,
+              room_type.base_price,
+              room_type.capacity,
+              setting.ai_enabled,
+              setting.version AS settings_version
+       FROM room_types room_type
+       LEFT JOIN pricing_settings setting ON setting.setting_id = 1
+       WHERE room_type.type_id = $1`,
+      [input.room_type_id],
+    ) as PricingSnapshotRow[];
+    const row = rows[0];
+
+    if (!row) {
+      throw new NotFoundException(`Không tìm thấy loại phòng với ID: ${input.room_type_id}.`);
+    }
+
+    // get availability across the date range
+    const availabilityRows = await this.dataSource.query(
+      `WITH RECURSIVE dates AS (
+         SELECT $2::date AS date
+         UNION ALL
+         SELECT (date + INTERVAL '1 day')::date
+         FROM dates
+         WHERE date < $3::date
+       ),
+       candidate_rooms AS (
+         SELECT room.room_id,
+                room.current_status <> 'Maintenance' AS is_sellable,
+                room.current_status = 'Available'
+                  AND room.occupancy_booking_id IS NULL
+                  AND room.housekeeping_status = 'Ready' AS is_operationally_available
+         FROM rooms room
+         WHERE room.type_id = $1
+       )
+       SELECT d.date::text,
+              (
+                SELECT COUNT(*)::int
+                FROM candidate_rooms candidate
+                WHERE candidate.is_sellable
+                  AND (d.date > $4::date OR candidate.is_operationally_available)
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM booking_details detail
+                    INNER JOIN bookings booking ON booking.booking_id = detail.booking_id
+                    WHERE detail.room_id = candidate.room_id
+                      AND (booking.status IN ('Confirmed', 'CheckedIn')
+                        OR (booking.status = 'Pending' AND booking.pending_expires_at > clock_timestamp()))
+                      AND booking.check_in_date <= d.date
+                      AND booking.check_out_date > d.date
+                  )
+              ) AS rooms_available
+       FROM dates d
+       ORDER BY d.date ASC`,
+      [input.room_type_id, input.start_date, input.end_date, businessDate]
+    ) as Array<{ date: string; rooms_available: number | string }>;
+
+    const availabilityMap = new Map<string, number>();
+    for (const r of availabilityRows) {
+      availabilityMap.set(r.date, Number(r.rooms_available));
+    }
+
+    const aiEnabled = row.ai_enabled;
+    const basePrice = Number(row.base_price);
+    const results = [];
+
+    // Process predictions concurrently to speed up the endpoint
+    const predictionPromises = [];
+    const dateStrs = [];
+
+    for (let d = new Date(start); d <= end; d.setTime(d.getTime() + 86400000)) {
+      const dateStr = d.toISOString().slice(0, 10);
+      const leadTime = Math.floor((d.getTime() - today.getTime()) / 86400000);
+      dateStrs.push(dateStr);
+      
+      if (aiEnabled && d >= today) {
+        // assume 1 guest for baseline calendar quote
+        predictionPromises.push(
+          this.getAiPrediction({
+            check_in_date: dateStr,
+            check_out_date: new Date(d.getTime() + 86400000).toISOString().slice(0, 10),
+            lead_time: leadTime,
+            guest_count: 1, 
+          }).catch(() => null)
+        );
+      } else {
+        predictionPromises.push(Promise.resolve(null));
+      }
+    }
+
+    const predictions = await Promise.all(predictionPromises);
+
+    for (let i = 0; i < dateStrs.length; i++) {
+      const dateStr = dateStrs[i];
+      const aiPrediction = predictions[i];
+      const multiplier = aiPrediction?.multiplier ?? 1;
+      const nightlyPrice = Math.round(basePrice * multiplier * 100) / 100;
+      
+      results.push({
+        date: dateStr,
+        nightly_price: nightlyPrice,
+        available: availabilityMap.get(dateStr) ?? 0,
+      });
+    }
+
+    return results;
+  }
 
   async calculate(input: PriceQuoteDto): Promise<PricingCalculation> {
     const businessDate = this.getBusinessDate();

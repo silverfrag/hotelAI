@@ -8,6 +8,7 @@ import { useReservation } from "@/hooks/useReservation";
 import { formatCurrency } from "@/utils/formatCurrency";
 import Link from "next/link";
 import { addIsoDays } from "@/utils/businessDate";
+import { CalendarPicker } from "./CalendarPicker";
 import { ReservationRecoverySignIn } from "@/components/features/auth/ReservationRecoverySignIn";
 
 type Step = 1 | 2 | 3 | 4;
@@ -41,6 +42,8 @@ export default function BookView({ rooms, businessDate, initial = {} }: { rooms:
   const [step, setStep] = useState<Step>(initial.step === '3' ? 3 : 1);
   const [selectedDest, setSelectedDest] = useState(destinations.find((d) => d.name.toLowerCase() === initial.destination?.toLowerCase()) ?? destinations[0]);
   const [selectedRoom, setSelectedRoom] = useState(rooms.find((r) => String(r.id) === initial.room_type_id) ?? rooms[0]);
+  const [cart, setCart] = useState<Array<{room: RoomPresentation, guests: number}>>([]);
+  const [calendarViewRoomId, setCalendarViewRoomId] = useState<number | null>(null);
   const [checkIn, setCheckIn] = useState(initial.check_in_date || businessDate);
   const [checkOut, setCheckOut] = useState(initial.check_out_date || addIsoDays(businessDate, 5));
   const [guests, setGuests] = useState(Math.max(1, Math.min(20, Number(initial.guest_count) || 2)));
@@ -56,9 +59,11 @@ export default function BookView({ rooms, businessDate, initial = {} }: { rooms:
   const reservation = useReservation(input);
   const { quote, result, loading, quoteError, expired, submitting, retryOnly, recoveryAccount, recoveryNeedsSignIn } = reservation;
   const submitted = !!result;
-  const roomTotal = (selectedRoom?.price ?? 0) * nights;
-  const nightlyPrice = result?.nightly_price ?? quote?.nightly_price ?? selectedRoom?.price ?? 0;
-  const grandTotal = result?.total_price ?? quote?.total_price ?? roomTotal;
+  const isMultiRoom = cart.length > 0;
+  const activeRoom = isMultiRoom ? cart[0].room : selectedRoom;
+  const roomTotal = (activeRoom?.price ?? 0) * nights;
+  const nightlyPrice = isMultiRoom ? cart.reduce((sum, c) => sum + c.room.price, 0) : (result?.nightly_price ?? quote?.nightly_price ?? selectedRoom?.price ?? 0);
+  const grandTotal = isMultiRoom ? (quote?.total_price ?? roomTotal) + cart.slice(1).reduce((sum, c) => sum + c.room.price * nights, 0) : (result?.total_price ?? quote?.total_price ?? roomTotal);
   const returnUrl = `/book?${new URLSearchParams({ room_type_id: String(selectedRoom?.id ?? ''), check_in_date: checkIn, check_out_date: checkOut, guest_count: String(guests), total_of_special_requests: String(requests), destination: selectedDest.name, step: '3' })}`;
   const goNext = () => {
     if (submitting || result || retryOnly) return;
@@ -218,55 +223,64 @@ export default function BookView({ rooms, businessDate, initial = {} }: { rooms:
           {/* STEP 2: Choose room */}
           {step === 2 && (
             <div>
-              <h2 className="font-display text-3xl mb-2" style={{ color: "var(--fg)" }}>
-                Choose your room
-              </h2>
-              <p className="text-sm mb-8" style={{ color: "var(--muted)" }}>
-                {nights} nights · {guests} guest{guests > 1 ? "s" : ""} · {selectedDest.name}
-              </p>
+              <div className="flex justify-between items-end mb-8">
+                <div>
+                  <h2 className="font-display text-3xl mb-2" style={{ color: "var(--fg)" }}>
+                    Choose your room
+                  </h2>
+                  <p className="text-sm" style={{ color: "var(--muted)" }}>
+                    {nights} nights · {checkIn} to {checkOut} · {selectedDest.name}
+                  </p>
+                </div>
+                {cart.length > 0 && (
+                  <div className="text-right">
+                    <div className="text-sm text-[var(--gold)]">{cart.length} room(s) selected</div>
+                    <button onClick={() => goNext()} className="mt-2 text-xs uppercase tracking-wider bg-[var(--gold)] text-[var(--bg)] px-4 py-2 rounded-sm">Continue</button>
+                  </div>
+                )}
+              </div>
+              
               <div className="flex flex-col gap-4">
                 {rooms.map((room) => {
-                  const sel = selectedRoom.id === room.id;
-                  const available = room.guests >= guests;
+                  const inCartCount = cart.filter(c => c.room.id === room.id).length;
+                  const sel = selectedRoom?.id === room.id || inCartCount > 0;
+                  
                   return (
-                    <div
-                      key={room.id}
-                      className={`flex gap-0 transition-all duration-200 overflow-hidden ${available ? "cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
-                      style={{
-                        border: `1px solid ${sel ? "var(--gold)" : "var(--border)"}`,
-                        background: sel ? "rgba(196,153,90,0.05)" : "var(--bg2)",
-                      }}
-                      role="button" tabIndex={available ? 0 : -1} aria-disabled={!available} aria-pressed={sel} aria-label={`Choose ${room.name}`} onKeyDown={(e) => { if (available && !sel && !submitting && !retryOnly && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); reservation.changeSelection(); setSelectedRoom(room); } }} onClick={() => { if (available && !sel && !submitting && !retryOnly) { reservation.changeSelection(); setSelectedRoom(room); } }}
-                    >
-                      <div className="w-36 shrink-0 overflow-hidden">
-                        <img src={room.img} alt={room.name} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1 p-5 flex items-start justify-between gap-4">
-                        <div>
-                          <div className="text-[9px] tracking-widest uppercase mb-1" style={{ color: sel ? "var(--gold)" : "var(--dim)" }}>
-                            {room.category}
-                          </div>
-                          <div className="font-display text-lg mb-1" style={{ color: "var(--fg)" }}>{room.name}</div>
-                          <div className="text-[10px] mb-3" style={{ color: "var(--muted)" }}>
-                            {room.type} · Illustrative photograph
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {room.features.slice(0, 3).map((f) => (
-                              <span key={f} className="text-[8px] uppercase tracking-wider px-2 py-0.5" style={{ border: "1px solid var(--border-gold)", color: "var(--muted)" }}>{f}</span>
-                            ))}
-                          </div>
+                    <div key={room.id} className="flex flex-col gap-4 p-4 border transition-all duration-200" style={{ borderColor: sel ? "var(--gold)" : "var(--border)", background: sel ? "rgba(196,153,90,0.05)" : "var(--bg2)" }}>
+                      <div className="flex gap-4">
+                        <div className="w-36 shrink-0 overflow-hidden">
+                          <img src={room.img} alt={room.name} className="w-full h-full object-cover" />
                         </div>
-                        <div className="text-right shrink-0">
-                          <div className="font-display text-xl" style={{ color: "var(--gold)" }}>{formatCurrency(room.price)}</div>
-                          <div className="text-[9px]" style={{ color: "var(--dim)" }}>/night</div>
-                          <div className="font-display text-sm mt-1" style={{ color: "var(--muted)" }}>
-                            {formatCurrency(room.price * nights)} total
+                        <div className="flex-1 flex flex-col justify-center">
+                          <div className="text-[9px] tracking-widest uppercase mb-1" style={{ color: "var(--gold)" }}>{room.category}</div>
+                          <div className="font-display text-lg mb-1">{room.name}</div>
+                          <div className="text-[10px] text-[var(--muted)]">Up to {room.guests} guests </div>
+                        </div>
+                        <div className="flex flex-col justify-center items-end gap-2">
+                          <div className="text-lg font-medium">{formatCurrency(room.price)} <span className="text-[10px] text-[var(--muted)]">/ night</span></div>
+                          <button onClick={() => setCalendarViewRoomId(calendarViewRoomId === room.id ? null : room.id)} className="text-[10px] underline text-[var(--gold)]">View Calendar</button>
+                          <div className="flex items-center gap-2 mt-2">
+                            {inCartCount > 0 && (
+                              <button onClick={() => {
+                                const idx = cart.findIndex(c => c.room.id === room.id);
+                                if (idx > -1) setCart(cart.filter((_, i) => i !== idx));
+                              }} className="px-2 py-1 border border-[var(--border)] text-xs">-</button>
+                            )}
+                            {inCartCount > 0 && <span className="text-xs">{inCartCount}</span>}
+                            <button onClick={() => setCart([...cart, { room, guests: Math.min(guests, room.guests) }])} className="px-3 py-1 bg-[var(--gold)] text-[var(--bg)] text-xs">+ Add</button>
                           </div>
                         </div>
                       </div>
-                      {sel && (
-                        <div className="w-10 flex items-center justify-center shrink-0" style={{ background: "var(--gold)", color: "var(--bg)" }}>
-                          <CheckIcon />
+                      
+                      {calendarViewRoomId === room.id && (
+                        <div className="mt-4 p-4 border border-[var(--border-gold)]">
+                           <CalendarPicker 
+                             roomTypeId={room.id} 
+                             businessDate={businessDate} 
+                             initialCheckIn={checkIn} 
+                             initialCheckOut={checkOut} 
+                             onDatesChange={(cin, cout) => { setCheckIn(cin); setCheckOut(cout); }} 
+                           />
                         </div>
                       )}
                     </div>
@@ -300,7 +314,7 @@ export default function BookView({ rooms, businessDate, initial = {} }: { rooms:
                   <h2 className="font-display text-4xl mb-4">{result.booking.status === 'Confirmed' ? 'Reservation confirmed' : result.booking.status === 'Pending' ? 'Reservation awaiting deposit' : `Reservation: ${result.booking.status}`}</h2>
                   <p className="text-sm mb-6" style={{color:'var(--muted)'}}>Your reservation is saved in My bookings. Payment is arranged with the hotel.</p>
                   {result.booking.status === 'Pending' && <p className="text-sm mb-6" style={{color:'var(--gold)'}}>Required deposit: {formatCurrency(result.booking.deposit_required)}. Hold expires: {result.booking.pending_expires_at ? new Date(result.booking.pending_expires_at).toLocaleString('en-GB', {timeZone:'Asia/Bangkok'}) + ' (Bangkok)' : 'Check My bookings for your deadline'}.</p>}
-                  <div className="p-5 mb-6" style={{border:'1px solid var(--border-gold)',background:'var(--bg2)'}}><p className="text-[9px] tracking-[.2em] uppercase mb-3">Booking reference</p><p className="font-display text-xl break-all">{result.booking.booking_id}</p><p className="text-xs mt-3">Room {result.room_number} · {selectedRoom.name} · {nights} nights</p><p className="mt-3 text-sm">Total {formatCurrency(result.total_price ?? result.applied_price)} · Payment: {result.payment_status}</p></div>
+                  <div className="p-5 mb-6" style={{border:'1px solid var(--border-gold)',background:'var(--bg2)'}}><p className="text-[9px] tracking-[.2em] uppercase mb-3">Booking reference</p><p className="font-display text-xl break-all">{result.booking.booking_id}</p><p className="text-xs mt-3">Room(s) {result.room_number} · {isMultiRoom ? cart.map(c=>c.room.name).join(', ') : selectedRoom.name} · {nights} nights</p><p className="mt-3 text-sm">Total {formatCurrency(result.total_price ?? result.applied_price)} · Payment: {result.payment_status}</p></div>
                   <Link href="/bookings" className="inline-block px-6 py-3 text-xs" style={{background:'var(--gold)',color:'var(--bg)'}}>View My bookings</Link>
                 </div>
               ) : (
@@ -315,7 +329,7 @@ export default function BookView({ rooms, businessDate, initial = {} }: { rooms:
                   <div className="space-y-4 max-w-xl">
                     {[
                       { label: "Travel inspiration", value: `${selectedDest.name}, ${selectedDest.country}` },
-                      { label: "Room", value: selectedRoom.name },
+                      { label: "Rooms", value: isMultiRoom ? cart.map(c => c.room.name).join(', ') : selectedRoom.name },
                       { label: "Check-in", value: checkIn },
                       { label: "Check-out", value: checkOut },
                       { label: "Duration", value: `${nights} night${nights > 1 ? "s" : ""}` },
@@ -397,8 +411,17 @@ export default function BookView({ rooms, businessDate, initial = {} }: { rooms:
             <div className="aspect-[16/9] overflow-hidden mb-4 rounded-sm">
               <img src={selectedRoom.img} alt={`${selectedRoom.name} illustrative photo`} className="w-full h-full object-cover" />
             </div>
-            <div className="font-display text-lg mb-0.5" style={{ color: "var(--fg)" }}>{selectedRoom.name}</div>
-            <div className="text-[10px] mb-5" style={{ color: "var(--muted)" }}>{selectedRoom.name} · {nights} nights</div>
+            {isMultiRoom ? cart.map((c, i) => (
+              <div key={i} className="mb-2">
+                <div className="font-display text-base" style={{ color: "var(--fg)" }}>{c.room.name}</div>
+                <div className="text-[10px]" style={{ color: "var(--muted)" }}>{c.room.name} · {nights} nights</div>
+              </div>
+            )) : (
+              <>
+                <div className="font-display text-lg mb-0.5" style={{ color: "var(--fg)" }}>{selectedRoom.name}</div>
+                <div className="text-[10px] mb-5" style={{ color: "var(--muted)" }}>{selectedRoom.name} · {nights} nights</div>
+              </>
+            )}
 
             <div className="h-px mb-5" style={{ background: "var(--border)" }} />
 

@@ -25,6 +25,7 @@ export interface PriceQuoteInput {
 
 export interface CreateBookingInput extends PriceQuoteInput {
   quote_id: string;
+  rooms?: { room_type_id: number; guest_count: number; quote_id?: string }[];
 }
 
 interface ApiResponse<T> extends CoreApiSuccessMetadata {
@@ -284,5 +285,39 @@ export async function cancelBooking(
   if (!payload?.data) {
     throw invalidCoreResponseError(response, 'Máy chủ chưa trả về trạng thái booking sau khi hủy.', payload, createBookingError);
   }
+  return payload.data;
+}
+
+export async function getCalendarPricing(
+  room_type_id: number,
+  start_date: string,
+  end_date: string,
+  signal?: AbortSignal,
+): Promise<Array<{ date: string; nightly_price: number; available: number }>> {
+  const url = new URL(`${apiBaseUrl}/pricing/calendar`);
+  url.searchParams.set('room_type_id', String(room_type_id));
+  url.searchParams.set('start_date', start_date);
+  url.searchParams.set('end_date', end_date);
+  
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+    signal,
+  });
+  const payload = await parseCoreResponse<ApiResponse<Array<{ date: string; nightly_price: number; available: number }>>>(response, {
+    fallbackMessage: 'Không thể lấy giá lịch.',
+    createError: createBookingError,
+  });
+
+  if (payload?.status !== 'success' || !Array.isArray(payload.data)) {
+    throw invalidCoreResponseError(
+      response,
+      'Máy chủ trả về kết quả không hợp lệ.',
+      payload,
+      createBookingError,
+    );
+  }
+
   return payload.data;
 }

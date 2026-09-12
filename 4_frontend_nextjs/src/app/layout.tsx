@@ -3,6 +3,7 @@ import { DM_Sans, Fraunces } from 'next/font/google';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { ChatWidget } from '@/components/features/chat/ChatWidget';
 import './globals.css';
 
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans', display: 'swap' });
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <ThemeProvider>
             <LanguageProvider>
               {children}
+              <ChatWidget />
             </LanguageProvider>
           </ThemeProvider>
         </AuthProvider>

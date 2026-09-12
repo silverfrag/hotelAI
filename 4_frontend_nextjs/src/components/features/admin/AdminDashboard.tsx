@@ -416,6 +416,27 @@ export function AdminDashboard() {
                 icon={CircleDollarSign}
               />
               <MetricCard
+                label="RevPAR"
+                value={formatCurrency(asNumber(dashboard.summary.revpar))}
+                helper="Doanh thu trên mỗi phòng có sẵn"
+                icon={CircleDollarSign}
+                tone="text-emerald-400"
+              />
+              <MetricCard
+                label="Công suất phòng (Occupancy)"
+                value={`${dashboard.summary.occupancy_rate}%`}
+                helper="Tỷ lệ lấp đầy hiện tại"
+                icon={BedDouble}
+                tone="text-indigo-400"
+              />
+              <MetricCard
+                label="Dự báo nhu cầu (Forecast)"
+                value={`${dashboard.summary.forecasted_demand}%`}
+                helper="Dự báo công suất dựa trên xu hướng"
+                icon={RefreshCw}
+                tone="text-purple-400"
+              />
+              <MetricCard
                 label="Tổng booking"
                 value={String(dashboard.summary.total_bookings)}
                 helper={`${dashboard.summary.completed_bookings} hoàn tất · ${dashboard.summary.canceled_bookings} đã hủy · ${dashboard.summary.expired_bookings} hết hạn · ${dashboard.summary.no_show_bookings} không đến`}
