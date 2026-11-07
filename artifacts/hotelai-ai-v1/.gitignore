@@ -1,0 +1,4 @@
+# Evidence is retained locally and handed over separately with SHA-256 manifests.
+# Do not commit pre-existing patches, raw data, backups or machine diagnostics.
+*
+!.gitignore
