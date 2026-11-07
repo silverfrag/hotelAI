@@ -466,3 +466,12 @@ Báo cáo Markdown và DOCX theo mẫu đồ án, gồm kiến trúc, dữ liệ
 - Dữ liệu cốt lõi thiếu thì phải từ chối phát hành quote mới, không thể fallback bằng số tự suy ra. Dữ liệu thị trường thiếu mới áp dụng quy tắc coverage/chính sách.
 - Coverage sự kiện chỉ mô tả phạm vi nguồn đã đánh giá, không chứng minh sự vắng mặt của mọi sự kiện trên thị trường.
 - Các giá trị coverage 80%/100%/100%, hạn mức corpus/vận hành, làm tròn 1.000 VND và khoảng tự điều chỉnh tài nguyên là đề xuất được chấp nhận khi người dùng yêu cầu triển khai bản kế hoạch này. Điểm duyệt riêng registry, nhãn, M3 và M6 vẫn phải được ghi nhận trước hành động phụ thuộc.
+
+## 9. Quyết định bổ sung được duyệt — 2026-11-07
+
+- Registry 5 tên miền văn bản ở mục 3.3 đã được người dùng duyệt. Mọi điều kiện robots/điều khoản vẫn áp dụng.
+- Người dùng duyệt tạm dừng stack `hotelai` cũ để chạy demo riêng, giữ volume/database.
+- Collector giá: sau chọn (b), người dùng chuyển sang **(a)** do chưa có nguồn/quyền thay thế. V1 dùng hợp đồng `stay-market-v1-no-competitors`, tắt nhóm giá đối thủ, công bố độ phủ không đủ ở admin/báo cáo; không điền giá giả/trung tính hoặc dùng model yêu cầu feature đã tắt. Đường tích hợp ứng dụng sẽ nghiệm thu tại M3/M4.
+- **Thay hạn mức corpus riêng cho `danang.gov.vn`: tối đa 100 request/toàn đợt**, thay cho 50 tại bảng mục 3.3. Tổng tất cả nguồn vẫn ≤200; các tên miền khác vẫn tối đa 50; khoảng cách tối thiểu ≥5 giây hoặc giới hạn nghiêm hơn của nguồn. Không dùng alias để tăng ngân sách. Khảo sát giá vẫn ≤20/nguồn, không bị thay đổi bởi quyết định này.
+- Cấu hình Qwen3 M0: model/digest hiện có, Q4_K_M, context 8192, tối đa 700 output tokens, 1 CPU thread, 1 worker, keep_alive=0; schema/prompt/runtime đã có manifest. Không đổi gate hoặc model.
+- Người dùng duyệt thiết kế M2 tại `docs/HOTELAI_AI_V1_CONTEXT_DESIGN.md`: hoàn thiện schema/prompt/chuẩn hóa trên dev và đóng băng lại trước test. Runtime v2 đã đóng băng; không sử dụng vòng cải tiến sau thất bại gate vì chưa chấm test chính thức. Nhãn test/mẫu dev vẫn cần duyệt riêng. Thiết kế M3 và giả định nghiệp vụ demo mới được gửi, **chưa được coi là đã duyệt**.

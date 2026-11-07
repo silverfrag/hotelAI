@@ -79,7 +79,19 @@ if($Action -eq 'status') {
         try { $r=Invoke-WebRequest -Uri $url -TimeoutSec 3 -UseBasicParsing; [pscustomobject]@{url=$url;http=$r.StatusCode;body=($r.Content | ConvertFrom-Json)} }
         catch { [pscustomobject]@{url=$url;http='unavailable'} }
     })
-    $report = @{measured_at=(Get-Date).ToUniversalTime().ToString('o');processes=$processes;health=$health;memory=(Memory-Sample);conversion_ready=$false;qwen_runtime_frozen=$false}
+    $freezeCandidates=@(Get-ChildItem -LiteralPath (Join-Path $root 'artifacts/hotelai-ai-v1/20261029-092250') -Filter runtime.json -Recurse -File |
+        Where-Object { $_.Directory.Name -match '^runtime-freeze-v\d+$' } |
+        Sort-Object { (Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json).frozen_at } -Descending)
+    $freezeFile=if($freezeCandidates.Count){$freezeCandidates[0].FullName}else{$null}
+    $isFrozen=$false
+    if($freezeFile -and (Test-Path -LiteralPath $freezeFile)){
+        $freeze=Get-Content -LiteralPath $freezeFile -Raw | ConvertFrom-Json
+        $changed=@($freeze.source_files | Where-Object {
+            (Get-FileHash -LiteralPath (Join-Path $root $_.path) -Algorithm SHA256).Hash.ToLowerInvariant() -ne $_.sha256
+        })
+        $isFrozen=($freeze.frozen -and $changed.Count -eq 0)
+    }
+    $report = @{measured_at=(Get-Date).ToUniversalTime().ToString('o');processes=$processes;health=$health;memory=(Memory-Sample);conversion_ready=$false;qwen_runtime_frozen=$isFrozen;runtime_manifest=$freezeFile}
     $json = $report | ConvertTo-Json -Depth 10
     $json | Set-Content -LiteralPath (Join-Path $runtime 'status.json') -Encoding utf8
     Write-Output $json
@@ -124,8 +136,12 @@ try {
 $ollama=Join-Path $root '.tmp/local-ai/ollama-v0.40.12/ollama.exe'
 Start-Owned 'ollama' $ollama @('serve') $root @{OLLAMA_HOST='127.0.0.1:11435';OLLAMA_MODELS=(Join-Path $root '.tmp/local-ai/models');OLLAMA_NO_CLOUD='1';OLLAMA_NUM_PARALLEL='1';OLLAMA_MAX_LOADED_MODELS='1'}
 Wait-Http 'http://127.0.0.1:11435/api/tags'
+$qwenRuntime=Get-Content -LiteralPath (Join-Path $root '2_ai_pricing_service/app/core/local_context_runtime.json') -Raw | ConvertFrom-Json
+$tags=Invoke-RestMethod -Uri 'http://127.0.0.1:11435/api/tags' -TimeoutSec 5
+if(-not @($tags.models | Where-Object { $_.name -eq $qwenRuntime.model -and $_.digest -eq $qwenRuntime.digest }).Count){throw 'Qwen model digest differs from the selected runtime'}
 Start-Owned 'ai' (Join-Path $root '2_ai_pricing_service/.venv/Scripts/python.exe') @('-m','uvicorn','app.main:app','--host','127.0.0.1','--port','58220') (Join-Path $root '2_ai_pricing_service') @{
     MARKET_CONTEXT_PROVIDER='ollama';MARKET_CONTEXT_MODEL='qwen3:1.7b';MARKET_CONTEXT_OLLAMA_URL='http://127.0.0.1:11435/api/chat';OMP_NUM_THREADS='1';OPENBLAS_NUM_THREADS='1'
+    MARKET_LEGACY_COLLECTION_DISABLED='1';MARKET_CONTEXT_JOBS_DIR=(Join-Path $runtime 'context-jobs')
     MODEL_PATH=(Join-Path $runtime 'no-operational-price-model.pkl');CONVERSION_MODEL_PATH=(Join-Path $runtime 'no-operational-conversion-model.pkl')
 }
 Wait-Http 'http://127.0.0.1:58220/health/live'

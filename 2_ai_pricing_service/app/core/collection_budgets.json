@@ -1,0 +1,9 @@
+{
+  "version": "ai-v1-corpus-budget-2",
+  "total_requests": 200,
+  "default_domain_requests": 50,
+  "domain_request_overrides": {"danang.gov.vn": 100},
+  "minimum_domain_delay_seconds": 5,
+  "approval": "user_chat_2026-11-07: Duyệt tối đa 100 request cho danang.gov.vn",
+  "scope": "corpus collection and policy discovery only; price feasibility remains 20/source"
+}

@@ -1,0 +1,19 @@
+{
+  "version": "hotelai-ai-v1-qwen-runtime-2",
+  "model": "qwen3:1.7b",
+  "digest": "8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7",
+  "quantization": "Q4_K_M",
+  "num_ctx": 8192,
+  "num_predict": 700,
+  "num_thread": 1,
+  "temperature": 0,
+  "think": false,
+  "keep_alive": 0,
+  "chat_template_token_reserve": 512,
+  "input_budget_method": "conservative UTF-8 byte upper bound, including JSON schema",
+  "max_document_characters": 3000,
+  "max_total_characters": 6000,
+  "max_documents": 3,
+  "max_workers": 1,
+  "timeout_seconds": 240
+}

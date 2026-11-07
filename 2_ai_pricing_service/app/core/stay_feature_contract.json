@@ -1,0 +1,6 @@
+{
+  "version": "stay-market-v1-no-competitors",
+  "disabled_groups": {
+    "competitors": "user_chat_2026-11-07: chưa có url công khai hoặc link tài liệu tạm chuyển qua a"
+  }
+}

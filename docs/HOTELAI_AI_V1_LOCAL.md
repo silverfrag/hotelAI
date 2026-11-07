@@ -29,6 +29,8 @@ Giới hạn Compose cưỡng chế: PostgreSQL 384 MiB, Redis 96 MiB (maxmemory
 
 FastAPI chạy `app.main:app`, NestJS chạy `dist/main.js`, Next.js chạy production build. Không dùng academic server thay thế. Artifact giá/conversion vận hành cố ý chưa được nạp: liveness FastAPI có thể healthy trong khi `/health` báo model unavailable. Trạng thái này không chứng minh pricing sẵn sàng. Tính đúng nguồn fallback, context và booking sẽ được nghiệm thu tại các milestone tiếp theo sau điểm duyệt M3.
 
-Qwen3 resource smoke ngày 2026-11-07 dùng model hiện có, context 4096, 1 CPU thread, output 32, keep_alive=0; đây chỉ là kiểm tra hạ tầng. Runtime extraction trong code cũ chưa được đồng bộ/đóng băng; không coi smoke này là gate chất lượng Qwen3 hoặc bằng chứng p95.
+Smoke ban đầu context 4096/output 32 chỉ kiểm tra hạ tầng. M0 sau đó đóng băng extraction v1; người dùng đã duyệt cập nhật M2 trên dev và đóng băng lại v2. Bản hiện tại context 8192, output 700, một CPU thread/worker, keep_alive=0, cùng digest Qwen3/Q4_K_M. Manifest tại `artifacts/hotelai-ai-v1/20261029-092250/M2/runtime-freeze-v2/`; `status` kiểm hash mọi source file trong manifest mới nhất, không chỉ đọc cờ frozen. RAM tối thiểu 2,7674 GiB trong probe adapter v2 cùng toàn stack, 5 health qua; chưa nghiệm thu precision/recall hay p95.
+
+Launcher tắt collector preview cũ (`MARKET_LEGACY_COLLECTION_DISABLED=1`) để không thu ngoài registry/budget. Việc thu corpus chỉ qua script có ledger. Job context lưu JSON có version/hash tại `.tmp/ai-v1-local/context-jobs`, không lưu pickle/secret; đọc cache không gia hạn TTL. Chưa có refresh vận hành đầy đủ được nghiệm thu. Giá đối thủ đã tắt theo nhánh (a) người dùng duyệt; Qwen và conversion vẫn chưa đạt nghiệm thu vận hành.
 
 Sau khi dừng demo, stack cũ có thể được mở lại bằng `docker start` với các container đã ghi trong `artifacts/hotelai-ai-v1/20261029-092250/M0/old-stack-stop.json`. Không chạy song song khi RAM chưa đủ. Launcher không tự khởi động stack cũ.
