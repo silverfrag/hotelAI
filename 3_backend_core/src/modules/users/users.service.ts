@@ -58,10 +58,15 @@ export class UsersService {
       `SELECT c.customer_id, c.full_name, c.email, c.phone, c.nationality, c.role,
               c.account_status, c.version, c.loyalty_tier, c.loyalty_points, c.created_at, c.updated_at,
               COALESCE(COUNT(b.booking_id), 0) AS total_stays,
-              COALESCE(SUM(p.amount), 0) AS total_spent
+              COALESCE(SUM(ledger.net_paid), 0) AS total_spent
        FROM customers c
        LEFT JOIN bookings b ON c.customer_id = b.customer_id AND b.status IN ('Completed', 'CheckedIn')
-       LEFT JOIN payments p ON b.booking_id = p.booking_id AND p.status = 'Completed'
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(SUM(CASE WHEN payment.transaction_type = 'Payment'
+           THEN payment.amount ELSE -payment.amount END), 0) AS net_paid
+         FROM payment_transactions payment
+         WHERE payment.booking_id = b.booking_id AND payment.status = 'Succeeded'
+       ) ledger ON true
        WHERE c.customer_id = $1::uuid
        GROUP BY c.customer_id`,
 
@@ -95,7 +100,7 @@ export class UsersService {
         ...(next.phone !== current.phone ? ['phone'] : []),
         ...(next.nationality !== current.nationality ? ['nationality'] : []),
       ];
-      if (!changedFields.length) return this.mapProfile(current);
+      if (!changedFields.length) return this.getProfile(customerId, manager);
 
       const [updatedRows] = await manager.query(
         `UPDATE customers
@@ -120,7 +125,7 @@ export class UsersService {
         eventType: 'customer.profile-updated.v1',
         payload: { customer_id: customerId, version: Number(updated.version), fields: changedFields },
       });
-      return this.mapProfile(updated);
+      return this.getProfile(customerId, manager);
     });
   }
 
@@ -299,6 +304,22 @@ export class UsersService {
   }
 
   private mapProfile(row: CustomerRow): UserProfileView {
+    const totalSpent = Number(row.total_spent || 0);
+    // 10,000 VND spent = 1 loyalty point
+    const earnedPoints = Math.floor(totalSpent / 10000);
+    const loyaltyPoints = Math.max(Number(row.loyalty_points || 0), earnedPoints);
+
+    let earnedTier: UserProfileView['loyalty_tier'] = 'Bronze';
+    if (loyaltyPoints >= 20000) {
+      earnedTier = 'Platinum';
+    } else if (loyaltyPoints >= 5000) {
+      earnedTier = 'Gold';
+    } else if (loyaltyPoints >= 1000) {
+      earnedTier = 'Silver';
+    }
+    const tiers: UserProfileView['loyalty_tier'][] = ['Bronze', 'Silver', 'Gold', 'Platinum'];
+    const loyaltyTier = tiers[Math.max(tiers.indexOf(row.loyalty_tier || 'Bronze'), tiers.indexOf(earnedTier))];
+
     return {
       id: row.customer_id,
       full_name: row.full_name,
@@ -308,10 +329,10 @@ export class UsersService {
       role: row.role,
       account_status: row.account_status,
       version: Number(row.version),
-      loyalty_tier: row.loyalty_tier,
-      loyalty_points: row.loyalty_points,
+      loyalty_tier: loyaltyTier,
+      loyalty_points: loyaltyPoints,
       total_stays: Number(row.total_stays || 0),
-      total_spent: Number(row.total_spent || 0),
+      total_spent: totalSpent,
       created_at: row.created_at,
       updated_at: row.updated_at,
     };

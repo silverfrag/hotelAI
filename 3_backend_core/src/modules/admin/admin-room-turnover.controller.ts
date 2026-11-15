@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -17,8 +18,10 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { DatabaseIdPipe } from '../../common/pipes/database-id.pipe';
 import { AdminRoomTurnoverService } from './admin-room-turnover.service';
 import {
+  AllocationQueueQueryDto,
   ExecuteUpgradeDto,
   HousekeepingQueueQueryDto,
+  OptimizeBookingQueueDto,
   ReassignRoomDto,
   UpdateHousekeepingStatusDto,
 } from './dto/room-turnover.dto';
@@ -104,6 +107,26 @@ export class AdminRoomTurnoverController {
         request.user.sub,
         idempotencyKey,
       ),
+    };
+  }
+
+  @Get('allocations/queue')
+  async getAllocationQueue(@Query() query: AllocationQueueQueryDto) {
+    const data = await this.roomTurnover.getAllocationQueue(query);
+    return {
+      status: 'success',
+      count: data.items.length,
+      data,
+    };
+  }
+
+  @Post('allocations/optimize-queue')
+  @HttpCode(200)
+  async optimizeBookingQueue(@Body() dto: OptimizeBookingQueueDto) {
+    const data = await this.roomTurnover.optimizeBookingQueue(dto);
+    return {
+      status: 'success',
+      data,
     };
   }
 }

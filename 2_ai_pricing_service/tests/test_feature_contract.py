@@ -9,6 +9,7 @@ from app.core.feature_contract import (
     count_weekend_nights,
     stay_includes_weekend_night,
 )
+from app.core.serving_contract import SERVING_FEATURE_ORDER, build_serving_features
 from notebooks.train_model import (
     ARRIVAL_DATE_COLUMN,
     TrainingConfig,
@@ -43,14 +44,14 @@ def test_weekend_feature_rejects_empty_or_backward_stays() -> None:
 
 
 def test_serving_feature_builder_uses_model_order_and_full_stay() -> None:
-    features = build_pricing_features(
+    features = build_serving_features(
         lead_time=21,
         check_in=date(2026, 8, 14),
         check_out=date(2026, 8, 17),
         guest_count=2,
     )
 
-    assert tuple(features) == FEATURE_ORDER
+    assert tuple(features) == SERVING_FEATURE_ORDER
     assert features == {
         "lead_time": 21,
         "arrival_month_sin": -0.5,

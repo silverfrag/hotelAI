@@ -1,0 +1,215 @@
+{
+  "artifact_schema_version": "1.0.0",
+  "created_at_utc": "2026-09-23T10:52:21.904229+00:00",
+  "data": {
+    "filter": "hotel == City Hotel AND is_canceled == 0 AND adr > 0 AND stay_nights > 0 AND guest_count > 0",
+    "filtered_city_hotel_rows": 46228,
+    "invalid_quote_context_rows_removed": 30,
+    "sha256": "7c2ae42a7353905ea136e5c2287f17c92c5435826598bfbb8491c6f0c7b1fc06",
+    "source_file": "hotel_bookings.csv",
+    "source_rows": 119390,
+    "training_candidate_rows": 45119
+  },
+  "demand_feature_contract": {
+    "features": {
+      "availability_tightness": {
+        "description": "Complement of availability ratio; 1.0 = zero rooms left",
+        "range": "[0.0, 1.0]",
+        "source": "real_time_inventory_snapshot"
+      },
+      "booking_velocity_score": {
+        "description": "Normalised ratio of recent booking pace to historical average; 0.5 = on-trend, >0.5 = accelerating demand",
+        "range": "[0.0, 1.0]",
+        "source": "real_time_booking_log"
+      },
+      "demand_pressure_score": {
+        "description": "Composite demand pressure: occupancy × velocity weighted sum",
+        "range": "[0.0, 1.0]",
+        "source": "computed"
+      },
+      "occupancy_ratio": {
+        "description": "Fraction of sellable rooms booked for the target period",
+        "range": "[0.0, 1.0]",
+        "source": "real_time_inventory_snapshot"
+      }
+    },
+    "training_note": "When real-time snapshots are unavailable (historical CSV training), use synthesize_occupancy_for_training() to generate plausible signals with Gaussian noise, ensuring the model learns from variance not lookup.",
+    "version": "1.0.0"
+  },
+  "evaluation": {
+    "adr_mae_improvement_over_baseline": 0.039691,
+    "adr_metrics": {
+      "mae": 26.699509,
+      "mape": 0.215943,
+      "r2": 0.295938,
+      "rmse": 33.842567
+    },
+    "baseline": {
+      "adr_mae": 27.803039,
+      "adr_r2": 0.209129,
+      "adr_rmse": 35.868291,
+      "fallback": "training_month_median_then_training_global_median",
+      "global_fallbacks": 0,
+      "global_median": 1.0,
+      "group_matches": 9029,
+      "mae": 0.274912,
+      "month_fallbacks": 0,
+      "strategy": "training_month_and_arrival_weekday_median"
+    },
+    "feature_importance": {
+      "arrival_month_cos": 0.291347,
+      "arrival_month_sin": 0.060872,
+      "arrival_weekday_cos": 0.028966,
+      "arrival_weekday_sin": 0.037321,
+      "availability_tightness": 0.028645,
+      "booking_velocity_score": 0.046405,
+      "demand_pressure_score": 0.04855,
+      "guest_count": 0.136631,
+      "lead_time": 0.218383,
+      "occupancy_ratio": 0.027819,
+      "price_vs_market_ratio": 0.0,
+      "stay_nights": 0.042853,
+      "weekend_nights": 0.00858,
+      "weekend_share": 0.023629
+    },
+    "holdout_rows": 9029,
+    "mae": 0.266228,
+    "mae_improvement_over_baseline": 0.031588,
+    "mape": 0.195663,
+    "passes_baseline_gate": true,
+    "r2": -0.333126,
+    "rmse": 0.335006,
+    "split": {
+      "actual_holdout_fraction": 0.200115,
+      "cutoff_date": "2017-04-25",
+      "holdout_date_range": [
+        "2017-04-25",
+        "2017-08-31"
+      ],
+      "requested_holdout_fraction": 0.2,
+      "strategy": "chronological_by_arrival_date",
+      "training_date_range": [
+        "2015-07-01",
+        "2017-04-24"
+      ]
+    },
+    "target_base_adr": 95.0,
+    "target_reference": {
+      "global_fallback_base_adr": 95.0,
+      "room_type_base_adr": {
+        "A": 90.0,
+        "B": 85.5,
+        "C": 110.0,
+        "D": 121.5,
+        "E": 146.145,
+        "F": 181.16,
+        "G": 216.0
+      },
+      "strategy": "training_reserved_room_type_median_adr",
+      "unknown_holdout_room_types": []
+    },
+    "training_rows": 36090
+  },
+  "feature_contract": {
+    "cyclic_encoding": "sin/cos with month zero-based over 12 and Monday zero-based over 7",
+    "demand_signals": {
+      "description": "Real-time demand context features added in v3.0.0. These require live inventory and booking-log data at serving time. Defaults represent a neutral mid-season, on-trend market state.",
+      "features": [
+        "occupancy_ratio",
+        "booking_velocity_score",
+        "demand_pressure_score",
+        "availability_tightness",
+        "price_vs_market_ratio"
+      ],
+      "version": "1.0.0"
+    },
+    "excluded_user_controlled_features": [
+      "total_of_special_requests"
+    ],
+    "feature_order": [
+      "lead_time",
+      "arrival_month_sin",
+      "arrival_month_cos",
+      "arrival_weekday_sin",
+      "arrival_weekday_cos",
+      "stay_nights",
+      "weekend_nights",
+      "weekend_share",
+      "guest_count",
+      "occupancy_ratio",
+      "booking_velocity_score",
+      "demand_pressure_score",
+      "availability_tightness",
+      "price_vs_market_ratio"
+    ],
+    "stay_interval": "check-in inclusive, check-out exclusive",
+    "target_reference": "ADR divided by the training median ADR of reserved room type",
+    "version": "3.0.0",
+    "weekend_days": [
+      "Saturday",
+      "Sunday"
+    ],
+    "weekend_definition": "1 when at least one occupied night in [check_in_date, check_out_date) starts on Saturday or Sunday; otherwise 0"
+  },
+  "model_version": "random_forest_v3_demand_aware",
+  "runtime": {
+    "joblib": "1.5.3",
+    "pandas": "3.0.5",
+    "python": "3.12.14",
+    "scikit_learn": "1.9.0"
+  },
+  "target": {
+    "clip_range": [
+      0.5,
+      3.0
+    ],
+    "definition": "ADR / median ADR for reserved room type in the chronological training partition",
+    "name": "price_multiplier",
+    "reference": {
+      "global_fallback_base_adr": 95.0,
+      "room_type_base_adr": {
+        "A": 90.0,
+        "B": 85.5,
+        "C": 110.0,
+        "D": 121.5,
+        "E": 146.145,
+        "F": 181.16,
+        "G": 216.0
+      },
+      "strategy": "training_reserved_room_type_median_adr",
+      "unknown_holdout_room_types": []
+    }
+  },
+  "training": {
+    "config": {
+      "max_depth": 10,
+      "n_estimators": 100,
+      "n_jobs": 1,
+      "random_seed": 42,
+      "test_size": 0.2
+    },
+    "estimator": "RandomForestRegressor",
+    "estimator_parameters": {
+      "bootstrap": true,
+      "ccp_alpha": 0.0,
+      "criterion": "squared_error",
+      "max_depth": 10,
+      "max_features": 1.0,
+      "max_leaf_nodes": null,
+      "max_samples": null,
+      "min_impurity_decrease": 0.0,
+      "min_samples_leaf": 1,
+      "min_samples_split": 2,
+      "min_weight_fraction_leaf": 0.0,
+      "monotonic_cst": null,
+      "n_estimators": 100,
+      "n_jobs": 1,
+      "oob_score": false,
+      "random_state": 42,
+      "verbose": 0,
+      "warm_start": false
+    },
+    "script_sha256": "ec98bd633e67c37919f93b4c6070d0a05d49cec1ccc6d8a69c8c4f524626b90f"
+  },
+  "training_run_id": "7afcb0c0c5664f09"
+}

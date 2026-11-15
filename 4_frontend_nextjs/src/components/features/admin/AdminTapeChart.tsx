@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
@@ -73,6 +73,7 @@ export function AdminTapeChart() {
 
   // Loaded data
   const [chartData, setChartData] = useState<TapeChartView | null>(null);
+  const chartRequest = useRef(0);
 
   // Interactive booking details modal
   const [activeBooking, setActiveBooking] = useState<{
@@ -94,41 +95,43 @@ export function AdminTapeChart() {
 
   // Fetch tape chart data
   const loadChart = useCallback(async (isRefresh = false) => {
+    const request = ++chartRequest.current;
     if (!session?.accessToken) return;
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     setError('');
 
     try {
-      const params: { startDate?: string; days?: number; roomTypeId?: number; floor?: number } = {
-        days,
-      };
+      // Keep the complete inventory for this bounded date window. Filtering the
+      // response on the server also removes options needed to change filters.
+      const params: { startDate?: string; days: number } = { days };
       if (startDate) params.startDate = startDate;
-      if (selectedRoomType !== 'all') params.roomTypeId = Number(selectedRoomType);
-      if (selectedFloor !== 'all') params.floor = Number(selectedFloor);
 
       const data = await getAdminTapeChart(session.accessToken, params);
+      if (request !== chartRequest.current) return;
       setChartData(data);
-      if (!startDate && data.businessDate) {
-        setStartDate(data.startDate);
-      }
     } catch (err: unknown) {
+      if (request !== chartRequest.current) return;
       const msg = err instanceof Error ? err.message : 'Không thể tải sơ đồ phòng.';
       setError(msg);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (request === chartRequest.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [session?.accessToken, days, startDate, selectedRoomType, selectedFloor]);
+  }, [session?.accessToken, days, startDate]);
 
   useEffect(() => {
-    loadChart();
+    void loadChart();
+    return () => { chartRequest.current++; };
   }, [loadChart]);
 
   // Timeline date shift helpers
   const handleShiftDays = (delta: number) => {
-    if (!chartData?.startDate) return;
-    const [y, m, d] = chartData.startDate.split('-').map(Number);
+    const currentStart = startDate || chartData?.startDate;
+    if (!currentStart) return;
+    const [y, m, d] = currentStart.split('-').map(Number);
     const cur = new Date(Date.UTC(y, m - 1, d));
     cur.setUTCDate(cur.getUTCDate() + delta);
     setStartDate(cur.toISOString().slice(0, 10));
@@ -275,6 +278,8 @@ export function AdminTapeChart() {
   const displayRooms = useMemo(() => {
     if (!chartData?.rooms) return [];
     return chartData.rooms.filter((room) => {
+      if (selectedRoomType !== 'all' && room.roomTypeId !== Number(selectedRoomType)) return false;
+      if (selectedFloor !== 'all' && room.floor !== Number(selectedFloor)) return false;
       // Status filter
       if (selectedStatus === 'occupied' && room.currentStatus !== 'Occupied') return false;
       if (selectedStatus === 'available' && room.currentStatus !== 'Available') return false;
@@ -282,7 +287,7 @@ export function AdminTapeChart() {
 
       // Search query (matches room number or customer name)
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+        const q = searchQuery.trim().toLowerCase();
         const matchRoom = room.roomNumber.toLowerCase().includes(q) || room.roomTypeName.toLowerCase().includes(q);
         const matchBooking = Object.values(room.slots).some(
           (s) => s && (s.customerName.toLowerCase().includes(q) || s.bookingId.toLowerCase().includes(q)),
@@ -292,7 +297,7 @@ export function AdminTapeChart() {
 
       return true;
     });
-  }, [chartData?.rooms, selectedStatus, searchQuery]);
+  }, [chartData?.rooms, selectedRoomType, selectedFloor, selectedStatus, searchQuery]);
 
   // Available rooms of the same type for reassignment
   const availableTargetRooms = useMemo(() => {
@@ -310,7 +315,7 @@ export function AdminTapeChart() {
         {/* Page Header */}
         <PageHeader
           title="Sơ đồ phòng (Room Tape Chart)"
-          description="Quan sát toàn diện 98 phòng resort, điều phối nhận/trả phòng và xếp dải ngày lưu trú thời gian thực."
+          description="Theo dõi danh sách phòng, điều phối nhận/trả phòng và xem lịch lưu trú theo ngày."
           actions={
             <div className="flex items-center gap-2.5">
               <Badge variant="primary" className="gap-1.5 px-3 py-1 font-semibold uppercase tracking-wider text-xs">
@@ -358,9 +363,14 @@ export function AdminTapeChart() {
           </div>
         )}
 
-        {/* Live KPI Metric Cards */}
-        {chartData && (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {/* Current property-wide metrics; timeline filters only change rows. */}
+        {chartData && !loading && !error && (
+          <section aria-label="Tình trạng hiện tại toàn khách sạn" className="space-y-3">
+            <p className="text-xs text-slate-400">
+              Số liệu hiện tại của toàn khách sạn, không thay đổi theo bộ lọc hay dải ngày trên lịch.
+              {' '}Ngày nghiệp vụ: {chartData.businessDate}.
+            </p>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Card className="border-slate-800 bg-slate-900/70 backdrop-blur-md">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -370,7 +380,7 @@ export function AdminTapeChart() {
                 <div className="mt-2 text-2xl font-bold text-white tracking-tight">
                   {chartData.metrics.totalRooms}
                 </div>
-                <span className="text-[11px] text-slate-400">8 hạng phòng</span>
+                <span className="text-[11px] text-slate-400">{roomTypesList.length} hạng phòng</span>
               </CardContent>
             </Card>
 
@@ -386,32 +396,6 @@ export function AdminTapeChart() {
                 <span className="text-[11px] text-slate-400">
                   {chartData.metrics.occupiedRoomsToday} phòng đang ở
                 </span>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-800 bg-slate-900/70 backdrop-blur-md">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-400 font-medium">Khách đến hôm nay</span>
-                  <LogIn className="h-4 w-4 text-blue-400" />
-                </div>
-                <div className="mt-2 text-2xl font-bold text-blue-400 tracking-tight">
-                  {chartData.metrics.arrivalsToday}
-                </div>
-                <span className="text-[11px] text-slate-400">Cần nhận phòng</span>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-800 bg-slate-900/70 backdrop-blur-md">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-400 font-medium">Khách đi hôm nay</span>
-                  <LogOut className="h-4 w-4 text-orange-400" />
-                </div>
-                <div className="mt-2 text-2xl font-bold text-orange-400 tracking-tight">
-                  {chartData.metrics.departuresToday}
-                </div>
-                <span className="text-[11px] text-slate-400">Cần trả phòng</span>
               </CardContent>
             </Card>
 
@@ -443,6 +427,7 @@ export function AdminTapeChart() {
               </CardContent>
             </Card>
           </div>
+          </section>
         )}
 
         {/* Toolbar Controls (Dates, Range, Filters) */}
@@ -483,7 +468,8 @@ export function AdminTapeChart() {
               <div className="relative">
                 <Input
                   type="date"
-                  value={startDate}
+                  aria-label="Ngày bắt đầu lịch"
+                  value={startDate || chartData?.startDate || ''}
                   onChange={(e) => setStartDate(e.target.value)}
                   className="h-9 w-40 bg-slate-800 border-slate-700 text-xs text-white"
                 />
@@ -511,6 +497,7 @@ export function AdminTapeChart() {
             <div className="flex flex-wrap items-center gap-2">
               {/* Room type filter */}
               <Select
+                aria-label="Lọc theo hạng phòng"
                 value={selectedRoomType}
                 onChange={(e) => setSelectedRoomType(e.target.value)}
                 className="h-9 bg-slate-800 border-slate-700 text-xs text-white w-40"
@@ -525,6 +512,7 @@ export function AdminTapeChart() {
 
               {/* Floor filter */}
               <Select
+                aria-label="Lọc theo tầng"
                 value={selectedFloor}
                 onChange={(e) => setSelectedFloor(e.target.value)}
                 className="h-9 bg-slate-800 border-slate-700 text-xs text-white w-28"
@@ -539,6 +527,7 @@ export function AdminTapeChart() {
 
               {/* Status filter */}
               <Select
+                aria-label="Lọc theo trạng thái phòng"
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
                 className="h-9 bg-slate-800 border-slate-700 text-xs text-white w-32"
@@ -554,6 +543,7 @@ export function AdminTapeChart() {
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
                   type="text"
+                  aria-label="Tìm phòng hoặc khách"
                   placeholder="Số phòng / Tên khách"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -562,6 +552,11 @@ export function AdminTapeChart() {
               </div>
             </div>
           </div>
+          {chartData && !loading && !error && (
+            <p className="mt-3 text-xs text-slate-400" role="status">
+              Hiển thị {displayRooms.length}/{chartData.rooms.length} phòng. Bộ lọc chỉ áp dụng cho bảng lịch bên dưới.
+            </p>
+          )}
         </Card>
 
         {/* Legend */}

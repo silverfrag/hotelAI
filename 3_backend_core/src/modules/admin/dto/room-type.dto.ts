@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsNumber, IsString, Length, Max, Min, ValidateIf } from 'class-validator';
+import { IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Length, Max, Min, ValidateIf } from 'class-validator';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
@@ -19,6 +19,13 @@ export class CreateRoomTypeDto {
   @Min(1)
   @Max(1_000)
   capacity: number;
+
+  @IsOptional()
+  @ValidateIf((_object, value) => value !== null && value !== undefined)
+  @IsNumber({ maxDecimalPlaces: 2, allowInfinity: false, allowNaN: false })
+  @Min(0.01)
+  @Max(99_999_999.99)
+  declared_max_price?: number | null;
 }
 
 export class UpdateRoomTypeDto {
@@ -40,4 +47,10 @@ export class UpdateRoomTypeDto {
   @Min(1)
   @Max(1_000)
   capacity?: number;
+
+  @ValidateIf((_object, value) => value !== undefined && value !== null)
+  @IsNumber({ maxDecimalPlaces: 2, allowInfinity: false, allowNaN: false })
+  @Min(0.01)
+  @Max(99_999_999.99)
+  declared_max_price?: number | null;
 }

@@ -1,0 +1,28 @@
+# Independent academic demo. No PMS, credentials, host data mounts or migrations.
+name: hotelai-academic
+services:
+  ai:
+    build:
+      context: ./2_ai_pricing_service
+      target: production
+    command: ["uvicorn", "app.academic_main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      OMP_NUM_THREADS: "2"
+    ports: ["127.0.0.1:58010:8000"]
+  core:
+    build:
+      context: ./3_backend_core
+      dockerfile: Dockerfile.academic
+    environment:
+      ACADEMIC_CORE_HOST: "0.0.0.0"
+      ACADEMIC_CORE_PORT: "3000"
+      AI_ACADEMIC_URL: "http://ai:8000/api/v1/academic"
+    ports: ["127.0.0.1:53013:3000"]
+    depends_on: [ai]
+  web:
+    build:
+      context: ./4_frontend_nextjs
+    environment:
+      BACKEND_API_URL: "http://core:3000/api/v1/core"
+    ports: ["127.0.0.1:53014:3000"]
+    depends_on: [core]

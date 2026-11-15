@@ -7,13 +7,18 @@ import {
   Banknote,
   CalendarCheck2,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  Clock,
   LoaderCircle,
   LogIn,
   LogOut,
   RefreshCw,
   Search,
+  ShieldCheck,
+  SlidersHorizontal,
   XCircle,
 } from 'lucide-react';
 import { PageContainer } from '@/components/common/PageContainer';
@@ -37,15 +42,26 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import {
   AdminApiError,
+  authorizeAdminBookingCredit,
   cancelAdminBooking,
   checkInAdminBooking,
   checkOutAdminBooking,
-  markAdminBookingNoShow,
+  confirmAdminBooking,
+  expireAdminPendingBookings,
   getAdminBookingPayment,
+  getAdminBookingPolicy,
   getAdminBookings,
+  getAdminWorkflowReadiness,
+  markAdminBookingNoShow,
   recordAdminPayment,
+  updateAdminBookingPolicy,
 } from '@/services/admin.service';
-import type { AdminBooking, AdminBookingStatus } from '@/types/admin.type';
+import type {
+  AdminBooking,
+  AdminBookingPolicy,
+  AdminBookingStatus,
+  AdminWorkflowReadiness,
+} from '@/types/admin.type';
 import type { BookingPaymentSummary, PaymentMethod, PaymentStatus } from '@/types/booking.type';
 import { formatCurrency } from '@/utils/formatCurrency';
 
@@ -97,7 +113,7 @@ function newPaymentKey(): string {
 }
 
 type ActionTarget = {
-  kind: 'cancel' | 'check-in' | 'check-out' | 'no-show';
+  kind: 'cancel' | 'check-in' | 'check-out' | 'no-show' | 'confirm';
   booking: AdminBooking;
 };
 
@@ -169,17 +185,30 @@ function BookingActions({
   onAction,
   onPayment,
   onRefundLookup,
+  onAuthorizeCredit,
 }: {
   booking: AdminBooking;
   pending: boolean;
   onAction: (target: ActionTarget) => void;
   onPayment: (booking: AdminBooking) => void;
   onRefundLookup: (booking: AdminBooking) => void;
+  onAuthorizeCredit?: (booking: AdminBooking) => void;
 }) {
+  const canConfirmPending = booking.status === 'Pending'
+    && booking.can_cancel
+    && asNumber(booking.net_paid) >= asNumber(booking.deposit_required);
+  const canAuthorizeCredit = Boolean(onAuthorizeCredit)
+    && booking.status === 'CheckedIn'
+    && booking.checkout_payment_required
+    && !booking.can_check_out
+    && asNumber(booking.balance_due) > 0
+    && asNumber(booking.credit_authorized) === 0;
   const hasLifecycleAction = booking.can_cancel
     || booking.can_check_in
     || booking.can_check_out
-    || booking.can_mark_no_show;
+    || booking.can_mark_no_show
+    || canConfirmPending
+    || canAuthorizeCredit;
   // List eligibility is a hint; the payment dialog checks the ledger's can_record_payment flag.
   const canRecordPayment = !['Canceled', 'Expired', 'NoShow'].includes(booking.status)
     && (booking.status !== 'Pending' || booking.can_cancel)
@@ -198,6 +227,16 @@ function BookingActions({
           aria-label={`Hủy booking của ${booking.customer_name}`}
         >
           <XCircle /> Hủy
+        </Button>
+      )}
+      {canConfirmPending && (
+        <Button
+          size="sm"
+          disabled={pending}
+          onClick={() => onAction({ kind: 'confirm', booking })}
+          aria-label={`Xác nhận booking của ${booking.customer_name}`}
+        >
+          <CheckCircle2 /> Xác nhận
         </Button>
       )}
       {booking.can_mark_no_show && (
@@ -219,6 +258,17 @@ function BookingActions({
           aria-label={`Nhận phòng cho ${booking.customer_name}`}
         >
           <LogIn /> Nhận phòng
+        </Button>
+      )}
+      {canAuthorizeCredit && (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={pending}
+          onClick={() => onAuthorizeCredit?.(booking)}
+          aria-label={`Duyệt công nợ cho ${booking.customer_name}`}
+        >
+          <ShieldCheck /> Duyệt công nợ
         </Button>
       )}
       {booking.can_check_out && (
@@ -291,6 +341,28 @@ export function AdminBookingsManager({
   const [paymentLoading, setPaymentLoading] = useState(false);
   const paymentRequest = useRef(0);
 
+  // Booking Policy & Pending Expiry Readiness
+  const [policy, setPolicy] = useState<AdminBookingPolicy | null>(null);
+  const [readiness, setReadiness] = useState<AdminWorkflowReadiness | null>(null);
+  const [policyLoading, setPolicyLoading] = useState(true);
+  const [policyExpanded, setPolicyExpanded] = useState(false);
+  const [savingPolicy, setSavingPolicy] = useState(false);
+  const [expiringPending, setExpiringPending] = useState(false);
+  const [policyError, setPolicyError] = useState('');
+  const [policyNotice, setPolicyNotice] = useState('');
+  const [draftDepositPercent, setDraftDepositPercent] = useState('0');
+  const [draftPendingTtlMinutes, setDraftPendingTtlMinutes] = useState('30');
+  const [draftRequireCheckoutPayment, setDraftRequireCheckoutPayment] = useState(true);
+  const [policyReason, setPolicyReason] = useState('');
+
+  // Credit Authorization Dialog
+  const [creditTarget, setCreditTarget] = useState<AdminBooking | null>(null);
+  const [creditAmount, setCreditAmount] = useState('');
+  const [creditReason, setCreditReason] = useState('');
+  const [creditKey, setCreditKey] = useState('');
+  const [creditError, setCreditError] = useState('');
+  const [savingCredit, setSavingCredit] = useState(false);
+
   const updateUrl = useCallback((nextSearch: string, nextStatus: AdminBookingStatus | '') => {
     const params = new URLSearchParams();
     if (nextSearch) params.set('search', nextSearch);
@@ -335,11 +407,32 @@ export function AdminBookingsManager({
     }
   }, [accessToken, offset, search, status]);
 
+  const loadPolicyAndReadiness = useCallback(async () => {
+    if (!accessToken) return;
+    setPolicyLoading(true);
+    try {
+      const [nextPolicy, nextReadiness] = await Promise.all([
+        getAdminBookingPolicy(accessToken),
+        getAdminWorkflowReadiness(accessToken),
+      ]);
+      setPolicy(nextPolicy);
+      setReadiness(nextReadiness);
+      setDraftDepositPercent(String(nextPolicy.deposit_percent));
+      setDraftPendingTtlMinutes(String(nextPolicy.pending_ttl_minutes));
+      setDraftRequireCheckoutPayment(nextPolicy.require_full_payment_at_checkout);
+    } catch (caught) {
+      setPolicyError(caught instanceof Error ? caught.message : 'Không thể tải chính sách giữ phòng.');
+    } finally {
+      setPolicyLoading(false);
+    }
+  }, [accessToken]);
+
   useEffect(() => {
     const controller = new AbortController();
     void loadBookings(false, controller.signal);
+    void loadPolicyAndReadiness();
     return () => controller.abort();
-  }, [loadBookings]);
+  }, [loadBookings, loadPolicyAndReadiness]);
 
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -379,7 +472,8 @@ export function AdminBookingsManager({
   function openAction(target: ActionTarget) {
     setActionTarget(target);
     setActionReason('');
-    setActionKey(newPaymentKey().replace('ui-payment:', 'ui-no-show:'));
+    const keyPrefix = target.kind === 'confirm' ? 'ui-confirm:' : 'ui-no-show:';
+    setActionKey(newPaymentKey().replace('ui-payment:', keyPrefix));
     setActionStale(false);
     setActionError('');
   }
@@ -392,6 +486,10 @@ export function AdminBookingsManager({
       setActionError('Nhập lý do từ 10 đến 500 ký tự để ghi nhận khách không đến.');
       return;
     }
+    if (kind === 'confirm' && (actionReason.trim().length < 10 || actionReason.trim().length > 500)) {
+      setActionError('Nhập lý do từ 10 đến 500 ký tự để xác nhận booking.');
+      return;
+    }
     setPendingBookingId(booking.booking_id);
     setActionError('');
     setNotice('');
@@ -400,6 +498,13 @@ export function AdminBookingsManager({
         case 'cancel':
           await cancelAdminBooking(accessToken, booking.booking_id);
           setNotice(`Đã hủy booking ${shortReference(booking.booking_id)} của ${booking.customer_name}.`);
+          break;
+        case 'confirm':
+          await confirmAdminBooking(accessToken, booking.booking_id, {
+            expected_version: booking.lifecycle_version,
+            reason: actionReason.trim(),
+          }, actionKey);
+          setNotice(`Đã xác nhận booking ${shortReference(booking.booking_id)} cho ${booking.customer_name}.`);
           break;
         case 'check-in':
           await checkInAdminBooking(accessToken, booking.booking_id);
@@ -418,16 +523,134 @@ export function AdminBookingsManager({
           break;
       }
       setActionTarget(null);
-      await loadBookings(true);
+      await Promise.all([loadBookings(true), loadPolicyAndReadiness()]);
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : 'Không thể cập nhật booking.');
       if (caught instanceof AdminApiError && caught.status === 409) {
         setActionStale(true);
         setActionError(`${caught.message} Đóng hộp thoại và kiểm tra booking đã làm mới trước khi thử lại.`);
-        await loadBookings(true);
+        await Promise.all([loadBookings(true), loadPolicyAndReadiness()]);
       }
     } finally {
       setPendingBookingId(null);
+    }
+  }
+
+  async function handleSavePolicy(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!accessToken || !policy) return;
+    setPolicyError('');
+    setPolicyNotice('');
+    const depositVal = Number(draftDepositPercent);
+    const ttlVal = Number(draftPendingTtlMinutes);
+    if (!Number.isFinite(depositVal) || depositVal < 0 || depositVal > 100) {
+      setPolicyError('Tỷ lệ đặt cọc phải trong khoảng 0 đến 100%.');
+      return;
+    }
+    if (!Number.isInteger(ttlVal) || ttlVal < 1 || ttlVal > 1440) {
+      setPolicyError('Thời gian giữ phòng Pending phải là số nguyên từ 1 đến 1440 phút.');
+      return;
+    }
+    if (policyReason.trim().length < 10 || policyReason.trim().length > 500) {
+      setPolicyError('Vui lòng nhập lý do cập nhật chính sách từ 10 đến 500 ký tự.');
+      return;
+    }
+    const depositChanged = Math.round(depositVal * 100) !== Math.round(policy.deposit_percent * 100);
+    const ttlChanged = ttlVal !== policy.pending_ttl_minutes;
+    const checkoutChanged = draftRequireCheckoutPayment !== policy.require_full_payment_at_checkout;
+    if (!depositChanged && !ttlChanged && !checkoutChanged) {
+      setPolicyError('Chưa có thay đổi nào so với chính sách hiện tại.');
+      return;
+    }
+    setSavingPolicy(true);
+    try {
+      const updated = await updateAdminBookingPolicy(accessToken, {
+        expected_version: policy.version,
+        reason: policyReason.trim(),
+        ...(depositChanged ? { deposit_percent: Math.round(depositVal * 100) / 100 } : {}),
+        ...(ttlChanged ? { pending_ttl_minutes: ttlVal } : {}),
+        ...(checkoutChanged ? { require_full_payment_at_checkout: draftRequireCheckoutPayment } : {}),
+      });
+      setPolicy(updated);
+      setPolicyReason('');
+      setPolicyExpanded(false);
+      setPolicyNotice(`Đã cập nhật chính sách giữ phòng lên v${updated.version} (Cọc ${updated.deposit_percent}%, TTL ${updated.pending_ttl_minutes} phút).`);
+      await loadPolicyAndReadiness();
+    } catch (caught) {
+      setPolicyError(caught instanceof Error ? caught.message : 'Không thể cập nhật chính sách booking.');
+      if (caught instanceof AdminApiError && caught.status === 409) {
+        await loadPolicyAndReadiness();
+      }
+    } finally {
+      setSavingPolicy(false);
+    }
+  }
+
+  async function handleExpirePending() {
+    if (!accessToken) return;
+    setExpiringPending(true);
+    setPolicyError('');
+    setPolicyNotice('');
+    try {
+      const result = await expireAdminPendingBookings(accessToken, 100);
+      setPolicyNotice(
+        result.expired_count > 0
+          ? `Đã quét và chuyển ${result.expired_count} booking Pending quá hạn sang Expired (trả lại phòng trống).`
+          : 'Không có booking Pending quá hạn nào cần giải phóng.',
+      );
+      await Promise.all([loadPolicyAndReadiness(), loadBookings(true)]);
+    } catch (caught) {
+      setPolicyError(caught instanceof Error ? caught.message : 'Không thể chạy quét booking Pending hết hạn.');
+    } finally {
+      setExpiringPending(false);
+    }
+  }
+
+  function openCreditDialog(booking: AdminBooking) {
+    setCreditTarget(booking);
+    setCreditAmount(String(asNumber(booking.balance_due)));
+    setCreditReason('');
+    setCreditKey(newPaymentKey().replace('ui-payment:', 'ui-credit:'));
+    setCreditError('');
+  }
+
+  async function submitCreditAuthorization(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!accessToken || !creditTarget) return;
+    const amount = Number(creditAmount);
+    if (!Number.isFinite(amount) || amount < 0.01 || amount > asNumber(creditTarget.balance_due)) {
+      setCreditError('Hạn mức công nợ phải từ 0.01 đến tối đa số dư còn thiếu.');
+      return;
+    }
+    if (creditReason.trim().length < 10 || creditReason.trim().length > 500) {
+      setCreditError('Nhập lý do duyệt công nợ từ 10 đến 500 ký tự.');
+      return;
+    }
+    setSavingCredit(true);
+    setCreditError('');
+    try {
+      await authorizeAdminBookingCredit(
+        accessToken,
+        creditTarget.booking_id,
+        {
+          expected_version: creditTarget.lifecycle_version,
+          reason: creditReason.trim(),
+          authorized_amount: Math.round(amount * 100) / 100,
+        },
+        creditKey,
+      );
+      setNotice(
+        `Đã phê duyệt công nợ ${formatCurrency(amount)} cho booking #${shortReference(creditTarget.booking_id)} (${creditTarget.customer_name}). Có thể tiến hành trả phòng.`,
+      );
+      setCreditTarget(null);
+      await loadBookings(true);
+    } catch (caught) {
+      setCreditError(caught instanceof Error ? caught.message : 'Không thể phê duyệt công nợ.');
+      if (caught instanceof AdminApiError && caught.status === 409) {
+        await loadBookings(true);
+      }
+    } finally {
+      setSavingCredit(false);
     }
   }
 
@@ -510,7 +733,7 @@ export function AdminBookingsManager({
         title="Quản lý booking"
         description="Tìm kiếm, theo dõi và cập nhật vòng đời booking trên toàn khách sạn."
         actions={
-          <Button variant="outline" onClick={() => void loadBookings(true)} disabled={loading || refreshing}>
+          <Button variant="outline" onClick={() => { void loadBookings(true); void loadPolicyAndReadiness(); }} disabled={loading || refreshing}>
             <RefreshCw className={refreshing ? 'animate-spin' : ''} />
             Làm mới
           </Button>
@@ -530,6 +753,166 @@ export function AdminBookingsManager({
           {notice}
         </div>
       )}
+
+      {/* Booking Policy & Pending Hold Expiry Readiness Card */}
+      <Card className="mb-6">
+        <CardContent className="pt-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <SlidersHorizontal className="size-4 text-primary" aria-hidden="true" />
+                <h2 className="text-sm font-semibold">Chính sách giữ phòng &amp; Quét hết hạn</h2>
+                {policy && (
+                  <Badge variant="outline">Phiên bản v{policy.version}</Badge>
+                )}
+                {readiness && (
+                  <Badge variant={readiness.expiry_worker === 'running' ? 'success' : readiness.expiry_worker === 'error' ? 'danger' : 'warning'}>
+                    Worker: {readiness.expiry_worker}
+                  </Badge>
+                )}
+                {readiness && readiness.expired_backlog > 0 && (
+                  <Badge variant="danger">Quá hạn chờ quét: {readiness.expired_backlog}</Badge>
+                )}
+              </div>
+              {policyLoading && !policy ? (
+                <p className="text-xs text-muted-foreground">Đang tải cấu hình giữ phòng &amp; trạng thái worker…</p>
+              ) : (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span>
+                    Đặt cọc bắt buộc: <strong className="text-foreground">{policy?.deposit_percent ?? 0}%</strong>
+                    {(policy?.deposit_percent ?? 0) === 0 ? ' (xác nhận ngay)' : ' (vào Pending)'}
+                  </span>
+                  <span>
+                    Giữ chỗ Pending: <strong className="text-foreground">{policy?.pending_ttl_minutes ?? 30} phút</strong>
+                  </span>
+                  <span>
+                    Trả phòng phải đủ tiền/công nợ: <strong className="text-foreground">{policy?.require_full_payment_at_checkout ? 'Có' : 'Không'}</strong>
+                  </span>
+                  {readiness && (
+                    <span>
+                      Đang Pending: <strong className="text-foreground">{readiness.pending_count}</strong>
+                      {readiness.last_expiry_run_at ? ` · Quét gần nhất ${formatDateTime(readiness.last_expiry_run_at)}` : ''}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleExpirePending()}
+                disabled={expiringPending || policyLoading}
+              >
+                {expiringPending ? <LoaderCircle className="animate-spin" /> : <Clock />}
+                Quét &amp; hủy Pending hết hạn ngay
+              </Button>
+              <Button
+                type="button"
+                variant={policyExpanded ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setPolicyExpanded((v) => !v);
+                  setPolicyError('');
+                }}
+                disabled={!policy}
+              >
+                {policyExpanded ? <ChevronUp /> : <ChevronDown />}
+                {policyExpanded ? 'Thu gọn' : 'Chỉnh chính sách'}
+              </Button>
+            </div>
+          </div>
+
+          {policyError && (
+            <p className="mt-3 rounded-md bg-danger-muted px-3 py-2 text-xs text-danger" role="alert">
+              {policyError}
+            </p>
+          )}
+          {policyNotice && (
+            <p className="mt-3 rounded-md bg-success-muted px-3 py-2 text-xs text-success" role="status">
+              {policyNotice}
+            </p>
+          )}
+
+          {policyExpanded && policy && (
+            <form onSubmit={(event) => void handleSavePolicy(event)} className="mt-4 grid gap-4 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="grid gap-1 text-xs font-medium">
+                Tỷ lệ đặt cọc (%)
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.5"
+                  value={draftDepositPercent}
+                  onChange={(event) => setDraftDepositPercent(event.target.value)}
+                  disabled={savingPolicy}
+                  required
+                />
+              </label>
+              <label className="grid gap-1 text-xs font-medium">
+                Thời gian giữ phòng Pending (phút)
+                <Input
+                  type="number"
+                  min={1}
+                  max={1440}
+                  step={1}
+                  value={draftPendingTtlMinutes}
+                  onChange={(event) => setDraftPendingTtlMinutes(event.target.value)}
+                  disabled={savingPolicy}
+                  required
+                />
+              </label>
+              <label className="grid gap-1 text-xs font-medium sm:col-span-2">
+                Lý do thay đổi chính sách (10–500 ký tự)
+                <Input
+                  value={policyReason}
+                  minLength={10}
+                  maxLength={500}
+                  placeholder="Ví dụ: Áp dụng cọc 30% giữ chỗ dịp cuối tuần cao điểm"
+                  onChange={(event) => setPolicyReason(event.target.value)}
+                  disabled={savingPolicy}
+                  required
+                />
+              </label>
+              <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2 lg:col-span-4">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium">
+                  <input
+                    type="checkbox"
+                    checked={draftRequireCheckoutPayment}
+                    onChange={(event) => setDraftRequireCheckoutPayment(event.target.checked)}
+                    disabled={savingPolicy}
+                  />
+                  <span>Bắt buộc thanh toán đủ hoặc phê duyệt công nợ trước khi trả phòng (check-out)</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={savingPolicy}
+                    onClick={() => {
+                      setDraftDepositPercent(String(policy.deposit_percent));
+                      setDraftPendingTtlMinutes(String(policy.pending_ttl_minutes));
+                      setDraftRequireCheckoutPayment(policy.require_full_payment_at_checkout);
+                      setPolicyReason('');
+                      setPolicyExpanded(false);
+                      setPolicyError('');
+                    }}
+                  >
+                    Hủy
+                  </Button>
+                  <Button type="submit" size="sm" disabled={savingPolicy || policyReason.trim().length < 10}>
+                    {savingPolicy && <LoaderCircle className="animate-spin" />}
+                    Lưu chính sách (v{policy.version + 1})
+                  </Button>
+                </div>
+              </div>
+            </form>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="pt-5">
@@ -647,6 +1030,18 @@ export function AdminBookingsManager({
                               ? `Cần hoàn ${formatCurrency(asNumber(booking.refund_due))}`
                               : `Còn thu ${formatCurrency(asNumber(booking.balance_due))}`}
                           </span>
+                          {booking.status === 'Pending' && (
+                            <span className="text-[11px] text-amber-400 tabular-nums">
+                              Cọc {formatCurrency(asNumber(booking.deposit_required))}
+                              {booking.pending_expires_at ? ` · hạn ${formatDateTime(booking.pending_expires_at)}` : ''}
+                              {!booking.can_cancel ? ' (đã quá hạn)' : ''}
+                            </span>
+                          )}
+                          {asNumber(booking.credit_authorized) > 0 && (
+                            <span className="text-[11px] text-emerald-400 tabular-nums">
+                              Công nợ đã duyệt: {formatCurrency(asNumber(booking.credit_authorized))}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="min-w-36 text-right">
@@ -656,6 +1051,7 @@ export function AdminBookingsManager({
                           onAction={openAction}
                           onPayment={openPayment}
                           onRefundLookup={(target) => router.push(`/admin/payments?search=${encodeURIComponent(target.booking_id)}`)}
+                          onAuthorizeCredit={openCreditDialog}
                         />
                       </TableCell>
                     </TableRow>
@@ -688,6 +1084,17 @@ export function AdminBookingsManager({
                           ? `Cần hoàn ${formatCurrency(asNumber(booking.refund_due))}`
                           : `Còn thu ${formatCurrency(asNumber(booking.balance_due))}`}
                       </dd>
+                      {booking.status === 'Pending' && (
+                        <dd className="mt-0.5 text-[11px] text-amber-400 tabular-nums">
+                          Cọc {formatCurrency(asNumber(booking.deposit_required))}
+                          {booking.pending_expires_at ? ` · hạn ${formatDateTime(booking.pending_expires_at)}` : ''}
+                        </dd>
+                      )}
+                      {asNumber(booking.credit_authorized) > 0 && (
+                        <dd className="mt-0.5 text-[11px] text-emerald-400 tabular-nums">
+                          Công nợ đã duyệt: {formatCurrency(asNumber(booking.credit_authorized))}
+                        </dd>
+                      )}
                     </div>
                     <div className="col-span-2">
                       <dt className="text-xs text-muted-foreground">Lưu trú</dt>
@@ -701,6 +1108,7 @@ export function AdminBookingsManager({
                       onAction={openAction}
                       onPayment={openPayment}
                       onRefundLookup={(target) => router.push(`/admin/payments?search=${encodeURIComponent(target.booking_id)}`)}
+                      onAuthorizeCredit={openCreditDialog}
                     />
                   </div>
                 </li>
@@ -739,11 +1147,13 @@ export function AdminBookingsManager({
         onClose={pendingBookingId ? () => undefined : () => { setActionTarget(null); setActionError(''); }}
         title={actionTarget?.kind === 'cancel'
           ? 'Xác nhận hủy booking?'
-          : actionTarget?.kind === 'check-in'
-            ? 'Xác nhận nhận phòng?'
-            : actionTarget?.kind === 'check-out'
-              ? 'Xác nhận trả phòng?'
-              : 'Xác nhận khách không đến?'}
+          : actionTarget?.kind === 'confirm'
+            ? 'Xác nhận chuyển booking sang Confirmed?'
+            : actionTarget?.kind === 'check-in'
+              ? 'Xác nhận nhận phòng?'
+              : actionTarget?.kind === 'check-out'
+                ? 'Xác nhận trả phòng?'
+                : 'Xác nhận khách không đến?'}
         description={actionTarget
           ? `Booking #${shortReference(actionTarget.booking.booking_id)} · ${actionTarget.booking.customer_name}`
           : undefined}
@@ -758,17 +1168,19 @@ export function AdminBookingsManager({
             </Button>
             <Button
               variant={actionTarget?.kind === 'cancel' ? 'danger' : 'primary'}
-              disabled={Boolean(pendingBookingId) || actionStale || (actionTarget?.kind === 'no-show' && actionReason.trim().length < 10)}
+              disabled={Boolean(pendingBookingId) || actionStale || ((actionTarget?.kind === 'no-show' || actionTarget?.kind === 'confirm') && actionReason.trim().length < 10)}
               onClick={() => void confirmAction()}
             >
               {pendingBookingId && <LoaderCircle className="animate-spin" />}
               {actionTarget?.kind === 'cancel'
                 ? 'Hủy booking'
-                : actionTarget?.kind === 'check-in'
-                  ? 'Nhận phòng'
-                  : actionTarget?.kind === 'check-out'
-                    ? 'Trả phòng'
-                    : 'Ghi nhận không đến'}
+                : actionTarget?.kind === 'confirm'
+                  ? 'Xác nhận booking'
+                  : actionTarget?.kind === 'check-in'
+                    ? 'Nhận phòng'
+                    : actionTarget?.kind === 'check-out'
+                      ? 'Trả phòng'
+                      : 'Ghi nhận không đến'}
             </Button>
           </>
         }
@@ -778,6 +1190,28 @@ export function AdminBookingsManager({
           <p className="leading-6 text-muted-foreground">
             Booking sẽ chuyển sang trạng thái đã hủy và phòng được trả lại cho các ngày đã đặt. Thao tác này không thể hoàn tác trên màn hình quản trị.
           </p>
+        ) : actionTarget?.kind === 'confirm' ? (
+          <div className="grid gap-4 leading-6 text-muted-foreground">
+            <p>
+              Booking Pending đã đủ tiền cọc ({formatCurrency(asNumber(actionTarget.booking.net_paid))} / {formatCurrency(asNumber(actionTarget.booking.deposit_required))}) và còn hạn giữ phòng. Chuyển sang <strong className="text-foreground">Confirmed</strong>?
+            </p>
+            <label className="grid gap-1.5 text-sm font-medium">
+              Lý do xác nhận thủ công
+              <Input
+                value={actionReason}
+                minLength={10}
+                maxLength={500}
+                disabled={Boolean(pendingBookingId) || actionStale}
+                onChange={(event) => {
+                  setActionReason(event.target.value);
+                  setActionKey(newPaymentKey().replace('ui-payment:', 'ui-confirm:'));
+                  setActionError('');
+                }}
+                placeholder="Nhập lý do từ 10 đến 500 ký tự"
+                required
+              />
+            </label>
+          </div>
         ) : actionTarget?.kind === 'check-in' ? (
           <div className="grid gap-2 leading-6 text-muted-foreground">
             <p>
@@ -811,6 +1245,64 @@ export function AdminBookingsManager({
           </div>
         )}
       </Dialog>
+
+      {creditTarget && (
+        <Dialog
+          open
+          onClose={savingCredit ? () => undefined : () => { setCreditTarget(null); setCreditError(''); }}
+          title={`Phê duyệt công nợ #${shortReference(creditTarget.booking_id)}`}
+          description={`${creditTarget.customer_name} · Còn phải thu ${formatCurrency(asNumber(creditTarget.balance_due))}`}
+        >
+          <form className="grid gap-4" onSubmit={(event) => void submitCreditAuthorization(event)}>
+            <p className="text-sm text-muted-foreground">
+              Phê duyệt hạn mức công nợ cho khách đang lưu trú để mở khóa thao tác <strong>Trả phòng (Check-out)</strong> khi chưa tất toán hết hóa đơn.
+            </p>
+            {creditError && <p className="rounded-md bg-danger-muted px-3 py-2 text-xs text-danger" role="alert">{creditError}</p>}
+            <label className="grid gap-1.5 text-sm font-medium">
+              Số tiền công nợ được duyệt (VND)
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                max={asNumber(creditTarget.balance_due)}
+                value={creditAmount}
+                onChange={(event) => {
+                  setCreditAmount(event.target.value);
+                  setCreditKey(newPaymentKey().replace('ui-payment:', 'ui-credit:'));
+                  setCreditError('');
+                }}
+                disabled={savingCredit}
+                required
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium">
+              Lý do phê duyệt (10–500 ký tự)
+              <Input
+                value={creditReason}
+                minLength={10}
+                maxLength={500}
+                placeholder="Ví dụ: Công ty đối tác thanh toán chuyển khoản cuối tháng"
+                onChange={(event) => {
+                  setCreditReason(event.target.value);
+                  setCreditKey(newPaymentKey().replace('ui-payment:', 'ui-credit:'));
+                  setCreditError('');
+                }}
+                disabled={savingCredit}
+                required
+              />
+            </label>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" disabled={savingCredit} onClick={() => { setCreditTarget(null); setCreditError(''); }}>
+                Đóng
+              </Button>
+              <Button type="submit" disabled={savingCredit || creditReason.trim().length < 10}>
+                {savingCredit ? <LoaderCircle className="animate-spin" /> : <ShieldCheck />}
+                Xác nhận duyệt công nợ
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+      )}
 
       {paymentTarget && (
         <Dialog

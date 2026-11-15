@@ -1,20 +1,22 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsDateString,
   IsInt,
   IsNotEmpty,
   IsOptional,
+  IsString,
   IsUUID,
   Matches,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
 
 export class BookingRoomItemDto {
   @IsNotEmpty() @IsInt() @Min(1) @Max(2_147_483_647) room_type_id: number;
-  
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -25,12 +27,18 @@ export class BookingRoomItemDto {
   @IsOptional()
   @IsUUID('4')
   quote_id?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(32)
+  coupon_code?: string;
 }
 
 export class CreateBookingDto {
   // Legacy single-room fields
   @IsOptional() @IsInt() @Min(1) @Max(2_147_483_647) room_type_id?: number;
-  
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -41,6 +49,12 @@ export class CreateBookingDto {
   @IsOptional()
   @IsUUID('4')
   quote_id?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(32)
+  coupon_code?: string;
 
   // New multi-room field
   @IsOptional()

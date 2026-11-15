@@ -54,8 +54,8 @@ async function accountRequest<T>(
   return payload as T;
 }
 
-export async function getOwnProfile(): Promise<UserProfile> {
-  const response = await accountRequest<DataResponse<UserProfile>>('/me');
+export async function getOwnProfile(signal?: AbortSignal): Promise<UserProfile> {
+  const response = await accountRequest<DataResponse<UserProfile>>('/me', { signal });
   return response.data;
 }
 

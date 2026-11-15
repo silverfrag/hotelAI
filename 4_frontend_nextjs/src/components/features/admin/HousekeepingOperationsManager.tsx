@@ -47,11 +47,32 @@ import { formatCurrency } from '@/utils/formatCurrency';
 
 type Tab = 'housekeeping' | 'ai-upgrades';
 
-type ZoneFilter = 'all' | 'floor1' | 'floor2' | 'floor3' | 'floor4' | 'floor5' | 'villas' | 'penthouses';
+type ZoneFilter =
+  | 'all'
+  | 'superior'
+  | 'deluxe'
+  | 'premium'
+  | 'executive'
+  | 'suite'
+  | 'studio';
 
-export function HousekeepingOperationsManager() {
+function parseRoomFloor(roomNumber: string): number | null {
+  const match = roomNumber.trim().match(/^(\d{3,4})$/);
+  if (!match) return null;
+  return Math.floor(Number(match[1]) / 100);
+}
+
+export function HousekeepingOperationsManager({
+  initialTab = 'housekeeping',
+}: {
+  initialTab?: Tab;
+} = {}) {
   const { session } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>('housekeeping');
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -103,18 +124,17 @@ export function HousekeepingOperationsManager() {
   const cleaningRooms = useMemo(() => rooms.filter((r) => r.housekeeping_status === 'Cleaning').length, [rooms]);
   const dirtyRooms = useMemo(() => rooms.filter((r) => r.housekeeping_status === 'Dirty').length, [rooms]);
 
-  // Filtered rooms
+  // Filtered rooms across White Sand 3F-13F room blocks
   const filteredRooms = useMemo(() => {
     return rooms.filter((r) => {
       if (statusFilter !== 'all' && r.housekeeping_status !== statusFilter) return false;
-      const num = r.room_number;
-      if (zoneFilter === 'floor1') return num.startsWith('1');
-      if (zoneFilter === 'floor2') return num.startsWith('2');
-      if (zoneFilter === 'floor3') return num.startsWith('3');
-      if (zoneFilter === 'floor4') return num.startsWith('4');
-      if (zoneFilter === 'floor5') return num.startsWith('5');
-      if (zoneFilter === 'villas') return num.startsWith('V') || num.startsWith('PV');
-      if (zoneFilter === 'penthouses') return num.startsWith('P') && !num.startsWith('PV');
+      const floor = parseRoomFloor(r.room_number);
+      if (zoneFilter === 'superior') return floor === 3 || floor === 4;
+      if (zoneFilter === 'deluxe') return floor === 5 || floor === 6;
+      if (zoneFilter === 'premium') return floor === 7 || floor === 8;
+      if (zoneFilter === 'executive') return floor === 9 || floor === 10;
+      if (zoneFilter === 'suite') return floor === 11 || floor === 12;
+      if (zoneFilter === 'studio') return floor === 13;
       return true;
     });
   }, [rooms, statusFilter, zoneFilter]);
@@ -174,7 +194,7 @@ export function HousekeepingOperationsManager() {
           booking_id: rec.booking_id,
           target_room_id: rec.recommended_room.room_id,
           expected_assignment_version: rec.expected_assignment_version,
-          reason: `AI Smart Upgrade: ${rec.occupancy_boost_reason}`,
+          reason: `Nâng hạng theo quy tắc: ${rec.occupancy_boost_reason}`,
         },
         idempotencyKey,
       );
@@ -192,8 +212,8 @@ export function HousekeepingOperationsManager() {
   return (
     <PageContainer>
       <PageHeader
-        title="Điều Phối Buồng Phòng & AI Nâng Hạng"
-        description="Quản trị luân chuyển 98 phòng resort và tối ưu hóa doanh thu (Yield Upsell) qua Lõi Khuyến Nghị AI Nâng Hạng Phòng Thông Minh."
+        title="Điều phối buồng phòng & Nâng hạng"
+        description="Theo dõi trạng thái buồng phòng và xem gợi ý nâng hạng dựa trên quy tắc và dữ liệu phòng hiện có."
         actions={
           <Button
             variant="outline"
@@ -237,8 +257,8 @@ export function HousekeepingOperationsManager() {
           <CardContent className="p-4">
             <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Tổng Quy Mô</p>
             <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-2xl font-bold text-white">{totalRooms || 98}</span>
-              <span className="text-xs text-slate-400">Phòng resort</span>
+              <span className="text-2xl font-bold text-white">{totalRooms || 54}</span>
+              <span className="text-xs text-slate-400">Phòng White Sand</span>
             </div>
           </CardContent>
         </Card>
@@ -300,7 +320,7 @@ export function HousekeepingOperationsManager() {
           }`}
         >
           <Layers className="size-4" />
-          <span>Sơ Đồ 98 Phòng Buồng Phòng</span>
+          <span>Sơ Đồ 54 Phòng Buồng Phòng (3F–13F)</span>
           <span className="ml-1.5 rounded-full bg-white/10 px-2 py-0.5 text-xs text-slate-300">
             {rooms.length}
           </span>
@@ -315,7 +335,7 @@ export function HousekeepingOperationsManager() {
           }`}
         >
           <Sparkles className="size-4 text-purple-400" />
-          <span>AI Smart Upgrade & Tối Ưu Doanh Thu</span>
+          <span>Gợi ý nâng hạng phòng</span>
           {recommendations.length > 0 && (
             <span className="ml-1.5 rounded-full bg-purple-500/20 px-2 py-0.5 text-xs font-bold text-purple-300 border border-purple-500/30 animate-pulse">
               {recommendations.length}
@@ -355,14 +375,13 @@ export function HousekeepingOperationsManager() {
                 onChange={(e) => setZoneFilter(e.target.value as ZoneFilter)}
                 className="rounded-lg border border-white/10 bg-[#161c2b] px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-amber-500"
               >
-                <option value="all">Toàn bộ 98 phòng resort</option>
-                <option value="floor1">Tầng 1 - Deluxe & Twin (101-120)</option>
-                <option value="floor2">Tầng 2 - Deluxe & Twin (201-222)</option>
-                <option value="floor3">Tầng 3 - Family Suite (301-316)</option>
-                <option value="floor4">Tầng 4 - Executive Ocean (401-414)</option>
-                <option value="floor5">Tầng 5 - Panoramic Sunrise (501-512)</option>
-                <option value="villas">Khu Biệt Thự (V101-V108, PV01-PV02)</option>
-                <option value="penthouses">Khu Penthouse Đỉnh Tháp (P601-P604)</option>
+                <option value="all">Toàn bộ {totalRooms || 54} phòng White Sand</option>
+                <option value="superior">Tầng 3F – 4F · Superior Room (301–406)</option>
+                <option value="deluxe">Tầng 5F – 6F · Deluxe Room (501–606)</option>
+                <option value="premium">Tầng 7F – 8F · Premium Room (701–804)</option>
+                <option value="executive">Tầng 9F – 10F · Executive Room (901–1004)</option>
+                <option value="suite">Tầng 11F – 12F · Suite (1101–1204)</option>
+                <option value="studio">Tầng 13F · Studio Apartment (1301–1306)</option>
               </select>
             </div>
           </div>
@@ -471,16 +490,14 @@ export function HousekeepingOperationsManager() {
               </div>
               <div className="space-y-1">
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <span>Chiến Lược Tối Ưu Doanh Thu & Nâng Hạng Phòng Thông Minh (Yield Upsell)</span>
+                  <span>Gợi ý nâng hạng phòng theo quy tắc</span>
                   <span className="rounded bg-purple-500/20 px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold text-purple-300">
-                    AI Active
+                    Theo quy tắc
                   </span>
                 </h2>
                 <p className="text-xs text-slate-300 leading-relaxed max-w-3xl">
-                  Khi các hạng phòng tiêu chuẩn (Deluxe King, Premier Twin) có công suất cao, Lõi AI tự động quét và đề
-                  xuất nâng hạng miễn phí/ưu đãi cho các đặt phòng phù hợp lên các hạng Suite cao cấp còn trống. Điều này
-                  vừa tối đa hóa chỉ số hài lòng của khách (NPS), vừa <strong>giải phóng phòng tiêu chuẩn</strong> để đón
-                  các lượt khách giờ chót với mức giá cao đỉnh điểm.
+                  Gợi ý được lọc theo booking đủ điều kiện, sức chứa và phòng hạng cao hơn còn trống.
+                  Nhân viên cần kiểm tra và xác nhận trước khi chuyển phòng. Hệ thống chưa cung cấp điểm tin cậy từ mô hình học máy hoặc dự báo doanh thu cho các gợi ý này.
                 </p>
               </div>
             </div>
@@ -497,9 +514,9 @@ export function HousekeepingOperationsManager() {
               <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4">
                 <CheckCircle2 className="size-6" />
               </div>
-              <h3 className="text-base font-semibold text-white">Kho Phòng Đang Đạt Trạng Thái Phân Bổ Tối Ưu</h3>
+              <h3 className="text-base font-semibold text-white">Chưa có gợi ý nâng hạng phù hợp</h3>
               <p className="mt-1.5 text-xs text-slate-400 max-w-md mx-auto">
-                Lõi AI chưa phát hiện xung đột công suất hoặc cơ hội thặng dư cần tái phân bổ trong 60 ngày tới.
+                Chưa tìm thấy booking và phòng đích đáp ứng các điều kiện nâng hạng trong dữ liệu hiện tại.
               </p>
             </div>
           ) : (
@@ -526,7 +543,7 @@ export function HousekeepingOperationsManager() {
                           </CardDescription>
                         </div>
                         <span className="rounded-full bg-purple-500/15 px-2.5 py-1 text-[11px] font-bold text-purple-300 border border-purple-500/25">
-                          Độ tin cậy: {Math.round(rec.confidence_score * 100)}%
+                          Gợi ý theo quy tắc
                         </span>
                       </div>
                     </CardHeader>
@@ -541,7 +558,7 @@ export function HousekeepingOperationsManager() {
                         </div>
 
                         <div className="flex flex-col items-center px-2">
-                          <span className="text-[10px] font-semibold text-purple-400 mb-0.5">AI UPGRADE</span>
+                          <span className="text-[10px] font-semibold text-purple-400 mb-0.5">NÂNG HẠNG</span>
                           <ArrowRight className="size-4 text-purple-400" />
                         </div>
 

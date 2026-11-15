@@ -63,6 +63,9 @@ services:
       context: ./2_ai_pricing_service
     restart: unless-stopped
     init: true
+    environment:
+      MARKET_CONTEXT_PROVIDER: ${MARKET_CONTEXT_PROVIDER:-native_nlp}
+      MARKET_CONTEXT_MODEL: ${MARKET_CONTEXT_MODEL:-native_vn_nlp_v1}
     networks:
       - hotel_network
     healthcheck:

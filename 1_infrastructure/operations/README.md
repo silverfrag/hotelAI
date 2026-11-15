@@ -26,6 +26,32 @@ The optional `migration-integration.test.mjs` tests replay, real DDL rollback, c
 | Redis | `redis://127.0.0.1:56380` |
 | Kafka | `127.0.0.1:59093` |
 
+### Browser checks when Windows reserves infrastructure host ports
+
+If Docker reports that Windows cannot bind port 56380 or 59093, check the excluded port
+ranges first (`netsh interface ipv4 show excludedportrange protocol=tcp`). For
+browser and HTTP checks, Redis and Kafka do not need published host ports. The
+optional overlay keeps both on the private validation network:
+
+```powershell
+docker compose -f 1_infrastructure/operations/compose.test.yml -f 1_infrastructure/operations/compose.browser-test.yml up --no-deps -d --wait redis kafka
+```
+
+This overlay requires Docker Compose support for `!reset` (verified with v5.4.0).
+It changes only validation Redis/Kafka port publication and removes Kafka's
+external listener; it does not modify Windows network settings. Core continues
+to use `redis:6379` and `kafka:29092` inside Docker. Existing validation volumes
+remain intact when these two containers are recreated. Host-side infrastructure
+scripts and `run-validation.mjs` still require the normal published ports; do not
+run those suites against the browser-only overlay.
+
+When resuming retained test evidence, preserve the database configured in the
+existing core container. If Compose `start` reports that its completed one-shot
+`db_migrations` dependency no longer exists, verify the retained database's
+migration history before starting that existing core container directly. Do not
+recreate core with the base default database or replay migrations merely to
+restore a browser session.
+
 For smoke scripts that support environment overrides, set `API_BASE_URL`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `REDIS_URL`, and `KAFKA_BROKERS` explicitly to this stack. Do not load the live `.env` or run the existing top-level smoke suite without verifying its restart/outage targets: some older scripts operate on the default compose project. Restarting or pausing validation services must always include `-f 1_infrastructure/operations/compose.test.yml`.
 
 The repeatable backend-only runner creates a fresh scratch database (previous

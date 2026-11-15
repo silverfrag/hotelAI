@@ -1,21 +1,14 @@
 'use client';
 
-import { ArrowRight, Sparkles, Users } from 'lucide-react';
 import Link from 'next/link';
+import { ArrowRight, Sparkles, Users } from 'lucide-react';
+import { mapApiRoomToPresentation } from '@/services/room-presentation';
 import { RoomType } from '@/types/room.type';
 import { useTranslation } from '@/contexts/LanguageContext';
 
-const ROOM_IMAGES = [
-  'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1591088398332-8a7791972843?w=800&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&auto=format&fit=crop&q=80',
-];
-
 export function RoomCard({ room }: { room: RoomType }) {
   const { t, formatPrice } = useTranslation();
-  const imgIndex = (room.type_id - 1) % ROOM_IMAGES.length;
-  const imageUrl = ROOM_IMAGES[imgIndex];
+  const imageUrl = mapApiRoomToPresentation(room).img;
 
   return (
     <article className="group flex flex-col rounded-[32px] overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--gold-secondary)] shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-1.5">

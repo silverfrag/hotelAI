@@ -36,7 +36,13 @@ def write_conversion_artifact(path: Path) -> None:
                 "training_run_id": "conversion-test-run",
                 "lifecycle_stage": "shadow_only",
                 "feature_contract": conversion_feature_contract_metadata(),
-                "data_quality": {"passes_readiness_gate": True},
+                "data_quality": {
+                    "passes_readiness_gate": True,
+                    "provenance_policy_version": "1.0.0",
+                    "missing_provenance_columns": [],
+                    "eligible_rows": 10,
+                    "verified_observed_rows": 10,
+                },
                 "evaluation": {"passes_performance_gate": True},
             },
         },
@@ -76,6 +82,26 @@ def valid_payload() -> dict[str, object]:
         "currency": "VND",
         "pricing_source": "ai",
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("quality", [
+    {"passes_readiness_gate": True},
+    {"passes_readiness_gate": True, "provenance_policy_version": "0.9.0", "missing_provenance_columns": [], "eligible_rows": 10, "verified_observed_rows": 10},
+    {"passes_readiness_gate": True, "provenance_policy_version": "1.0.0", "missing_provenance_columns": ["data_provenance"], "eligible_rows": 10, "verified_observed_rows": 10},
+    {"passes_readiness_gate": True, "provenance_policy_version": "1.0.0", "missing_provenance_columns": [], "eligible_rows": 10, "verified_observed_rows": 0},
+])
+async def test_legacy_or_unverified_artifact_is_not_served(tmp_path: Path, quality: dict) -> None:
+    artifact = tmp_path / "legacy.pkl"
+    write_conversion_artifact(artifact)
+    contents = joblib.load(artifact)
+    contents["metadata"]["data_quality"] = quality
+    joblib.dump(contents, artifact)
+    original = artifact.read_bytes()
+    async with conversion_client(tmp_path, artifact) as client:
+        assert (await client.get("/api/v1/conversion-model-info")).status_code == 503
+        assert (await client.post("/api/v1/predict-conversion", json=valid_payload())).status_code == 503
+    assert artifact.read_bytes() == original
 
 
 @pytest.mark.asyncio

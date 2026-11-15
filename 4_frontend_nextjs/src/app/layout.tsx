@@ -10,8 +10,8 @@ const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans', display
 const fraunces = Fraunces({ subsets: ['latin'], variable: '--font-fraunces', display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'Hotel AI — Đặt phòng Nghỉ dưỡng Thượng lưu & Giá Thông minh',
-  description: 'Hệ thống đặt phòng resort và khách sạn 5 sao với thuật toán định giá AI thời gian thực, minh bạch và an toàn.',
+  title: 'White Sand Boutique Hotel | Đặt phòng & Định giá thông minh',
+  description: 'Hệ thống mô phỏng đặt phòng và định giá thông minh tại White Sand Boutique Hotel Đà Nẵng (89-91 Võ Văn Kiệt, Sơn Trà) với 6 hạng phòng và 54 phòng.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

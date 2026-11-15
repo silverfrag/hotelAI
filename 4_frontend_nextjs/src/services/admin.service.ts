@@ -10,8 +10,14 @@ import {
 import type {
   AdminBooking,
   AdminBookingPage,
+  AdminBookingPolicy,
   AdminBookingStatus,
+  AdminBookingWorkflowActionResult,
+  AdminCreditAuthorizationResult,
   AdminDashboard,
+  AdminDriftMonitoring,
+  AdminExpirePendingResult,
+  AdminExplainSampleResult,
   AdminHousekeepingMutation,
   AdminHousekeepingPage,
   AdminHousekeepingQueueItem,
@@ -26,8 +32,14 @@ import type {
   AdminRoom,
   AdminRoomReassignment,
   AdminRoomType,
+  AdminWorkflowReadiness,
+  AiShadowAudit,
+  AiShadowReadiness,
+  AiShadowRuntimeStatus,
+  AiShadowSettings,
   CreateRoomInput,
   ExecuteUpgradeInput,
+  ExplainPricingSampleInput,
   HousekeepingStatus,
   PricingLog,
   PricingLogPage,
@@ -39,6 +51,8 @@ import type {
   RoomTypeInput,
   SmartUpgradeRecommendation,
   TapeChartView,
+  UpdateAdminBookingPolicyInput,
+  UpdateAiShadowSettingsInput,
   UpdateHousekeepingStatusInput,
   UpdateRoomInput,
 } from '@/types/admin.type';
@@ -411,6 +425,95 @@ export async function markAdminBookingNoShow(
   return response.data;
 }
 
+export async function getAdminBookingPolicy(accessToken: string): Promise<AdminBookingPolicy> {
+  const response = await adminRequest<DataResponse<AdminBookingPolicy>>(
+    '/booking-policy',
+    accessToken,
+  );
+  return response.data;
+}
+
+export async function updateAdminBookingPolicy(
+  accessToken: string,
+  input: UpdateAdminBookingPolicyInput,
+): Promise<AdminBookingPolicy> {
+  const response = await adminRequest<DataResponse<AdminBookingPolicy>>(
+    '/booking-policy',
+    accessToken,
+    { method: 'PATCH', body: JSON.stringify(input) },
+  );
+  return response.data;
+}
+
+export async function getAdminWorkflowReadiness(
+  accessToken: string,
+): Promise<AdminWorkflowReadiness> {
+  const response = await adminRequest<DataResponse<AdminWorkflowReadiness>>(
+    '/workflow/readiness',
+    accessToken,
+  );
+  return response.data;
+}
+
+export async function expireAdminPendingBookings(
+  accessToken: string,
+  limit = 100,
+): Promise<AdminExpirePendingResult> {
+  const response = await adminRequest<DataResponse<AdminExpirePendingResult>>(
+    '/workflow/expire',
+    accessToken,
+    { method: 'POST', body: JSON.stringify({ limit }) },
+  );
+  return response.data;
+}
+
+export async function getAdminBookingFinancialStatus(
+  accessToken: string,
+  bookingId: string,
+): Promise<BookingFinancialStatus> {
+  const response = await adminRequest<DataResponse<BookingFinancialStatus>>(
+    `/bookings/${encodeURIComponent(bookingId)}/financial-status`,
+    accessToken,
+  );
+  return response.data;
+}
+
+export async function confirmAdminBooking(
+  accessToken: string,
+  bookingId: string,
+  input: { expected_version: number; reason: string },
+  idempotencyKey: string,
+): Promise<AdminBookingWorkflowActionResult> {
+  const response = await adminRequest<DataResponse<AdminBookingWorkflowActionResult>>(
+    `/bookings/${encodeURIComponent(bookingId)}/confirm`,
+    accessToken,
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(input),
+    },
+  );
+  return response.data;
+}
+
+export async function authorizeAdminBookingCredit(
+  accessToken: string,
+  bookingId: string,
+  input: { expected_version: number; reason: string; authorized_amount: number },
+  idempotencyKey: string,
+): Promise<AdminCreditAuthorizationResult> {
+  const response = await adminRequest<DataResponse<AdminCreditAuthorizationResult>>(
+    `/bookings/${encodeURIComponent(bookingId)}/credit-authorization`,
+    accessToken,
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(input),
+    },
+  );
+  return response.data;
+}
+
 export async function getAdminBookingPayment(
   accessToken: string,
   bookingId: string,
@@ -601,4 +704,102 @@ export async function getAdminUserAudits(
     limit: response.limit ?? limit,
     offset: response.offset ?? offset,
   };
+}
+
+export async function getAiShadowSettings(accessToken: string): Promise<AiShadowSettings> {
+  const response = await adminRequest<DataResponse<AiShadowSettings>>(
+    '/pricing/shadow/settings',
+    accessToken,
+  );
+  return response.data;
+}
+
+export async function updateAiShadowSettings(
+  accessToken: string,
+  input: UpdateAiShadowSettingsInput,
+): Promise<AiShadowSettings> {
+  const response = await adminRequest<DataResponse<AiShadowSettings>>(
+    '/pricing/shadow/settings',
+    accessToken,
+    { method: 'PATCH', body: JSON.stringify(input) },
+  );
+  return response.data;
+}
+
+export async function pauseAiShadow(
+  accessToken: string,
+  input: { expected_version: number; change_reason: string },
+): Promise<AiShadowSettings> {
+  const response = await adminRequest<DataResponse<AiShadowSettings>>(
+    '/pricing/shadow/pause',
+    accessToken,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  return response.data;
+}
+
+export async function rollbackAiShadow(
+  accessToken: string,
+  input: { expected_version: number; target_version: number; change_reason: string },
+): Promise<AiShadowSettings> {
+  const response = await adminRequest<DataResponse<AiShadowSettings>>(
+    '/pricing/shadow/rollback',
+    accessToken,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  return response.data;
+}
+
+export async function getAiShadowReadiness(accessToken: string): Promise<AiShadowReadiness> {
+  const response = await adminRequest<DataResponse<AiShadowReadiness>>(
+    '/pricing/shadow/readiness',
+    accessToken,
+  );
+  return response.data;
+}
+
+export async function getAiShadowAudits(
+  accessToken: string,
+  limit = 20,
+): Promise<AiShadowAudit[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  const response = await adminRequest<{ status: string; data: AiShadowAudit[] }>(
+    `/pricing/shadow/audits?${params.toString()}`,
+    accessToken,
+  );
+  return response.data;
+}
+
+export async function getAiShadowRuntimeStatus(
+  accessToken: string,
+): Promise<AiShadowRuntimeStatus> {
+  const response = await adminRequest<DataResponse<AiShadowRuntimeStatus>>(
+    '/pricing/shadow/runtime-status',
+    accessToken,
+  );
+  return response.data;
+}
+
+export async function getAdminPricingDrift(
+  accessToken: string,
+  sampleSize = 500,
+): Promise<AdminDriftMonitoring> {
+  const params = new URLSearchParams({ sample_size: String(sampleSize) });
+  const response = await adminRequest<DataResponse<AdminDriftMonitoring>>(
+    `/pricing/drift?${params.toString()}`,
+    accessToken,
+  );
+  return response.data;
+}
+
+export async function explainPricingSample(
+  accessToken: string,
+  input: ExplainPricingSampleInput,
+): Promise<AdminExplainSampleResult> {
+  const response = await adminRequest<DataResponse<AdminExplainSampleResult>>(
+    '/pricing/explain-sample',
+    accessToken,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  return response.data;
 }

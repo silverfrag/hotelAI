@@ -1,0 +1,15 @@
+# Optional overlay for browser/HTTP checks when Windows reserves host ports.
+# Core reaches Redis and Kafka on the private validation network. No live
+# services or volumes are used. Host-side infrastructure tests need the base
+# compose file with available published ports instead.
+services:
+  backend_core:
+    ports: !override
+      - "127.0.0.1:${VALIDATION_CORE_PORT:-53002}:3000"
+  redis:
+    ports: !reset []
+  kafka:
+    ports: !reset []
+    environment:
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092

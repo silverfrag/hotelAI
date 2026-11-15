@@ -1,0 +1,14 @@
+flowchart TD
+    csv["CSV lịch sử: 119.390 dòng"] --> clean["Rà cột, dòng trùng, dữ liệu thiếu và ngữ cảnh hợp lệ"]
+    clean --> split["Chia theo thời điểm tạo booking suy ra; kiểm tra lúc biết nhãn"]
+    split --> train["Tập học: cho mô hình xem đầu vào và đáp án"]
+    split --> valid["Tập lựa chọn: so các mô hình sau khi học"]
+    split --> test["Tập kiểm tra: giữ ngoài học và chọn mô hình"]
+    train --> prep["Học cách điền thiếu, chuẩn hóa số và mã hóa nhóm"]
+    prep --> candidates["Huấn luyện các mô hình và đối chứng bằng tập học"]
+    candidates --> select["Dùng tập lựa chọn để chốt mô hình"]
+    valid --> select
+    select --> freeze["Giữ nguyên lựa chọn và các tham số đã học"]
+    freeze --> evaluate["Chấm mô hình đã chốt trên tập kiểm tra"]
+    test --> evaluate
+    evaluate --> files["Lưu mô hình, báo cáo và kết quả kiểm tra"]

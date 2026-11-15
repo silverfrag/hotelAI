@@ -270,9 +270,30 @@ if (rejectedBooking.response.status !== 409) {
 }
 
 const quotedBookingInput = { ...quotedInput, quote_id: quote.body.data.quote_id };
+const quotedRoomInput = {
+  room_type_id: quotedInput.room_type_id,
+  guest_count: quotedInput.guest_count,
+  quote_id: quote.body.data.quote_id,
+};
+const arrayBookingInput = {
+  check_in_date: quotedInput.check_in_date,
+  check_out_date: quotedInput.check_out_date,
+  total_of_special_requests: quotedInput.total_of_special_requests,
+  rooms: [quotedRoomInput],
+};
+for (const rejectedRooms of [[], [quotedRoomInput, quotedRoomInput], Array(9).fill(quotedRoomInput)]) {
+  const unsupported = await request('/bookings', {
+    method: 'POST', headers: authHeaders,
+    body: JSON.stringify({ ...arrayBookingInput, rooms: rejectedRooms }),
+  });
+  if (unsupported.response.status !== 400) {
+    throw new Error(`Unsupported room count ${rejectedRooms.length} should return 400, got ${unsupported.response.status}.`);
+  }
+}
+const quotedBookingKey = `quote:${randomUUID()}`;
 const quotedBooking = await request('/bookings', {
   method: 'POST',
-  headers: { ...authHeaders, 'Idempotency-Key': `quote:${randomUUID()}` },
+  headers: { ...authHeaders, 'Idempotency-Key': quotedBookingKey },
   body: JSON.stringify(quotedBookingInput),
 });
 if (quotedBooking.response.status !== 201
@@ -286,6 +307,36 @@ if (quotedBooking.response.status !== 201
     `Booking did not accept the immutable quote: ${quotedBooking.response.status} ${JSON.stringify(quotedBooking.body)}.`,
   );
 }
+const arrayReplay = await request('/bookings', {
+  method: 'POST', headers: { ...authHeaders, 'Idempotency-Key': quotedBookingKey },
+  body: JSON.stringify(arrayBookingInput),
+});
+if (arrayReplay.response.status !== 201
+  || arrayReplay.body?.data?.booking?.booking_id !== quotedBooking.body.data.booking.booking_id
+  || arrayReplay.body?.data?.quote_id !== quotedBooking.body.data.quote_id
+  || arrayReplay.body?.data?.total_price !== quotedBooking.body.data.total_price
+  || arrayReplay.body?.data?.nightly_price !== quotedBooking.body.data.nightly_price
+  || JSON.stringify(arrayReplay.body?.data?.rooms) !== JSON.stringify(quotedBooking.body.data.rooms)) {
+  throw new Error(`Single-room array replay must match the legacy quoted receipt: ${JSON.stringify(arrayReplay.body)}.`);
+}
+for (const changedRoom of [
+  { ...quotedRoomInput, room_type_id: quotedRoomInput.room_type_id + 1 },
+  { ...quotedRoomInput, guest_count: quotedRoomInput.guest_count + 1 },
+  { ...quotedRoomInput, quote_id: randomUUID() },
+]) {
+  const changedArray = await request('/bookings', {
+    method: 'POST', headers: { ...authHeaders, 'Idempotency-Key': quotedBookingKey },
+    body: JSON.stringify({ ...arrayBookingInput, rooms: [changedRoom] }),
+  });
+  if (changedArray.response.status !== 409) {
+    throw new Error(`Changed array room/guest/quote must invalidate replay, got ${changedArray.response.status}.`);
+  }
+}
+const conflictingInputs = await request('/bookings', {
+  method: 'POST', headers: authHeaders,
+  body: JSON.stringify({ ...arrayBookingInput, quote_id: randomUUID() }),
+});
+if (conflictingInputs.response.status !== 400) throw new Error('Conflicting legacy and array quote IDs must be rejected.');
 const reusedQuote = await request('/bookings', {
   method: 'POST',
   headers: { ...authHeaders, 'Idempotency-Key': `quote-reuse:${randomUUID()}` },
@@ -344,10 +395,18 @@ const invalidIdempotencyKey = await request('/bookings', {
 });
 if (invalidIdempotencyKey.response.status !== 400) throw new Error(`Invalid Idempotency-Key should return 400, got ${invalidIdempotencyKey.response.status}.`);
 
-const concurrentInput = { ...bookingInput, check_in_date: `${year}-03-10`, check_out_date: `${year}-03-12` };
-const concurrent = await Promise.all(Array.from({ length: 3 }, () => request('/bookings', { method: 'POST', headers: authHeaders, body: JSON.stringify(concurrentInput) })));
+const concurrencyRoom = rooms.body.data.filter(room => room.total_rooms > 0).sort((a, b) => a.total_rooms - b.total_rooms)[0];
+const concurrentInput = { ...bookingInput, room_type_id: concurrencyRoom.type_id, check_in_date: `${year}-03-10`, check_out_date: `${year}-03-12` };
+const inventoryQuote = await request('/pricing/quote', { method: 'POST', headers: authHeaders, body: JSON.stringify(concurrentInput) });
+if (inventoryQuote.response.status !== 201) throw new Error('Could not read capacity for the concurrency check.');
+quoteIds.push(inventoryQuote.body.data.quote_id);
+const availableCapacity = inventoryQuote.body.data.rooms_available;
+if (!Number.isSafeInteger(availableCapacity) || availableCapacity < 1 || availableCapacity > 100) throw new Error('Unexpected validation inventory capacity.');
+const concurrent = await Promise.all(Array.from({ length: availableCapacity + 1 }, () => request('/bookings', { method: 'POST', headers: authHeaders, body: JSON.stringify(concurrentInput) })));
 const statuses = concurrent.map(({ response }) => response.status).sort((a, b) => a - b);
-if (statuses.join(',') !== '201,201,404') throw new Error(`Concurrent inventory protection failed: ${statuses.join(',')}.`);
+if (statuses.filter(status => status === 201).length !== availableCapacity || statuses.at(-1) !== 404) throw new Error(`Concurrent inventory protection failed: ${statuses.join(',')}.`);
+const assignedRooms = concurrent.filter(({response}) => response.status === 201).map(({body}) => body.data.room_id);
+if (new Set(assignedRooms).size !== availableCapacity) throw new Error('Concurrent bookings assigned the same physical room.');
 
 const cancellableBooking = concurrent.find(({ response }) => response.status === 201);
 const bookingId = cancellableBooking?.body?.data?.booking?.booking_id;

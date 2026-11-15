@@ -4,7 +4,10 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 import { DataSource, EntityManager } from 'typeorm';
 import {
   PauseAiShadowDto,
@@ -71,7 +74,10 @@ export type AiShadowSettingView = {
 
 @Injectable()
 export class AdminAiShadowService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    @Optional() private readonly configService?: ConfigService,
+  ) {}
 
   async getSetting(): Promise<AiShadowSettingView> {
     const row = await this.selectSetting(this.dataSource);
@@ -172,6 +178,162 @@ export class AdminAiShadowService {
       [safeLimit],
     ) as Array<Record<string, unknown>>;
     return rows.map((row) => this.normalizeNumbers(row));
+  }
+
+  async getRuntimeStatus(): Promise<{
+    mode: 'shadow_only';
+    automatic_promotion: false;
+    causality_warning: string;
+    champion_artifact: {
+      status: 'ready' | 'unavailable';
+      model_version: string | null;
+      training_run_id: string | null;
+      feature_contract_version: string | null;
+    };
+    challenger_artifact: {
+      status: 'ready' | 'unavailable';
+      lifecycle_stage: 'shadow_only' | null;
+      model_version: string | null;
+      training_run_id: string | null;
+      feature_contract_version: string | null;
+      reason_vi: string;
+    };
+    attempt_summary: {
+      total_attempts: number;
+      succeeded_attempts: number;
+      failed_attempts: number;
+      unavailable_attempts: number;
+      timeout_attempts: number;
+      lineage_mismatch_attempts: number;
+      total_decisions: number;
+      last_attempt_at: string | null;
+    };
+  }> {
+    const safeId = (val: unknown): string | null =>
+      typeof val === 'string' && /^[a-zA-Z0-9_.-]{1,128}$/.test(val) ? val : null;
+
+    const resolveOrigin = (key: string): string | null => {
+      try {
+        const raw = this.configService?.get<string>(key);
+        if (!raw) return null;
+        const url = new URL(raw);
+        return ['http:', 'https:'].includes(url.protocol) ? url.origin : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const championOrigin = resolveOrigin('AI_SERVICE_URL');
+    const challengerOrigin = resolveOrigin('AI_SHADOW_OPTIMIZER_URL') ?? championOrigin;
+
+    const readStats = async () => {
+      const rows = await this.dataSource.query(
+        `SELECT COUNT(*)::int AS total_attempts,
+                COUNT(*) FILTER (WHERE outcome = 'succeeded')::int AS succeeded_attempts,
+                COUNT(*) FILTER (WHERE outcome <> 'succeeded')::int AS failed_attempts,
+                COUNT(*) FILTER (WHERE outcome = 'unavailable')::int AS unavailable_attempts,
+                COUNT(*) FILTER (WHERE outcome = 'timeout')::int AS timeout_attempts,
+                COUNT(*) FILTER (WHERE outcome = 'lineage_mismatch')::int AS lineage_mismatch_attempts,
+                MAX(occurred_at) AS last_attempt_at,
+                (SELECT COUNT(*)::int FROM ai_pricing_shadow_decisions) AS total_decisions
+         FROM ai_pricing_shadow_attempts`,
+      ) as Array<Record<string, unknown>>;
+      const row = rows[0] ?? {};
+      return {
+        total_attempts: Number(row.total_attempts ?? 0),
+        succeeded_attempts: Number(row.succeeded_attempts ?? 0),
+        failed_attempts: Number(row.failed_attempts ?? 0),
+        unavailable_attempts: Number(row.unavailable_attempts ?? 0),
+        timeout_attempts: Number(row.timeout_attempts ?? 0),
+        lineage_mismatch_attempts: Number(row.lineage_mismatch_attempts ?? 0),
+        total_decisions: Number(row.total_decisions ?? 0),
+        last_attempt_at: row.last_attempt_at ? new Date(String(row.last_attempt_at)).toISOString() : null,
+      };
+    };
+
+    const readChampion = async () => {
+      const empty = {
+        status: 'unavailable' as const,
+        model_version: null,
+        training_run_id: null,
+        feature_contract_version: null,
+      };
+      if (!championOrigin) return empty;
+      try {
+        const res = await axios.get(new URL('/api/v1/model-info', championOrigin).toString(), {
+          timeout: 2_000, maxRedirects: 0, maxContentLength: 131_072,
+        });
+        const meta = res.data?.metadata;
+        const mv = safeId(meta?.model_version);
+        const tr = safeId(meta?.training_run_id);
+        const fc = safeId(meta?.feature_contract?.version);
+        if (res.data?.status !== 'ready' || !mv || !tr || !fc) return empty;
+        return {
+          status: 'ready' as const,
+          model_version: mv,
+          training_run_id: tr,
+          feature_contract_version: fc,
+        };
+      } catch {
+        return empty;
+      }
+    };
+
+    const readChallenger = async () => {
+      const empty = (reasonVi: string) => ({
+        status: 'unavailable' as const,
+        lifecycle_stage: null,
+        model_version: null,
+        training_run_id: null,
+        feature_contract_version: null,
+        reason_vi: reasonVi,
+      });
+      if (!challengerOrigin) {
+        return empty('AI Shadow Optimizer URL chưa được cấu hình.');
+      }
+      try {
+        const res = await axios.get(new URL('/api/v1/conversion-model-info', challengerOrigin).toString(), {
+          timeout: 2_000, maxRedirects: 0, maxContentLength: 131_072,
+        });
+        const meta = res.data?.metadata;
+        const mv = safeId(meta?.model_version);
+        const tr = safeId(meta?.training_run_id);
+        const fc = safeId(meta?.feature_contract?.version);
+        if (res.data?.status !== 'ready' || meta?.lifecycle_stage !== 'shadow_only' || !mv || !tr || !fc) {
+          return empty('Metadata của Conversion Challenger chưa đạt chuẩn shadow_only.');
+        }
+        return {
+          status: 'ready' as const,
+          lifecycle_stage: 'shadow_only' as const,
+          model_version: mv,
+          training_run_id: tr,
+          feature_contract_version: fc,
+          reason_vi: 'Conversion Challenger sẵn sàng chạy song song ở chế độ quan sát shadow_only.',
+        };
+      } catch (error) {
+        const code = axios.isAxiosError(error) ? error.response?.status : undefined;
+        if (code === 503) {
+          return empty('Chưa có artifact conversion_challenger đạt cổng dữ liệu thật (503 có kiểm soát); hệ thống vẫn phục vụ Champion fail-open.');
+        }
+        return empty('Không thể kết nối điểm cuối /api/v1/conversion-model-info; hệ thống giữ nguyên Champion fail-open.');
+      }
+    };
+
+    const [attemptSummary, championArtifact, challengerArtifact] = await Promise.all([
+      readStats(),
+      readChampion(),
+      readChallenger(),
+    ]);
+
+    return {
+      mode: 'shadow_only',
+      automatic_promotion: false,
+      causality_warning:
+        'Mô hình Conversion Challenger chỉ học tương quan quan sát từ các báo giá đã xác nhận hiển thị (quote.exposed.v1). Hệ số giá chào không phải độ co giãn cầu nhân quả (price elasticity) và TUYỆT ĐỐI KHÔNG tự động nâng cấp mô hình khi chưa có thử nghiệm đối chứng.',
+      champion_artifact: championArtifact,
+      challenger_artifact: challengerArtifact,
+      attempt_summary: attemptSummary,
+    };
   }
 
   private async selectSetting(

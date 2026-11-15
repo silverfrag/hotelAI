@@ -20,12 +20,22 @@ export function useReservation(input: PriceQuoteInput | null, initialSearchId?: 
   const [now, setNow] = useState(0);
   const busy = useRef(false);
   const tracking = useRef<QuoteTrackingContext | null>(null);
+  const [visibleQuoteId, setVisibleQuoteId] = useState<string | null>(null);
+  const [docVisible, setDocVisible] = useState(
+    () => typeof document === 'undefined' || document.visibilityState === 'visible',
+  );
   const booked = useRef(new Set<string>());
+  const normalizedCoupon = input?.coupon_code?.trim().toUpperCase() || '';
   const quote = candidate && input
     && candidate.room_type.type_id === input.room_type_id
     && candidate.check_in_date === input.check_in_date
     && candidate.check_out_date === input.check_out_date
-    && candidate.guest_count === input.guest_count ? candidate : null;
+    && candidate.guest_count === input.guest_count
+    && (!normalizedCoupon
+      ? !candidate.coupon_code
+      : candidate.coupon_code?.trim().toUpperCase() === normalizedCoupon)
+    ? candidate
+    : null;
   const expired = !!quote && now >= Date.parse(quote.price_guaranteed_until);
   const recoveryNeedsSignIn = retryOnly && !!recoveryAccount && user?.id !== recoveryAccount.id;
 
@@ -38,20 +48,23 @@ export function useReservation(input: PriceQuoteInput | null, initialSearchId?: 
     return () => window.clearInterval(timer);
   }, []);
   useEffect(() => {
-    if (!quote || loading || result) return;
-    void recordQuoteEventOnce(quote.quote_id, 'quote.exposed.v1', context()).catch(() => {
-      // Confirmation retries exposure; do not mislabel a failed exposure as rejection.
-    });
-  }, [quote, loading, result]);
+    if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+    const syncVisibility = () => setDocVisible(document.visibilityState === 'visible');
+    syncVisibility();
+    document.addEventListener('visibilitychange', syncVisibility);
+    return () => document.removeEventListener('visibilitychange', syncVisibility);
+  }, []);
+  useEffect(() => {
+    if (!quote || loading || result || visibleQuoteId !== quote.quote_id || !docVisible) return;
+    void recordQuoteEventOnce(quote.quote_id, 'quote.exposed.v1', context()).catch(() => undefined);
+  }, [quote, loading, result, visibleQuoteId, docVisible]);
 
   function changeSelection() {
     if (busy.current || result || retryOnly) return;
     setError('');
-    if (quote && !expired && !booked.current.has(quote.quote_id)) {
-      void recordQuoteEventOnce(quote.quote_id, 'quote.exposed.v1', context())
-        .then(() => recordQuoteEventOnce(quote.quote_id, 'quote.rejected.v1', context()))
-        .catch(() => undefined);
-    }
+    // A changed selection is not an explicit rejection. Supersession is
+    // recorded only when both quotes have a verified exposure.
+    setVisibleQuoteId(null);
   }
 
   async function confirm() {
@@ -69,12 +82,15 @@ export function useReservation(input: PriceQuoteInput | null, initialSearchId?: 
     setSubmitting(true); setError('');
     let creationAttempted = false;
     try {
-      if (!retryOnly) await recordQuoteEventOnce(quote.quote_id, 'quote.exposed.v1', context());
       // Recovery remains in this mounted form and must use the original account:
       // backend idempotency is scoped by customer, so switching users is unsafe.
       if (!retryOnly) setRecoveryAccount({ id: user.id, email: user.email });
       creationAttempted = true;
-      setResult(await createBooking({ ...input, quote_id: quote.quote_id }, accessToken, `booking:${quote.quote_id}`));
+      const created = await createBooking({ ...input, quote_id: quote.quote_id }, accessToken, `booking:${quote.quote_id}`);
+      if (created.total_price !== quote.total_price) {
+        throw new BookingServiceError('The saved price does not match the accepted quote.', 201);
+      }
+      setResult(created);
     } catch (caught) {
       booked.current.delete(quote.quote_id);
       // An interrupted response may hide a committed booking. Retain this quote
@@ -89,5 +105,5 @@ export function useReservation(input: PriceQuoteInput | null, initialSearchId?: 
         : 'We couldn’t complete your reservation. You can retry safely or check My bookings.');
     } finally { busy.current = false; setSubmitting(false); }
   }
-  return { quote, loading, quoteError, error, result, expired, submitting, retryOnly, recoveryAccount, recoveryNeedsSignIn, confirm, changeSelection, refreshQuote: () => { if (busy.current || result || retryOnly) return; setError(''); setRefreshKey((key) => key + 1); } };
+  return { quote, loading, quoteError, error, result, expired, submitting, retryOnly, recoveryAccount, recoveryNeedsSignIn, confirm, changeSelection, markQuoteVisible: setVisibleQuoteId, refreshQuote: () => { if (busy.current || result || retryOnly) return; setVisibleQuoteId(null); setError(''); setRefreshKey((key) => key + 1); } };
 }

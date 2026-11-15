@@ -131,18 +131,15 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onMobileClose
           ))}
         </nav>
 
-        {/* System telemetry indicator */}
+        {/* Pricing information; connection status is fetched on the pricing page. */}
         {!collapsed && (
           <div className="mx-3 mb-3 p-3 rounded-xl bg-slate-900/60 border border-white/[0.06] text-xs">
-            <div className="flex items-center gap-2 text-emerald-400 font-semibold mb-1">
-              <span className="relative flex size-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-[11px] tracking-wide uppercase font-bold text-slate-300">Gateway Online</span>
+            <div className="flex items-center gap-2 text-amber-400 font-semibold mb-1">
+              <Sparkles className="size-3.5" aria-hidden="true" />
+              <span className="text-[11px] tracking-wide uppercase font-bold text-slate-300">AI & Định giá</span>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Mô hình AI & Gateway Core API đang đồng bộ.
+              Xem trạng thái mô hình tại Định giá & Doanh thu.
             </p>
           </div>
         )}

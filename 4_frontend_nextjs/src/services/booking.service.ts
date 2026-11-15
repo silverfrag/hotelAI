@@ -6,10 +6,16 @@ import {
   invalidCoreResponseError,
   parseCoreResponse,
 } from '@/services/core-api';
-import { BookingPaymentSummary, BookingSummary } from '@/types/booking.type';
+import {
+  BookingPaymentSummary,
+  BookingSummary,
+  CustomerNotification,
+  CustomerNotificationsPage,
+} from '@/types/booking.type';
 import {
   BookingResult,
   PriceQuote,
+  PublicCoupon,
   QuoteClientEvent,
   QuoteEventResult,
   QuoteTrackingContext,
@@ -21,6 +27,8 @@ export interface PriceQuoteInput {
   check_out_date: string;
   total_of_special_requests: number;
   guest_count: number;
+  coupon_code?: string;
+  rooms?: { room_type_id: number; guest_count: number; quote_id?: string }[];
 }
 
 export interface CreateBookingInput extends PriceQuoteInput {
@@ -79,12 +87,18 @@ function validQuote(value: unknown, input: PriceQuoteInput): value is PriceQuote
   return nights > 0 && isUuid(value.quote_id)
     && room.type_id === input.room_type_id && isVersion(room.type_id)
     && isText(room.type_name) && isAmount(room.base_price) && isVersion(room.capacity)
+    && (room.declared_max_price === undefined || room.declared_max_price === null || isAmount(room.declared_max_price))
     && room.capacity >= input.guest_count
     && value.check_in_date === input.check_in_date && value.check_out_date === input.check_out_date
     && value.guest_count === input.guest_count && isVersion(value.guest_count) && value.nights === nights
     && isCount(value.rooms_available) && isCount(value.rooms_sellable) && isCount(value.rooms_booked)
     && isAmount(value.occupancy_ratio) && value.occupancy_ratio <= 1
     && isAmount(value.nightly_price) && isAmount(value.total_price)
+    && (value.coupon_code === undefined || value.coupon_code === null || isText(value.coupon_code))
+    && (value.coupon_discount_vnd === undefined || isAmount(value.coupon_discount_vnd))
+    && (value.pre_coupon_total_price === undefined || isAmount(value.pre_coupon_total_price))
+    && (value.is_floor_price_clamped === undefined || typeof value.is_floor_price_clamped === 'boolean')
+    && (value.pricing_breakdown === undefined || value.pricing_breakdown === null || isRecord(value.pricing_breakdown))
     && isAmount(value.ai_multiplier) && value.ai_multiplier > 0
     && (value.pricing_source === 'ai' || value.pricing_source === 'base') && isVersion(value.settings_version)
     && value.currency === 'VND' && value.is_estimate === true && value.availability_is_guaranteed === false
@@ -99,16 +113,23 @@ function validBookingResult(value: unknown, input: CreateBookingInput): value is
   if (!isRecord(value) || !isRecord(value.booking)) return false;
   const booking = value.booking;
   const nights = stayNights(input.check_in_date, input.check_out_date);
-  return nights > 0 && value.quote_id === input.quote_id && isUuid(value.quote_id)
+  const expectedGuests = input.rooms && input.rooms.length > 0
+    ? input.rooms.reduce((acc, r) => acc + (r.guest_count || 1), 0)
+    : input.guest_count;
+  return nights > 0 && (value.quote_id === input.quote_id || (!input.quote_id && value.quote_id === null))
     && isUuid(booking.booking_id) && typeof booking.status === 'string' && bookingStatuses.has(booking.status)
     && booking.check_in_date === input.check_in_date && booking.check_out_date === input.check_out_date
-    && booking.guest_count === input.guest_count && isVersion(booking.guest_count)
+    && booking.guest_count === expectedGuests && isVersion(booking.guest_count)
     && isVersion(booking.lifecycle_version) && (booking.policy_version === null || isVersion(booking.policy_version))
     && isAmount(booking.deposit_required) && typeof booking.checkout_payment_required === 'boolean'
     && (booking.pending_expires_at === null || isTimestamp(booking.pending_expires_at))
     && (booking.status !== 'Pending' || isTimestamp(booking.pending_expires_at))
     && isVersion(value.room_id) && isText(value.room_number) && value.nights === nights
     && isAmount(value.applied_price) && isAmount(value.nightly_price) && isAmount(value.total_price)
+    && (value.coupon_code === undefined || value.coupon_code === null || isText(value.coupon_code))
+    && (value.coupon_discount_vnd === undefined || isAmount(value.coupon_discount_vnd))
+    && (value.pre_coupon_total_price === undefined || isAmount(value.pre_coupon_total_price))
+    && (value.is_floor_price_clamped === undefined || typeof value.is_floor_price_clamped === 'boolean')
     && isAmount(value.ai_multiplier) && value.ai_multiplier > 0
     && (value.pricing_source === 'ai' || value.pricing_source === 'base') && isVersion(value.settings_version)
     && typeof value.payment_status === 'string' && paymentStatuses.has(value.payment_status)
@@ -126,6 +147,10 @@ export async function createBooking(
   _sessionMarker: string,
   idempotencyKey: string,
 ): Promise<BookingResult> {
+  const normalizedCoupon = input.coupon_code?.trim().toUpperCase();
+  const { coupon_code: _omitCoupon, ...restInput } = input;
+  const requestBody = normalizedCoupon ? { ...restInput, coupon_code: normalizedCoupon } : restInput;
+
   const response = await fetch(`${apiBaseUrl}/bookings`, {
     method: 'POST',
     headers: {
@@ -133,7 +158,7 @@ export async function createBooking(
       'Idempotency-Key': idempotencyKey,
     },
     credentials: 'include',
-    body: JSON.stringify(input),
+    body: JSON.stringify(requestBody),
   });
   const payload = await parseCoreResponse<ApiResponse<BookingResult>>(response, {
     fallbackMessage: 'Không thể tạo đặt phòng.',
@@ -156,10 +181,22 @@ export async function getPriceQuote(
   input: PriceQuoteInput,
   signal?: AbortSignal,
 ): Promise<PriceQuote> {
+  const normalizedCoupon = input.coupon_code?.trim().toUpperCase();
+  const requestBody: Record<string, unknown> = {
+    room_type_id: input.room_type_id,
+    check_in_date: input.check_in_date,
+    check_out_date: input.check_out_date,
+    guest_count: input.guest_count,
+    total_of_special_requests: input.total_of_special_requests,
+  };
+  if (normalizedCoupon) {
+    requestBody.coupon_code = normalizedCoupon;
+  }
+
   const response = await fetch(`${apiBaseUrl}/pricing/quote`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
+    body: JSON.stringify(requestBody),
     cache: 'no-store',
     signal,
   });
@@ -172,6 +209,30 @@ export async function getPriceQuote(
     throw invalidCoreResponseError(
       response,
       'Máy chủ trả về báo giá không hợp lệ. Vui lòng lấy lại báo giá.',
+      payload,
+      createBookingError,
+    );
+  }
+
+  return payload.data;
+}
+
+export async function getActiveCoupons(signal?: AbortSignal): Promise<PublicCoupon[]> {
+  const response = await fetch(`${apiBaseUrl}/pricing/coupons`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+    signal,
+  });
+  const payload = await parseCoreResponse<ApiResponse<PublicCoupon[]>>(response, {
+    fallbackMessage: 'Không thể tải danh sách mã ưu đãi.',
+    createError: createBookingError,
+  });
+
+  if (payload?.status !== 'success' || !Array.isArray(payload.data)) {
+    throw invalidCoreResponseError(
+      response,
+      'Danh sách mã ưu đãi trả về không hợp lệ.',
       payload,
       createBookingError,
     );
@@ -294,12 +355,9 @@ export async function getCalendarPricing(
   end_date: string,
   signal?: AbortSignal,
 ): Promise<Array<{ date: string; nightly_price: number; available: number }>> {
-  const url = new URL(`${apiBaseUrl}/pricing/calendar`);
-  url.searchParams.set('room_type_id', String(room_type_id));
-  url.searchParams.set('start_date', start_date);
-  url.searchParams.set('end_date', end_date);
-  
-  const response = await fetch(url.toString(), {
+  const params = new URLSearchParams({ room_type_id: String(room_type_id), start_date, end_date });
+
+  const response = await fetch(`${apiBaseUrl}/pricing/calendar?${params}`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
@@ -310,10 +368,103 @@ export async function getCalendarPricing(
     createError: createBookingError,
   });
 
-  if (payload?.status !== 'success' || !Array.isArray(payload.data)) {
+  if (payload?.status !== 'success' || !Array.isArray(payload.data)
+    || !payload.data.every(day => isRecord(day) && typeof day.date === 'string'
+      && isDateOnly(day.date) && day.date >= start_date && day.date <= end_date
+      && isAmount(day.nightly_price) && isCount(day.available))
+    || new Set(payload.data.map(day => day.date)).size !== payload.data.length) {
     throw invalidCoreResponseError(
       response,
       'Máy chủ trả về kết quả không hợp lệ.',
+      payload,
+      createBookingError,
+    );
+  }
+
+  return payload.data;
+}
+
+export async function getOwnNotifications(
+  options: { limit?: number; offset?: number } = {},
+  signal?: AbortSignal,
+): Promise<CustomerNotificationsPage> {
+  const limit = Math.min(100, Math.max(1, Math.trunc(options.limit ?? 20)));
+  const offset = Math.max(0, Math.trunc(options.offset ?? 0));
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  const response = await fetch(`${apiBaseUrl}/users/me/notifications?${params}`, {
+    credentials: 'include',
+    cache: 'no-store',
+    signal,
+  });
+  const payload = await parseCoreResponse<
+    ApiResponse<CustomerNotification[]> & {
+      total?: number;
+      unread?: number;
+      limit?: number;
+      offset?: number;
+    }
+  >(response, {
+    fallbackMessage: 'Không thể tải thông báo đặt phòng.',
+    createError: createBookingError,
+  });
+
+  if (
+    payload?.status !== 'success'
+    || !Array.isArray(payload.data)
+    || !payload.data.every(
+      (item) => isRecord(item)
+        && isUuid(item.notification_id)
+        && isUuid(item.booking_id)
+        && isText(item.kind)
+        && isTimestamp(item.created_at)
+        && (item.read_at === null || isTimestamp(item.read_at)),
+    )
+  ) {
+    throw invalidCoreResponseError(
+      response,
+      'Dữ liệu thông báo trả về không hợp lệ.',
+      payload,
+      createBookingError,
+    );
+  }
+
+  return {
+    data: payload.data,
+    total: typeof payload.total === 'number' ? payload.total : payload.data.length,
+    unread: typeof payload.unread === 'number' ? payload.unread : 0,
+    limit: typeof payload.limit === 'number' ? payload.limit : limit,
+    offset: typeof payload.offset === 'number' ? payload.offset : offset,
+  };
+}
+
+export async function markOwnNotificationRead(
+  notificationId: string,
+): Promise<{ notification_id: string; read_at: string }> {
+  const response = await fetch(
+    `${apiBaseUrl}/users/me/notifications/${encodeURIComponent(notificationId)}/read`,
+    {
+      method: 'PATCH',
+      credentials: 'include',
+      cache: 'no-store',
+    },
+  );
+  const payload = await parseCoreResponse<ApiResponse<{ notification_id: string; read_at: string }>>(
+    response,
+    {
+      fallbackMessage: 'Không thể đánh dấu đã đọc thông báo.',
+      createError: createBookingError,
+    },
+  );
+
+  if (
+    payload?.status !== 'success'
+    || !isRecord(payload.data)
+    || !isUuid(payload.data.notification_id)
+    || !isTimestamp(payload.data.read_at)
+  ) {
+    throw invalidCoreResponseError(
+      response,
+      'Máy chủ chưa trả về trạng thái thông báo hợp lệ.',
       payload,
       createBookingError,
     );

@@ -1,0 +1,16 @@
+flowchart TD
+    history["Dữ liệu booking lịch sử Portugal"] --> learn["Chương trình huấn luyện chạy trước"]
+    learn --> saved["Lưu hai mô hình và bộ biến đổi đầu vào"]
+    saved --> aiService["Dịch vụ AI FastAPI nạp mô hình đã lưu"]
+    person["Sinh viên hoặc người dùng"] --> ui["Giao diện Next.js: hai trang học thuật"]
+    ui --> core["Máy chủ NestJS: kiểm tra yêu cầu và kết quả"]
+    core --> aiService
+    aiService --> adrModel["Mô hình ADR: cây học bù sai số"]
+    aiService --> cancelModel["Mô hình hủy: hồi quy logistic"]
+    adrModel --> package["Ghép hai dự đoán, đối chứng, giải thích và cảnh báo"]
+    cancelModel --> package
+    package --> core
+    core --> ui
+    ui --> person
+    core -.-> operations["Nhánh nghiệp vụ của stack chính: phòng và booking"]
+    operations --> database["PostgreSQL lưu dữ liệu nghiệp vụ mô phỏng"]

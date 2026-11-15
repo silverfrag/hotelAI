@@ -8,6 +8,8 @@
 # Node / Next.js
 node_modules/
 .next/
+.next-validation/
+.next-local-ai/
 out/
 dist/
 coverage/
@@ -21,6 +23,19 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 *.csv
+
+# Local build, browser, and review artifacts
+/.vercel/
+/tmp/
+/scratch/
+/artifacts/
+/output/
+/2_ai_pricing_service/scratch_temp/
+/playwright-report/
+/test-results/
+
+# Local progress report exports (the final report ZIP stays local in /output)
+/docs/BAO_CAO_TIEN_DO_*.docx
 
 # Temporary and logs
 .tmp/

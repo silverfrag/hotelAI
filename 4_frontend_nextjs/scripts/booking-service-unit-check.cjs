@@ -100,7 +100,33 @@ async function eventChecks(){
   assert.equal((await service.recordQuoteEvent(ids.quote,'quote.rejected.v1',context)).event_type,'quote.rejected.v1');
 }
 
+async function calendarChecks(){
+  const days=[{date:'2026-10-01',nightly_price:1200000,available:1},{date:'2026-10-31',nightly_price:1300000,available:0}];
+  const call=()=>service.getCalendarPricing(1,'2026-10-01','2026-10-31');
+  respond(days);assert.deepEqual(await call(),days,'Calendar includes the final requested day');
+  assert.ok(requests.at(-1).url.endsWith('/pricing/calendar?room_type_id=1&start_date=2026-10-01&end_date=2026-10-31'));
+  assert.equal(requests.at(-1).init.method,'GET');
+  for(const value of [null,{},[{...days[0],date:'2026-11-01'}],[{...days[0],date:'2026-02-30'}],
+    [{...days[0],nightly_price:-1}],[{...days[0],available:0.5}],[days[0],days[0]]])await rejects(call,value);
+}
+
+async function notificationChecks(){
+  const notif={notification_id:ids.event,booking_id:ids.booking,kind:'booking.pending.v1',
+    payload:{status:'Pending',deposit_required:300000,pending_expires_at:'2026-10-01T10:00:00Z'},
+    created_at:'2026-09-09T03:00:00.000Z',read_at:null};
+  global.fetch=async(url,init)=>{requests.push({url,init});return Response.json({status:'success',count:1,data:[notif],total:1,unread:1,limit:20,offset:0,request_id:'notif-list'});};
+  const page=await service.getOwnNotifications({limit:20,offset:0});
+  assert.equal(page.unread,1);assert.equal(page.data[0].notification_id,ids.event);
+  assert.equal(requests.at(-1).init.credentials,'include');
+  assert.ok(requests.at(-1).url.endsWith('/users/me/notifications?limit=20&offset=0'));
+  for(const bad of [null,{},[{...notif,notification_id:'bad'}],[{...notif,created_at:'not-a-date'}]])await rejects(()=>service.getOwnNotifications(),bad);
+  const readReceipt={notification_id:ids.event,read_at:'2026-09-09T03:05:00.000Z'};
+  respond(readReceipt);assert.deepEqual(await service.markOwnNotificationRead(ids.event),readReceipt);
+  assert.equal(requests.at(-1).init.method,'PATCH');assert.equal(requests.at(-1).init.credentials,'include');
+  for(const bad of [null,{notification_id:'bad',read_at:readReceipt.read_at},{notification_id:ids.event,read_at:'yesterday'}])await rejects(()=>service.markOwnNotificationRead(ids.event),bad);
+}
+
 (async()=>{
-  await quoteChecks();await receiptChecks();await eventChecks();
-  console.log('PASS (unit, mocked HTTP): real booking service accepts backend-shaped quotes/receipts/event replays; rejects missing/nested/mismatched/invalid amounts and expiry; preserves malformed-201 status and trace for safe booking recovery; exposure acknowledgment must match quote and event.');
+  await quoteChecks();await receiptChecks();await eventChecks();await calendarChecks();await notificationChecks();
+  console.log('PASS (unit, mocked HTTP): real booking service accepts backend-shaped quotes/receipts/event/notification replays; rejects missing/nested/mismatched/invalid amounts and expiry; preserves malformed-201 status and trace for safe booking recovery; exposure acknowledgment must match quote and event.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

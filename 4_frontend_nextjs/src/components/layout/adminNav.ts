@@ -32,7 +32,17 @@ export const adminNav: AdminNavSection[] = [
   },
 
   {
-    heading: 'Định giá',
-    items: [{ label: 'AI Pricing', href: '/admin/pricing', icon: LineChart }],
+    heading: 'Định giá & Doanh thu',
+    items: [
+      { label: 'AI Pricing', href: '/admin/pricing', icon: LineChart },
+      { label: 'Revenue Simulator', href: '/admin/revenue-simulator', icon: Sparkles, badge: 'P8' },
+    ],
+  },
+  {
+    heading: 'Nghiên cứu AI',
+    items: [
+      { label: 'AI Experiment', href: '/ai-experiment', icon: LineChart },
+      { label: 'Decision Lab', href: '/decision-lab', icon: Sparkles },
+    ],
   },
 ];

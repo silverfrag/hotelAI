@@ -84,9 +84,11 @@ export type AdminDashboardView = {
     booking_value: number;
     customer_count: number;
     room_count: number;
-    revpar: number;
+    revpar: null;
+    booking_value_per_room: number;
     occupancy_rate: number;
-    forecasted_demand: number;
+    forecasted_demand: null;
+    forecast_status: 'not_available';
   };
   monthly_revenue: Array<{
     month: string;
@@ -517,22 +519,15 @@ export class AdminOperationsService {
     ]);
 
     const summary = summaryRows[0] as Record<string, unknown>;
-    const roomCount = Number(summary.room_count) || 1; // avoid division by zero
+    const roomCount = Number(summary.room_count) || 0;
     const bookingValue = Number(summary.booking_value) || 0;
     const occupiedRooms = roomStatusRows.find(r => r.status === 'Occupied')?.room_count || 0;
     
-    // RevPAR = Total Revenue / Total Rooms
-    const revpar = bookingValue / roomCount;
+    const bookingValuePerRoom = roomCount > 0 ? bookingValue / roomCount : 0;
     // Occupancy Rate = (Occupied Rooms / Total Rooms) * 100
-    const occupancyRate = (Number(occupiedRooms) / roomCount) * 100;
+    const occupancyRate = roomCount > 0 ? (Number(occupiedRooms) / roomCount) * 100 : 0;
     
-    // Mock Forecasted Demand:
-    // Simple heuristic: current occupancy + pending bookings impact + random trend factor (for demo)
-    const pendingCount = Number(summary.pending_bookings) || 0;
-    let forecastedDemand = occupancyRate + (pendingCount * (100 / roomCount));
-    if (forecastedDemand > 100) forecastedDemand = 100;
-    // Add a slight positive trend for the flagship demo
-    forecastedDemand = Math.min(100, forecastedDemand * 1.05);
+    // No evaluated forecast or matching revenue/available-room-night period yet.
 
     return {
       business_date: businessDate,
@@ -549,9 +544,11 @@ export class AdminOperationsService {
         booking_value: bookingValue,
         customer_count: Number(summary.customer_count),
         room_count: roomCount,
-        revpar: Math.round(revpar),
+        revpar: null,
+        booking_value_per_room: Math.round(bookingValuePerRoom),
         occupancy_rate: Math.round(occupancyRate * 10) / 10,
-        forecasted_demand: Math.round(forecastedDemand * 10) / 10,
+        forecasted_demand: null,
+        forecast_status: 'not_available',
       },
       monthly_revenue: monthlyRows.map((row: Record<string, unknown>) => ({
         month: String(row.month),
@@ -1064,4 +1061,3 @@ export class AdminOperationsService {
     return `${values.year}-${values.month}-${values.day}`;
   }
 }
-

@@ -2,6 +2,14 @@ import { HousekeepingOperationsManager } from '@/components/features/admin/House
 
 export const metadata = { title: 'Buồng phòng & AI Nâng Hạng — Hotel AI Console' };
 
-export default function AdminHousekeepingPage() {
-  return <HousekeepingOperationsManager />;
+interface AdminHousekeepingPageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function AdminHousekeepingPage({ searchParams }: AdminHousekeepingPageProps) {
+  const params = await searchParams;
+  const rawTab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
+  const initialTab = rawTab === 'ai-upgrades' ? 'ai-upgrades' : 'housekeeping';
+
+  return <HousekeepingOperationsManager initialTab={initialTab} />;
 }

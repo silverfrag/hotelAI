@@ -197,6 +197,9 @@ function RoomTypeEditorDialog({
   const roomType = editor.mode === 'edit' ? editor.roomType : null;
   const [name, setName] = useState(roomType?.type_name ?? '');
   const [basePrice, setBasePrice] = useState(String(roomType?.base_price ?? ''));
+  const [declaredMaxPrice, setDeclaredMaxPrice] = useState(
+    roomType?.declared_max_price != null ? String(roomType.declared_max_price) : '',
+  );
   const [capacity, setCapacity] = useState(String(roomType?.capacity ?? 2));
   const [validationError, setValidationError] = useState('');
 
@@ -205,6 +208,8 @@ function RoomTypeEditorDialog({
     const normalizedName = name.trim();
     const parsedPrice = Number(basePrice);
     const parsedCapacity = Number(capacity);
+    const trimmedMax = declaredMaxPrice.trim();
+    let parsedMaxPrice: number | null = null;
     if (!normalizedName) return setValidationError('Vui lòng nhập tên loại phòng.');
     if (normalizedName.length > 50) return setValidationError('Tên loại phòng tối đa 50 ký tự.');
     if (!Number.isFinite(parsedPrice) || parsedPrice <= 0 || parsedPrice > 99_999_999.99) {
@@ -213,11 +218,29 @@ function RoomTypeEditorDialog({
     if (!Number.isInteger(parsedPrice * 100)) {
       return setValidationError('Giá cơ sở chỉ được có tối đa 2 chữ số thập phân.');
     }
+    if (trimmedMax !== '') {
+      const candidateMax = Number(trimmedMax);
+      if (!Number.isFinite(candidateMax) || candidateMax <= 0 || candidateMax > 99_999_999.99) {
+        return setValidationError('Giá trần kê khai phải lớn hơn 0 và không vượt quá 99.999.999,99 VND.');
+      }
+      if (!Number.isInteger(candidateMax * 100)) {
+        return setValidationError('Giá trần kê khai chỉ được có tối đa 2 chữ số thập phân.');
+      }
+      if (candidateMax < parsedPrice) {
+        return setValidationError('Giá trần kê khai phải lớn hơn hoặc bằng giá cơ sở.');
+      }
+      parsedMaxPrice = candidateMax;
+    }
     if (!Number.isInteger(parsedCapacity) || parsedCapacity < 1 || parsedCapacity > 1_000) {
       return setValidationError('Sức chứa phải là số nguyên từ 1 đến 1.000.');
     }
     setValidationError('');
-    await onSubmit({ name: normalizedName, base_price: parsedPrice, capacity: parsedCapacity });
+    await onSubmit({
+      name: normalizedName,
+      base_price: parsedPrice,
+      capacity: parsedCapacity,
+      declared_max_price: parsedMaxPrice,
+    });
   }
 
   return (
@@ -225,7 +248,7 @@ function RoomTypeEditorDialog({
       open
       onClose={saving ? () => undefined : onClose}
       title={roomType ? `Chỉnh sửa ${roomType.type_name}` : 'Thêm loại phòng'}
-      description="Giá cơ sở là đầu vào để AI tính giá bán theo nhu cầu."
+      description="Giá cơ sở và giá trần kê khai là ranh giới định giá cho từng hạng phòng White Sand."
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={saving}>Hủy</Button>
@@ -246,16 +269,31 @@ function RoomTypeEditorDialog({
           Tên loại phòng
           <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={50} autoFocus disabled={saving} />
         </label>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <label className="grid gap-1.5 font-medium">
             Giá cơ sở (VND/đêm)
             <Input type="number" min="1" step="1000" value={basePrice} onChange={(event) => setBasePrice(event.target.value)} disabled={saving} />
+          </label>
+          <label className="grid gap-1.5 font-medium">
+            Giá trần kê khai (VND/đêm)
+            <Input
+              type="number"
+              min="1"
+              step="1000"
+              value={declaredMaxPrice}
+              placeholder="Không giới hạn"
+              onChange={(event) => setDeclaredMaxPrice(event.target.value)}
+              disabled={saving}
+            />
           </label>
           <label className="grid gap-1.5 font-medium">
             Sức chứa
             <Input type="number" min="1" step="1" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} />
           </label>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Để trống giá trần nếu không giới hạn trần niêm yết. Khi bật định giá theo ngữ cảnh, giá trước coupon sẽ bị chặn ở mức giá trần này.
+        </p>
       </form>
     </Dialog>
   );
@@ -532,6 +570,7 @@ export function AdminRoomsManager() {
                   <TableRow>
                     <TableHead>Loại phòng</TableHead>
                     <TableHead>Giá cơ sở / đêm</TableHead>
+                    <TableHead>Giá trần kê khai</TableHead>
                     <TableHead>Sức chứa</TableHead>
                     <TableHead>Số phòng</TableHead>
                     <TableHead className="text-right">Thao tác</TableHead>
@@ -542,6 +581,11 @@ export function AdminRoomsManager() {
                     <TableRow key={roomType.type_id}>
                       <TableCell className="font-medium">{roomType.type_name}</TableCell>
                       <TableCell className="whitespace-nowrap font-medium tabular-nums">{formatCurrency(Number(roomType.base_price))}</TableCell>
+                      <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
+                        {roomType.declared_max_price != null
+                          ? formatCurrency(Number(roomType.declared_max_price))
+                          : 'Không giới hạn'}
+                      </TableCell>
                       <TableCell className="tabular-nums">{roomType.capacity} khách</TableCell>
                       <TableCell className="tabular-nums">{Number(roomType.room_count)}</TableCell>
                       <TableCell>

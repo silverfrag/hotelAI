@@ -11,6 +11,7 @@ import {
 
 interface LanguageContextType {
   language: Language;
+  lang: Language;
   setLanguage: (lang: Language) => void;
   t: (key: TranslationKey | (string & {}), defaultText?: string) => string;
   formatPrice: (amountVnd: number) => string;
@@ -84,6 +85,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     <LanguageContext.Provider
       value={{
         language,
+        lang: language,
         setLanguage,
         t,
         formatPrice,

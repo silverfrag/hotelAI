@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { AcademicModule } from './modules/academic/academic.module';
+import { RevenueModule } from './modules/revenue/revenue.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -21,6 +23,8 @@ import { ApiResponseInterceptor } from './common/interceptors/api-response.inter
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     TypeOrmModule.forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (config: ConfigService) => ({ type: 'postgres', host: config.getOrThrow('DB_HOST'), port: config.getOrThrow<number>('DB_PORT'), username: config.getOrThrow('DB_USER'), password: config.getOrThrow('DB_PASSWORD'), database: config.getOrThrow('DB_NAME'), autoLoadEntities: true, synchronize: false }) }),
     InfrastructureModule,
+    AcademicModule,
+    RevenueModule,
     AuthModule, UsersModule, RoomsModule, PricingModule, BookingsModule, PaymentsModule, AdminModule, BookingWorkflowModule, ChatModule,
   ],
   controllers: [HealthController],

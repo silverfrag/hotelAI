@@ -17,4 +17,15 @@ export class RoomType {
 
   @Column({ name: 'capacity', type: 'int' })
   capacity: number;
+
+  @Column({
+    name: 'declared_max_price',
+    type: 'numeric',
+    nullable: true,
+    transformer: {
+      to: (value: number | null) => value,
+      from: (value: string | null) => (value == null ? null : Number(value)),
+    },
+  })
+  declared_max_price: number | null;
 }

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 APP_TITLE = "Hotel AI Pricing Service"
-APP_VERSION = "1.2.0"
+APP_VERSION = "3.0.0"
 MODEL_PATH_ENV = "MODEL_PATH"
 CONVERSION_MODEL_PATH_ENV = "CONVERSION_MODEL_PATH"
 DEFAULT_MODEL_PATH = (

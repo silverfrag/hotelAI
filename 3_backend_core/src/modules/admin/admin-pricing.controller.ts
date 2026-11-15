@@ -1,15 +1,39 @@
-import { Body, Controller, Get, Patch, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AdminPricingService } from './admin-pricing.service';
+import { AdminPricingIntelligenceService } from './admin-pricing-intelligence.service';
+import {
+  DriftMonitoringQueryDto,
+  ExplainPricingSampleDto,
+  PricingIntelligenceQueryDto,
+} from './dto/pricing-intelligence.dto';
 import { PricingLogsQueryDto, UpdatePricingSettingDto } from './dto/pricing.dto';
 
 @Controller('admin/pricing')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')
 export class AdminPricingController {
-  constructor(private readonly adminPricing: AdminPricingService) {}
+  constructor(
+    private readonly adminPricing: AdminPricingService,
+    private readonly intelligence: AdminPricingIntelligenceService,
+  ) {}
+
+  @Get('intelligence')
+  async getIntelligence(@Query() query: PricingIntelligenceQueryDto) {
+    return { status: 'success', data: await this.intelligence.getIntelligence(query) };
+  }
+
+  @Get('drift')
+  async getDrift(@Query() query: DriftMonitoringQueryDto) {
+    return { status: 'success', data: await this.intelligence.getDriftMonitoring(query) };
+  }
+
+  @Post('explain-sample')
+  async explainSample(@Body() dto: ExplainPricingSampleDto) {
+    return { status: 'success', data: await this.intelligence.explainPricingSample(dto) };
+  }
 
   @Get('settings')
   async getSetting() {

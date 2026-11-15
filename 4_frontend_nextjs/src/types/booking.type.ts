@@ -94,3 +94,24 @@ export interface BookingSummary extends BookingPolicySnapshot {
   balance_due: number;
   refund_due: number;
 }
+
+export interface CustomerNotification {
+  notification_id: string;
+  booking_id: string;
+  kind: string;
+  payload: {
+    status?: string | null;
+    pending_expires_at?: string | null;
+    deposit_required?: number | string | null;
+  };
+  created_at: string;
+  read_at: string | null;
+}
+
+export interface CustomerNotificationsPage {
+  data: CustomerNotification[];
+  total: number;
+  unread: number;
+  limit: number;
+  offset: number;
+}

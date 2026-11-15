@@ -15,7 +15,10 @@ interface UseBookingHistoryOptions {
 }
 
 function messageFrom(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+  if (error instanceof BookingServiceError && error.status >= 400 && error.status < 500) {
+    return error.message;
+  }
+  return `${fallback} Vui lòng kiểm tra kết nối và thử lại sau ít phút.`;
 }
 
 export function useBookingHistory({
@@ -25,6 +28,8 @@ export function useBookingHistory({
 }: UseBookingHistoryOptions) {
   const [bookings, setBookings] = useState<BookingSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -43,17 +48,25 @@ export function useBookingHistory({
 
     const sequence = ++requestSequence.current;
     if (showLoading) setLoading(true);
-    setError('');
+    setRefreshing(true);
 
     try {
       const nextBookings = await getBookings(accessToken);
-      if (requestSequence.current === sequence) setBookings(nextBookings);
+      if (requestSequence.current === sequence) {
+        setBookings(nextBookings);
+        setError('');
+        setLoadFailed(false);
+      }
     } catch (caught) {
       if (requestSequence.current === sequence) {
         setError(handleError(caught, 'Không thể tải lịch sử đặt phòng.'));
+        setLoadFailed(true);
       }
     } finally {
-      if (requestSequence.current === sequence) setLoading(false);
+      if (requestSequence.current === sequence) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [accessToken, enabled, handleError]);
 
@@ -75,14 +88,19 @@ export function useBookingHistory({
       requestSequence.current += 1;
       setBookings([]);
       setLoading(false);
+      setRefreshing(false);
+      setLoadFailed(false);
       setError('');
+      setActionMessage('');
       return;
     }
 
     const controller = new AbortController();
     const sequence = ++requestSequence.current;
     setLoading(true);
+    setRefreshing(false);
     setError('');
+    setLoadFailed(false);
 
     getBookings(accessToken, controller.signal)
       .then((nextBookings) => {
@@ -92,6 +110,7 @@ export function useBookingHistory({
         if (caught instanceof DOMException && caught.name === 'AbortError') return;
         if (requestSequence.current === sequence) {
           setError(handleError(caught, 'Không thể tải lịch sử đặt phòng.'));
+          setLoadFailed(true);
         }
       })
       .finally(() => {
@@ -123,7 +142,7 @@ export function useBookingHistory({
       return true;
     } catch (caught) {
       if (caught instanceof BookingServiceError && caught.status === 409) await load(false);
-      setError(handleError(caught, 'Không thể hủy đặt phòng.'));
+      setError(handleError(caught, 'Chưa xác nhận được kết quả hủy. Hãy tải lại danh sách để kiểm tra trạng thái đặt phòng.'));
       return false;
     } finally {
       setCancellingId(null);
@@ -133,6 +152,8 @@ export function useBookingHistory({
   return {
     bookings,
     loading,
+    refreshing,
+    loadFailed,
     error,
     actionMessage,
     cancellingId,

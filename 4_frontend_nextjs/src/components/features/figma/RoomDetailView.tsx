@@ -75,7 +75,7 @@ export default function RoomDetailView({ room, businessDate }: { room: RoomPrese
   const TABS: { key: TabKey; label: string }[] = [
     { key: "description", label: "Description" },
     { key: "features", label: "Features" },
-    { key: "virtual", label: "Virtual" },
+    { key: "virtual", label: "Photos" },
     { key: "reviews", label: "Reviews" },
   ];
 
@@ -298,35 +298,73 @@ export default function RoomDetailView({ room, businessDate }: { room: RoomPrese
           )}
 
           {activeTab === "virtual" && (
-            <div role="tabpanel" id="room-panel-virtual" aria-labelledby="room-tab-virtual" className="max-w-xl">
+            <div role="tabpanel" id="room-panel-virtual" aria-labelledby="room-tab-virtual" className="max-w-2xl">
               <h2
                 className="font-display text-2xl mb-4"
                 style={{ color: "var(--fg)" }}
               >
-                Virtual Tour
+                Photo Inspiration
               </h2>
+              <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
+                Browse illustrative photography for {room.name}. Contact the hotel to confirm the room layout and amenities before booking.
+              </p>
               <div
-                className="aspect-video flex flex-col items-center justify-center gap-4"
+                className="relative aspect-video rounded-lg overflow-hidden border group cursor-pointer"
+                role="button"
+                tabIndex={0}
+                aria-label="Open illustrative photo gallery"
                 style={{
-                  background: "var(--bg2)",
-                  border: "1px solid var(--border-gold)",
+                  borderColor: "var(--border-gold)",
+                }}
+                onClick={() => galleryDialog.current?.showModal()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    galleryDialog.current?.showModal();
+                  }
                 }}
               >
-                <div
-                  className="w-16 h-16 rounded-full flex items-center justify-center"
-                  style={{ border: "1px solid var(--gold)", color: "var(--gold)" }}
-                >
-                  <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M10 8l6 4-6 4V8Z" fill="currentColor" />
-                  </svg>
+                <img
+                  src={gallery[1] ?? room.img}
+                  alt={`Illustrative photograph for ${room.name}`}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/30 flex flex-col justify-between p-6">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] tracking-[0.22em] uppercase px-3 py-1 bg-black/60 backdrop-blur-md border border-[var(--border-gold)] text-[var(--gold)] rounded-full">
+                      Illustrative photography
+                    </span>
+                    {room.sqm !== null && <span className="text-[10px] text-white/70">
+                      {room.sqm} m² Sanctuary
+                    </span>}
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <div
+                      className="w-16 h-16 rounded-full flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110 shadow-lg"
+                      style={{ background: "rgba(12,9,5,0.85)", border: "1px solid var(--gold)", color: "var(--gold)" }}
+                    >
+                      <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M10 8l6 4-6 4V8Z" fill="currentColor" />
+                      </svg>
+                    </div>
+                    <span className="font-display text-xl text-white">View Photo Gallery</span>
+                    <span className="text-xs text-white/70 mt-1">Actual room interiors may vary</span>
+                  </div>
+
+                  {/* Hotspots */}
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {room.features.map((spot) => (
+                      <span
+                        key={spot}
+                        className="text-[9px] tracking-wider uppercase px-2.5 py-1 bg-black/50 backdrop-blur-sm border border-white/20 text-white/90 rounded"
+                      >
+                        ✦ {spot}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <span className="text-sm" style={{ color: "var(--muted)" }}>
-                  360° Virtual Tour
-                </span>
-                <span className="text-[10px] tracking-widest uppercase" style={{ color: "var(--dim)" }}>
-                  No virtual tour is available for this room.
-                </span>
               </div>
             </div>
           )}

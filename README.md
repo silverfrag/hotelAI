@@ -2,6 +2,12 @@
 
 Hệ thống đặt phòng khách sạn nhiều dịch vụ, gồm giao diện khách hàng, bảng điều hành quản trị, backend nghiệp vụ và dịch vụ định giá AI.
 
+## Demo AI học thuật
+
+Phần thực nghiệm dùng dữ liệu thật Portugal 2015–2017 để ước lượng ADR tham chiếu (EUR) và nguy cơ hủy/no-show. **White Sand Boutique Hotel Đà Nẵng** (`6` hạng phòng, `54` phòng vật lý) là bối cảnh mô phỏng trên hệ thống; kết quả không chứng minh giá tối ưu, tăng doanh thu hoặc hiệu quả tại Việt Nam nếu chưa có thực nghiệm thị trường thật.
+
+Chạy toàn hệ thống qua Nginx tại `http://localhost`, mở `/ai-experiment` hoặc `/decision-lab`. Xem thêm [hướng dẫn demo & đánh giá kiểm thử](docs/HUONG_DAN_DEMO_VA_DANH_GIA.md), [kết quả thực nghiệm](docs/AI_EXPERIMENT_RESULTS.md), [kịch bản bảo vệ](docs/AI_DEFENSE.md) và [lộ trình E2E](docs/E2E_CONTEXT_AND_ROADMAP.md). Hai pipeline academic dùng hợp đồng riêng và được bảo toàn nguyên vẹn.
+
 ## Kiến trúc
 
 - `1_infrastructure`: PostgreSQL schema/migration, seed và Nginx API Gateway.
@@ -17,26 +23,24 @@ Hệ thống đặt phòng khách sạn nhiều dịch vụ, gồm giao diện k
 
 Khách hàng có thể:
 
-- xem, tìm kiếm, lọc và mở chi tiết loại phòng tại `/rooms`;
-- chọn ngày lưu trú và nhận báo giá AI tại `/checkout` mà chưa cần đăng nhập;
-- xem số phòng còn trống đúng theo khoảng ngày;
-- đăng ký/đăng nhập, xác nhận booking và xem giá cuối cùng;
-- xem lịch sử, trạng thái/sổ giao dịch thanh toán và hủy booking đủ điều kiện tại `/bookings`;
-- cập nhật hồ sơ, đổi mật khẩu và vô hiệu hóa tài khoản tại `/profile`.
+- khám phá khách sạn **White Sand Boutique Hotel Đà Nẵng** (`89-91 Võ Văn Kiệt, Sơn Trà`), tìm kiếm, lọc và mở chi tiết 6 hạng phòng tại `/`, `/about`, `/rooms` và `/rooms/[id]`;
+- chọn ngày lưu trú, xem tồn kho thực tế theo khoảng ngày và nhận báo giá AI minh bạch 4 nguồn `(A)/(B)/(C)/(D)` tại `/book` và `/checkout` (tự động ghi nhận `quote.exposed.v1` khi báo giá hiển thị thật trên màn hình);
+- áp dụng mã ưu đãi PostgreSQL (`WHITESAND10`, `SUMMER15`, `DIFF2026`, `SUITE20`, kiểm tra `min_room_type_id`, giới hạn lượt dùng, hạn dùng `UTC+7` và giá sàn `452,000 VND/đêm`);
+- đăng ký/đăng nhập tại `/login` và `/register`, xác nhận booking, xem lịch sử, hộp thông báo (`/bookings#notifications` + badge `AccountMenu`), sổ thanh toán và hủy booking đủ điều kiện hoàn trả tồn kho & lượt coupon tại `/bookings`;
+- cập nhật hồ sơ, đổi mật khẩu và vô hiệu hóa tài khoản tại `/profile`;
+- trao đổi với trợ lý **White Sand assistant** (`ChatWidget`, `hybrid_bm25_tfidf_v1`) dùng **Hybrid BM25 + TF-IDF RAG**, trích xuất slot ngày/hạng phòng/coupon và gọi công cụ đọc trực tiếp tồn kho theo ngày & lượt coupon trong PostgreSQL, trả chip trích dẫn SOP kèm nút chuyển thẳng sang `/book`.
 
 Quản trị viên có thể:
 
-- xem dashboard dữ liệu thật tại `/admin`;
-- tìm kiếm, lọc, phân trang, hủy, nhận phòng, trả phòng và đóng booking no-show tại `/admin/bookings`;
-- CRUD loại phòng/phòng vật lý và quản lý trạng thái sẵn sàng/bảo trì tại `/admin/rooms`; trạng thái `Occupied` được điều khiển tự động bởi nhận/trả phòng;
-- bật/tắt AI bằng optimistic versioning và xem audit giá tại `/admin/pricing`.
-- quản lý policy AI challenger qua API versioned có audit, pause/rollback và xem
-  readiness; chưa có màn hình UI riêng cho control plane này.
-- tìm kiếm, phân trang, cấp/hạ quyền, khóa/mở khóa người dùng và xem audit tại `/admin/users`.
+- xem dashboard dữ liệu thật & phân tích định giá theo đêm tại `/admin`;
+- xem sơ đồ phòng (Rack/Tape Chart) trực quan và kéo/chuyển phòng tại `/admin/tape-chart`;
+- tìm kiếm, lọc, phân trang, hủy, xác nhận/ủy quyền thẻ trước checkout, cấu hình chính sách giữ phòng (`Pending` TTL/deposit), quét hết hạn, nhận phòng, trả phòng và đóng booking no-show tại `/admin/bookings`;
+- CRUD loại phòng/phòng vật lý, giá trần kê khai (`declared_max_price`) và quản lý trạng thái sẵn sàng/bảo trì tại `/admin/rooms`;
+- quản lý buồng phòng `Dirty → Cleaning → Ready`, đổi phòng giữ nguyên giá/lineage và Smart Upgrade tại `/admin/housekeeping`;
+- theo dõi **Shadow Challenger & Readiness (6 gate + kiểm toán 0% giao thoa hạng phòng với White Sand)**, **AI Drift Monitoring (PSI + Empirical Portugal V2 Drift + Mahalanobis OOD)**, **Guardrailed Thompson Sampling Bandit Lab** và **Explain Price Sample (Saabas + Split Conformal 90%)** tại `/admin/pricing`;
+- mô phỏng doanh thu **P8 Revenue Simulator**, CRUD `pricing_coupons`, thẩm định thị trường Đà Nẵng (`native_vn_nlp_v1` + Open-Meteo), tối ưu phân bổ phòng **Google OR-Tools CP-SAT Live**, **Portfolio Multi-Night 6-Tier Optimizer** (kèm shadow price & 1-tier upgrade) và chạy **4 kịch bản Stress-Test Sandbox** tại `/admin/revenue-simulator`;
+- tìm kiếm, phân trang, cấp/hạ quyền, khóa/mở khóa người dùng và xem audit tại `/admin/users`;
 - ghi nhận các khoản thu thủ công từ booking, lọc ledger và hoàn tiền theo giao dịch gốc tại `/admin/payments`.
-- dùng API housekeeping để xử lý `Dirty → Cleaning → Ready`, trả phòng về
-  `Available + Dirty` và đổi phòng cùng loại mà không làm mất giá/AI lineage;
-  màn hình vận hành riêng chưa được thêm vào UI reference hiện tại.
 
 Booking dùng khóa advisory và transaction để chống overbooking. Booking detail cùng pricing log lưu snapshot tên phòng, tên loại phòng, giá cơ sở, hệ số AI, nguồn giá và version cấu hình nên dữ liệu lịch sử không đổi khi catalog được sửa.
 
@@ -119,6 +123,9 @@ Public/core:
 - `GET /api/v1/core/bookings`
 - `PATCH /api/v1/core/bookings/:bookingId/cancel`
 - `GET /api/v1/core/bookings/:bookingId/payment`
+- `GET /api/v1/core/users/me/notifications` & `PATCH /api/v1/core/users/me/notifications/:notificationId/read`
+- `GET /api/v1/core/pricing/coupons` & `GET /api/v1/core/pricing/calendar`
+- `POST /api/v1/core/chat`
 
 Admin, đều yêu cầu role `admin`:
 
@@ -126,34 +133,39 @@ Admin, đều yêu cầu role `admin`:
 - `GET/POST/PATCH/DELETE /api/v1/core/admin/rooms`
 - `GET /api/v1/core/admin/housekeeping?status=Dirty&limit=20&offset=0`
 - `PATCH /api/v1/core/admin/rooms/:roomId/housekeeping` (bắt buộc `Idempotency-Key`)
+- `GET /api/v1/core/admin/tape-chart`
 - `GET /api/v1/core/admin/dashboard?months=6`
 - `GET /api/v1/core/admin/bookings?limit=20&offset=0&status=Confirmed&search=...`
+- `POST /api/v1/core/admin/bookings/:bookingId/confirm` & `.../credit-authorization` & `.../no-show`
 - `PATCH /api/v1/core/admin/bookings/:bookingId/check-in`
 - `PATCH /api/v1/core/admin/bookings/:bookingId/check-out`
 - `POST /api/v1/core/admin/bookings/:bookingId/reassign-room` (bắt buộc `Idempotency-Key`)
+- `GET/PATCH /api/v1/core/admin/booking-policy` & `POST /api/v1/core/admin/workflow/expire`
+- `GET /api/v1/core/admin/allocations/queue` & `POST /api/v1/core/admin/allocations/optimize-queue`
 - `PATCH /api/v1/core/admin/bookings/:bookingId/complete` (đóng no-show đã quá hạn)
 - `POST /api/v1/core/admin/bookings/:bookingId/payments`
 - `GET /api/v1/core/admin/payments?limit=20&offset=0&transaction_type=Payment&method=Cash&search=...`
 - `POST /api/v1/core/admin/payments/:paymentId/refunds`
+- `GET /api/v1/core/admin/pricing/intelligence`, `GET /api/v1/core/admin/pricing/drift`, `POST /api/v1/core/admin/pricing/explain-sample`
 - `GET/PATCH /api/v1/core/admin/pricing/settings`
 - `GET /api/v1/core/admin/pricing/logs?limit=20&offset=0`
-- `GET/PATCH /api/v1/core/admin/pricing/shadow/settings`
-- `POST /api/v1/core/admin/pricing/shadow/pause`
-- `POST /api/v1/core/admin/pricing/shadow/rollback`
-- `GET /api/v1/core/admin/pricing/shadow/readiness`
-- `GET /api/v1/core/admin/pricing/shadow/audits?limit=50`
+- `GET/PATCH /api/v1/core/admin/pricing/shadow/settings`, `GET .../runtime-status`, `POST .../pause`, `POST .../rollback`, `GET .../readiness`, `GET .../audits`
+- `GET/POST /api/v1/core/admin/coupons`, `PATCH /api/v1/core/admin/coupons/:code`
+- `GET /api/v1/core/revenue/live-context`, `GET /.../scenarios`, `POST /.../decision`, `POST /.../market-decision`, `POST /.../optimize-allocation(-live)`, `GET /.../sandbox/scenarios`, `POST /.../sandbox/run`
 - `GET /api/v1/core/admin/users?limit=20&offset=0&role=customer&status=Active&search=...`
 - `GET/PATCH /api/v1/core/admin/users/:customerId`
 - `GET /api/v1/core/admin/users/:customerId/audits`
 
 AI:
 
-- `POST /api/v1/ai/predict-price`
+- `POST /api/v1/ai/predict-price` (V2 Random Forest + Split Conformal 90% + Mahalanobis OOD Gate) & `POST /api/v1/ai/explain-price` (Saabas Tree Interpreter)
 - `GET /api/v1/ai/health`
 - `GET /api/v1/ai/model-info` (metadata, feature contract và metric của artifact đang phục vụ)
+- `GET /api/v1/ai/monitoring/drift` & `POST /api/v1/ai/monitoring/evaluate-drift` (PSI + Empirical Portugal baseline drift)
 - `GET /api/v1/ai/conversion-model-info` (chỉ khả dụng khi có challenger artifact hợp lệ)
-- `POST /api/v1/ai/predict-conversion` (shadow-only)
-- `POST /api/v1/ai/optimize-price-shadow` (candidate scoring; không đổi giá trả khách)
+- `POST /api/v1/ai/predict-conversion` & `POST /api/v1/ai/optimize-price-shadow` (shadow-only)
+- `GET/POST /api/v1/ai/revenue/*` (Decision Engine, Đà Nẵng `native_vn_nlp_v1` market decision, OR-Tools CP-SAT allocator, Portfolio multi-night optimizer, Guardrailed Thompson Sampling Bandit simulator, Taxonomy drift audit, Scenario Sandbox)
+- `POST /api/v1/ai/concierge/ask` (Hybrid BM25 + TF-IDF SOP RAG & bilingual booking slot extractor)
 
 ## Hợp đồng response của Core API
 
@@ -276,6 +288,15 @@ docker build --target test -t hotelai-ai-test:local .
 docker run --rm hotelai-ai-test:local
 ```
 
+Kiểm thử tự động 2 kịch bản định giá động theo giờ thời gian thực (Kịch bản A: Surge cao điểm tối & Kịch bản B: Flash Clearance xả phòng giờ chót):
+
+```powershell
+Set-Location ..\2_ai_pricing_service
+python scripts/verify_hourly_scenarios.py
+# Hoặc chạy kiểm thử tự động với pytest:
+python -m pytest tests/test_scenarios_hourly_pricing.py
+```
+
 Xuất dataset không PII và chạy conversion readiness/training:
 
 ```powershell
@@ -335,9 +356,9 @@ CI chỉ có quyền đọc source, không dùng secret triển khai và tạo `
 
 ## Database và migration
 
-Database mới được seed hai loại phòng và ba phòng vật lý. `Demo Guest` là dữ liệu tham chiếu, không có mật khẩu đăng nhập mặc định.
+Database chuẩn hóa **White Sand Boutique Hotel Đà Nẵng** được seed **6 hạng phòng** (`Superior Room` → `Studio Apartment`) và **54 phòng vật lý** (`301–1306`) cùng 5 mã ưu đãi trong `pricing_coupons` (`WHITESAND10`, `SUMMER15`, `DIFF2026`, `SUITE20`, `EXPIRED50`). `Demo Guest` là dữ liệu tham chiếu, không có mật khẩu đăng nhập mặc định. (Lưu ý: nếu máy host đã chạy sẵn PostgreSQL khác ở cổng `5432`, set `$env:POSTGRES_PORT='55432'` trước khi chạy `docker compose` hoặc script DB).
 
-Các file trong `1_infrastructure/postgres/migrations` chạy theo thứ tự trước backend. Migration là idempotent, backfill dữ liệu cũ, bổ sung snapshot/audit/version/index và dùng `ON DELETE RESTRICT` cho lịch sử quan trọng. `customer_account_audits` là nhật ký chỉ-ghi ở lớp ứng dụng cho thay đổi hồ sơ, mật khẩu, quyền và trạng thái. `payment_transactions` là ledger chỉ-ghi: hoàn tiền tạo dòng mới liên kết khoản thu gốc, không sửa/xóa lịch sử. `event_outbox` giữ event cùng transaction với aggregate và có partial index cho hàng chưa publish. Booking lưu `guest_count`, `checked_in_at/by` và `checked_out_at/by`; số khách được kiểm tra với capacity loại phòng trong transaction. `booking_create_requests` ánh xạ `(customer, Idempotency-Key)` tới đúng một booking và từ chối replay khác payload. `pricing_quotes` giữ immutable feature/giá/model/inventory snapshot cho mọi báo giá, mặc định bảo đảm giá 15 phút qua `PRICING_QUOTE_TTL_SECONDS`; khi booking dùng `quote_id`, quote được khóa và đánh dấu accepted trong cùng transaction. Migration `012` thêm event ledger và training view để nối quote với conversion, cancellation, completed stay và net payment mà không làm rò rỉ trạng thái tương lai vào feature snapshot. Migration `013` thêm shadow policy versioned, append-only attempt/decision/audit ledger, guardrail, readiness và cơ chế pause/rollback; migration không tự promote model. `daily_pricing_logs` lưu model, training-run và feature-contract version để truy vết quyết định AI. Phòng chỉ được gắn tối đa một `occupancy_booking_id`. Xóa phòng hoặc loại phòng đang được tham chiếu trả `409`; chuyển phòng sang `Maintenance` cũng trả `409` nếu ảnh hưởng booking `Confirmed` hoặc `CheckedIn`.
+Các file trong `1_infrastructure/postgres/migrations` (`001` → `020`) chạy theo thứ tự trước backend. Migration là idempotent, backfill dữ liệu cũ, bổ sung snapshot/audit/version/index và dùng `ON DELETE RESTRICT` cho lịch sử quan trọng. `customer_account_audits` là nhật ký chỉ-ghi ở lớp ứng dụng cho thay đổi hồ sơ, mật khẩu, quyền và trạng thái. `payment_transactions` là ledger chỉ-ghi: hoàn tiền tạo dòng mới liên kết khoản thu gốc, không sửa/xóa lịch sử. `event_outbox` giữ event cùng transaction với aggregate và có partial index cho hàng chưa publish. Booking lưu `guest_count`, `checked_in_at/by` và `checked_out_at/by`; số khách được kiểm tra với capacity loại phòng trong transaction. `booking_create_requests` ánh xạ `(customer, Idempotency-Key)` tới đúng một booking và từ chối replay khác payload. `pricing_quotes` giữ immutable feature/giá/model/inventory snapshot cho mọi báo giá, mặc định bảo đảm giá 15 phút qua `PRICING_QUOTE_TTL_SECONDS`; khi booking dùng `quote_id`, quote được khóa và đánh dấu accepted trong cùng transaction. Migration `012` thêm event ledger và training view để nối quote với conversion, cancellation, completed stay và net payment mà không làm rò rỉ trạng thái tương lai vào feature snapshot. Migration `013` thêm shadow policy versioned, append-only attempt/decision/audit ledger, guardrail, readiness và cơ chế pause/rollback; migration không tự promote model. Các migration `014–020` bổ sung khóa toàn vẹn turnover/housekeeping, workflow giữ phòng `Pending`, role `hotelai_runtime` hạn chế quyền, Smart Room Upgrade, loyalty tier, và đồng bộ danh mục White Sand Đà Nẵng (`declared_max_price` + `pricing_coupons`). `daily_pricing_logs` lưu model, training-run và feature-contract version để truy vết quyết định AI. Phòng chỉ được gắn tối đa một `occupancy_booking_id`. Xóa phòng hoặc loại phòng đang được tham chiếu trả `409`; chuyển phòng sang `Maintenance` cũng trả `409` nếu ảnh hưởng booking `Confirmed` hoặc `CheckedIn`.
 
 Dashboard gọi `booking_value` là tổng giá trị booking chưa hủy. Doanh thu tiền mặt thực tế cần lấy từ payment ledger (tổng `Payment` trừ `Refund`), không đồng nhất với giá trị booking.
 

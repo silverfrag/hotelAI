@@ -30,6 +30,9 @@ const columns = [
   'nightly_price',
   'currency',
   'pricing_source',
+  'ai_model_version',
+  'data_provenance',
+  'provenance_reference',
   'exposure_at',
   'exposure_confirmed',
   'acceptance_label',
@@ -88,6 +91,13 @@ try {
               nightly_price,
               currency,
               pricing_source,
+              ai_model_version,
+              CASE
+                WHEN COALESCE(ai_model_version, '') ~* '(^|[^a-z0-9])(mock|synthetic|fixture|test|demo)([^a-z0-9]|$)'
+                  THEN 'synthetic'
+                ELSE 'unverified'
+              END AS data_provenance,
+              NULL::text AS provenance_reference,
               exposure_at,
               exposure_confirmed,
               acceptance_label,
@@ -121,6 +131,8 @@ try {
     rows: rowsWritten,
     sha256: digest.digest('hex'),
     contains_customer_pii: false,
+    provenance_policy: 'Known mock/test models are synthetic; all other legacy rows remain unverified until collection provenance is audited.',
+    observed_provenance_supported: false,
   }));
 } catch (error) {
   if (transactionOpen) {

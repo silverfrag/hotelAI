@@ -1,0 +1,11 @@
+flowchart TD
+    booking["Booking đã chọn hoặc kịch bản bạn nhập"] --> transport["Giao diện gửi qua Next.js và NestJS"]
+    transport --> check["FastAPI kiểm tra kiểu, ngày và giới hạn đầu vào"]
+    check --> features["Tính tháng, ngày, thứ và phần đêm cuối tuần"]
+    features --> transform["Biến đổi bằng bộ chuẩn bị đã học từ tập học"]
+    transform --> model["Mô hình cây học bù sai số ước lượng ADR"]
+    model --> output["ADR tham chiếu bằng EUR mỗi đêm"]
+    features --> baseline["Đối chứng trung vị theo khách sạn, phòng và tháng"]
+    output --> response["Ghép dự đoán, đối chứng, giải thích và cảnh báo"]
+    baseline --> response
+    response --> screen["Hiện kết quả; chỉ đối chiếu nhãn thật trong AI Experiment"]

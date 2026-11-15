@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 CONVERSION_ARTIFACT_SCHEMA_VERSION: Final = "1.0.0"
 CONVERSION_MODEL_KIND: Final = "conversion_challenger"
+CONVERSION_PROVENANCE_POLICY_VERSION: Final = "1.0.0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,8 +157,17 @@ class ConversionInferenceService:
             raise ValueError("Conversion feature contract version is incompatible.")
         if tuple(contract.get("feature_order", ())) != CONVERSION_FEATURE_ORDER:
             raise ValueError("Conversion feature order is incompatible.")
-        if metadata.get("data_quality", {}).get("passes_readiness_gate") is not True:
+        quality = metadata.get("data_quality", {})
+        if not isinstance(quality, dict) or quality.get("passes_readiness_gate") is not True:
             raise ValueError("Conversion artifact did not pass its data-readiness gate.")
+        if (quality.get("provenance_policy_version") != CONVERSION_PROVENANCE_POLICY_VERSION
+                or quality.get("missing_provenance_columns") != []):
+            raise ValueError("Conversion artifact requires verified data provenance under the current policy.")
+        eligible = quality.get("eligible_rows")
+        observed = quality.get("verified_observed_rows")
+        if (type(eligible) is not int or type(observed) is not int
+                or eligible <= 0 or observed < eligible):
+            raise ValueError("Conversion artifact has no verified eligible observations.")
         if metadata.get("evaluation", {}).get("passes_performance_gate") is not True:
             raise ValueError("Conversion artifact did not pass its performance gate.")
 

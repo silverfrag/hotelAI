@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { UserRound } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/contexts/LanguageContext';
+import { getOwnNotifications } from '@/services/booking.service';
 
 export function AccountMenu() {
   const { user, ready, logout, loggingOut, logoutError } = useAuth();
@@ -13,6 +14,7 @@ export function AccountMenu() {
   const router = useRouter();
   const pathname = usePathname();
   const menu = useRef<HTMLDetailsElement>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   async function signOut() {
     try {
@@ -35,6 +37,31 @@ export function AccountMenu() {
     menu.current?.removeAttribute('open');
   }, [pathname]);
 
+  useEffect(() => {
+    if (!ready || !user) {
+      setUnreadCount(0);
+      return;
+    }
+    const controller = new AbortController();
+    void getOwnNotifications({ limit: 1, offset: 0 }, controller.signal)
+      .then((page) => {
+        if (!controller.signal.aborted) setUnreadCount(page.unread);
+      })
+      .catch(() => undefined);
+
+    const onUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ unread?: number }>).detail;
+      if (typeof detail?.unread === 'number') {
+        setUnreadCount(detail.unread);
+      }
+    };
+    window.addEventListener('hotelai:notifications-updated', onUpdated);
+    return () => {
+      controller.abort();
+      window.removeEventListener('hotelai:notifications-updated', onUpdated);
+    };
+  }, [ready, user?.id, pathname]);
+
   return (
     <details
       ref={menu}
@@ -46,8 +73,17 @@ export function AccountMenu() {
         }
       }}
     >
-      <summary aria-label={t('account_menu')} className="p-1 cursor-pointer" style={{ color: 'var(--gold)' }}>
+      <summary aria-label={t('account_menu')} className="p-1 cursor-pointer relative" style={{ color: 'var(--gold)' }}>
         <UserRound size={17} />
+        {unreadCount > 0 && (
+          <span
+            aria-label={`${unreadCount} thông báo chưa đọc`}
+            className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold flex items-center justify-center"
+            style={{ background: 'var(--gold)', color: 'var(--bg)' }}
+          >
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
       </summary>
       <div
         className="absolute right-0 top-9 z-[60] w-52 py-2 text-[11px] shadow-2xl backdrop-blur-xl"
@@ -66,6 +102,19 @@ export function AccountMenu() {
             </p>
             <Link href="/profile">{t('account_my_profile')}</Link>
             <Link href="/bookings">{t('account_my_bookings')}</Link>
+            <Link href="/bookings#notifications">
+              <span className="inline-flex w-full items-center justify-between gap-2">
+                <span>Thông báo đặt phòng</span>
+                {unreadCount > 0 && (
+                  <span
+                    className="px-1.5 py-0.5 rounded-full text-[9px] font-bold"
+                    style={{ background: 'var(--gold)', color: 'var(--bg)' }}
+                  >
+                    {unreadCount}
+                  </span>
+                )}
+              </span>
+            </Link>
             {user.role === 'admin' && <Link href="/admin">{t('account_management')}</Link>}
             <button disabled={loggingOut} onClick={() => void signOut()} type="button">
               {loggingOut ? t('account_signing_out') : t('account_sign_out')}

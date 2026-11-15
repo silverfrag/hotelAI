@@ -1,5 +1,5 @@
-import { Type } from 'class-transformer';
-import { IsDateString, IsInt, IsNotEmpty, IsOptional, Matches, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsDateString, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 
 export class PriceQuoteDto {
   @IsNotEmpty()
@@ -30,4 +30,10 @@ export class PriceQuoteDto {
   @Min(1)
   @Max(1_000)
   guest_count = 1;
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(32)
+  coupon_code?: string;
 }

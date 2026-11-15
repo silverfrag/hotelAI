@@ -16,17 +16,26 @@ function deferred() {
 }
 
 function createClock() {
-  let now = Date.parse('2026-09-09T03:00:00Z'), nextId = 0;
-  const tasks = new Map(), storage = new Map();
+  let now = Date.parse('2026-09-09T03:00:00Z'), nextId = 0, visibilityState = 'visible';
+  const tasks = new Map(), storage = new Map(), docListeners = new Set();
   const schedule = (callback, delay, interval=false) => {const id=++nextId;tasks.set(id,{callback,due:now+delay,delay,interval});return id;};
-  const previousNow = Date.now, previousWindow = global.window;
+  const previousNow = Date.now, previousWindow = global.window, previousDocument = global.document;
   Date.now = () => now;
   global.window = {
     setTimeout:(callback,delay)=>schedule(callback,delay), clearTimeout:id=>tasks.delete(id),
     setInterval:(callback,delay)=>schedule(callback,delay,true), clearInterval:id=>tasks.delete(id),
     sessionStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value)},
   };
+  global.document = {
+    get visibilityState() { return visibilityState; },
+    addEventListener(type, listener) { if (type === 'visibilitychange') docListeners.add(listener); },
+    removeEventListener(type, listener) { if (type === 'visibilitychange') docListeners.delete(listener); },
+  };
   return {
+    setDocumentVisibility(next) {
+      visibilityState = next;
+      for (const listener of [...docListeners]) listener();
+    },
     async advance(ms) {
       const target=now+ms;
       for (;;) {
@@ -39,7 +48,11 @@ function createClock() {
       }
       now=target;await flush();
     },
-    restore() {Date.now=previousNow;if(previousWindow===undefined)delete global.window;else global.window=previousWindow;},
+    restore() {
+      Date.now=previousNow;
+      if(previousWindow===undefined)delete global.window;else global.window=previousWindow;
+      if(previousDocument===undefined)delete global.document;else global.document=previousDocument;
+    },
   };
 }
 
@@ -155,7 +168,19 @@ function reservationHarness() {
   return {clock,runner,quotes,bookings,events,
     changeInput:value=>{input=value;},setEventFailure:value=>{eventFailure=value;},refreshCount:()=>refreshCount,
     setUser:value=>{user=value;session=value?'cookie-session':null;},
-    async ready() {await clock.advance(350);quotes.at(-1).resolve(quoteFor(input,`quote-${quotes.length}`));await flush();runner.settle();await flush();return runner.settle();},
+    setDocumentVisibility:value=>{clock.setDocumentVisibility(value);runner.settle();},
+    async ready(expose = true) {
+      await clock.advance(350);
+      quotes.at(-1).resolve(quoteFor(input,`quote-${quotes.length}`));
+      await flush();
+      let state = runner.settle();
+      if (expose && state.quote) {
+        state.markQuoteVisible(state.quote.quote_id);
+        state = runner.settle();
+      }
+      await flush();
+      return runner.settle();
+    },
     close(){runner.unmount();clock.restore();},
   };
 }
@@ -163,12 +188,21 @@ function reservationHarness() {
 async function reservationChecks() {
   const h=reservationHarness();
   try {
-    let state=await h.ready();
-    assert.equal(h.events.length,1,'Rendered quote is exposed once');
+    let state=await h.ready(false);
+    assert.equal(h.events.length,0,'Quote is not exposed before viewport intersection confirms visibility');
+    h.setDocumentVisibility('hidden');
+    state.markQuoteVisible(state.quote.quote_id);
+    state=h.runner.settle();await flush();
+    assert.equal(h.events.length,0,'Hidden document tab suppresses quote exposure even when card intersected');
+    h.setDocumentVisibility('visible');await flush();
+    assert.equal(h.events.length,1,'Visible rendered quote is exposed once when tab returns visible');
+    state.markQuoteVisible(state.quote.quote_id);h.runner.settle();await flush();
+    assert.equal(h.events.length,1,'Repeated visibility signals do not duplicate quote exposure');
     assert.equal(h.events[0].context.search_id,'11111111-1111-4111-8111-111111111111','Existing search lineage is preserved');
+    h.changeInput({...initialInput,coupon_code:'WHITESAND10'});
+    assert.equal(h.runner.render(false).quote,null,'Adding a coupon hides the previous un-discounted quote synchronously');
     h.changeInput({...initialInput,total_of_special_requests:2});
     state=h.runner.render(false);assert.equal(state.quote,null,'Reservation cannot use the previous special-request quote');
-    await state.confirm();assert.equal(h.bookings.length,0,'Confirm during stale-input render never posts a booking');
     h.runner.commit();h.runner.settle();state=await h.ready();
     const create=state.confirm(),duplicate=state.confirm();await flush();
     assert.equal(h.bookings.length,1,'Immediate double submit sends one create request');
@@ -200,20 +234,18 @@ async function reservationChecks() {
   const exposure=reservationHarness();
   try {
     exposure.setEventFailure(new TypeError('Exposure response unavailable'));
-    const state=await exposure.ready();await state.confirm();
-    assert.equal(exposure.bookings.length,0,'Failed exposure cannot create a booking');
-    assert.equal(exposure.runner.settle().retryOnly,false,'A failed exposure is not an ambiguous booking POST');
-    exposure.setEventFailure(null);
-    const recovered=exposure.runner.settle().confirm();await flush();
-    assert.equal(exposure.bookings.length,1,'Exposure can retry successfully before creating');
-    exposure.bookings[0].resolve({booking:{booking_id:'exposed-booking',status:'Confirmed'}});await recovered;
+    const state=await exposure.ready();
+    const submitted=state.confirm();await flush();
+    assert.equal(exposure.bookings.length,1,'Failed exposure telemetry does not block customer reservation creation');
+    exposure.bookings[0].resolve({booking:{booking_id:'exposed-booking',status:'Confirmed'},total_price:1000000});await submitted;
     assert.equal(exposure.runner.settle().result.booking.booking_id,'exposed-booking');
   } finally {exposure.close();}
   const changed=reservationHarness();
   try {
     let state=await changed.ready();
+    assert.deepEqual(changed.events.map(event=>event.eventType),['quote.exposed.v1']);
     state.changeSelection();await flush();
-    assert.deepEqual(changed.events.map(event=>event.eventType),['quote.exposed.v1','quote.rejected.v1'],'Intentional selection change rejects only after successful exposure');
+    assert.deepEqual(changed.events.map(event=>event.eventType),['quote.exposed.v1'],'Selection edit clears visibility instead of fabricating an explicit quote rejection');
     changed.changeInput({...initialInput,guest_count:2});changed.runner.settle();state=await changed.ready();
     await changed.clock.advance(61000);state=changed.runner.settle();await state.confirm();
     assert.equal(changed.bookings.length,0,'An expired quote without an ambiguous POST cannot create');
@@ -230,7 +262,7 @@ async function reservationChecks() {
       const retry=ambiguous.runner.settle().confirm();await flush();
       assert.equal(ambiguous.bookings[1].key,ambiguous.bookings[0].key);
       assert.deepEqual(ambiguous.bookings[1].input,ambiguous.bookings[0].input);
-      ambiguous.bookings[1].resolve({booking:{booking_id:`recovered-${status}`,status:'Expired'}});await retry;
+      ambiguous.bookings[1].resolve({booking:{booking_id:`recovered-${status}`,status:'Expired'},total_price:1000000});await retry;
       assert.equal(ambiguous.runner.settle().result.booking.status,'Expired','Replay preserves the authoritative terminal state');
     } finally {ambiguous.close();}
   }
@@ -269,9 +301,20 @@ async function reservationChecks() {
     const resumed=locked.confirm();await flush();assert.equal(reauthentication.bookings.length,3,'Original customer can recover after sign-in and quote expiry');
     assert.equal(reauthentication.bookings[2].key,reauthentication.bookings[0].key);
     assert.deepEqual(reauthentication.bookings[2].input,reauthentication.bookings[0].input);
-    reauthentication.bookings[2].resolve({booking:{booking_id:'same-customer-recovery',status:'Confirmed'}});await resumed;
+    reauthentication.bookings[2].resolve({booking:{booking_id:'same-customer-recovery',status:'Confirmed'},total_price:1000000});await resumed;
     assert.equal(reauthentication.runner.settle().result.booking.booking_id,'same-customer-recovery');
   } finally {reauthentication.close();}
+  const priceMismatch=reservationHarness();
+  try {
+    const state=await priceMismatch.ready(),create=state.confirm();await flush();
+    priceMismatch.bookings[0].resolve({booking:{booking_id:'mismatched-price',status:'Pending'},total_price:1200000});
+    await create;
+    const locked=priceMismatch.runner.settle();
+    assert.equal(locked.result,null,'A changed saved total must not become a successful receipt');
+    assert.equal(locked.retryOnly,true,'A saved-price mismatch may hide a committed booking and retains its recovery key');
+    locked.refreshQuote();priceMismatch.runner.settle();await priceMismatch.clock.advance(350);
+    assert.equal(priceMismatch.quotes.length,1,'Mismatch cannot silently reprice the accepted booking');
+  } finally {priceMismatch.close();}
 }
 
 (async()=>{

@@ -1,17 +1,69 @@
 "use client";
 
-import { useState } from "react";
-import { destinations } from "@/data/travel-inspiration";
+import { useEffect, useRef, useState } from "react";
 import type { RoomPresentation } from "@/types/room-presentation.type";
+import type { PublicCoupon } from "@/types/room.type";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { useReservation } from "@/hooks/useReservation";
+import { getActiveCoupons } from "@/services/booking.service";
 import { formatCurrency } from "@/utils/formatCurrency";
 import Link from "next/link";
 import { addIsoDays } from "@/utils/businessDate";
 import { CalendarPicker } from "./CalendarPicker";
 import { ReservationRecoverySignIn } from "@/components/features/auth/ReservationRecoverySignIn";
+import { GuestPriceExplanationCard } from "@/components/features/booking/GuestPriceExplanationCard";
 
 type Step = 1 | 2 | 3 | 4;
+
+interface HotelHighlight {
+  id: string;
+  floor: string;
+  titleVi: string;
+  titleEn: string;
+  subVi: string;
+  subEn: string;
+  img: string;
+}
+
+const WHITE_SAND_HIGHLIGHTS: HotelHighlight[] = [
+  {
+    id: "lobby-1f",
+    floor: "1F · 24/7 Reception",
+    titleVi: "Lễ tân & Sảnh đón 1F",
+    titleEn: "Lobby & 24/7 Concierge (1F)",
+    subVi: "Đón tiếp ngay tại 89-91 Võ Văn Kiệt, Sơn Trà, Đà Nẵng",
+    subEn: "Check-in & hospitality desk at 89-91 Vo Van Kiet, Son Tra",
+    img: "/images/whitesand/facilities/concierge-reception.jpg",
+  },
+  {
+    id: "pool-gym-2f",
+    floor: "2F · Wellness",
+    titleVi: "Hồ bơi & Phòng Gym 2F",
+    titleEn: "Pool & Fitness (2F)",
+    subVi: "Miễn phí cho khách lưu trú mọi hạng phòng",
+    subEn: "Complimentary access for all registered guests",
+    img: "/images/whitesand/facilities/pool-gym-2f.jpg",
+  },
+  {
+    id: "restaurant-14f",
+    floor: "14F · Dining",
+    titleVi: "Nhà hàng tầm nhìn biển 14F",
+    titleEn: "Seaview Restaurant (14F)",
+    subVi: "Buffet sáng và ẩm thực địa phương Đà Nẵng",
+    subEn: "Breakfast buffet & coastal dining on the 14th floor",
+    img: "/images/whitesand/facilities/restaurant-14f.jpg",
+  },
+  {
+    id: "spa-15f",
+    floor: "15F · Spa",
+    titleVi: "White Sand Spa 15F",
+    titleEn: "White Sand Spa (15F)",
+    subVi: "Liệu trình thư giãn trên tầng cao nhất tòa nhà",
+    subEn: "Rooftop relaxation suites overlooking My Khe",
+    img: "/images/whitesand/facilities/spa-15f.jpg",
+  },
+];
 
 function CheckIcon() {
   return (
@@ -29,52 +81,219 @@ function ArrowRight() {
   );
 }
 
-const STEPS = [
-  { n: 1, label: "Escape" },
-  { n: 2, label: "Room" },
-  { n: 3, label: "Details" },
-  { n: 4, label: "Confirm" },
-];
+type InitialBooking = {
+  room_type_id?: string;
+  check_in_date?: string;
+  check_out_date?: string;
+  guest_count?: string;
+  total_of_special_requests?: string;
+  coupon_code?: string;
+  step?: string;
+};
 
-type InitialBooking = { room_type_id?: string; check_in_date?: string; check_out_date?: string; guest_count?: string; total_of_special_requests?: string; destination?: string; step?: string };
-export default function BookView({ rooms, businessDate, initial = {} }: { rooms: RoomPresentation[]; businessDate: string; initial?: InitialBooking }) {
+export default function BookView({
+  rooms,
+  businessDate,
+  initial = {},
+}: {
+  rooms: RoomPresentation[];
+  businessDate: string;
+  initial?: InitialBooking;
+}) {
+  const { t, lang } = useTranslation();
   const { user, ready } = useAuth();
-  const [step, setStep] = useState<Step>(initial.step === '3' ? 3 : 1);
-  const [selectedDest, setSelectedDest] = useState(destinations.find((d) => d.name.toLowerCase() === initial.destination?.toLowerCase()) ?? destinations[0]);
-  const [selectedRoom, setSelectedRoom] = useState(rooms.find((r) => String(r.id) === initial.room_type_id) ?? rooms[0]);
-  const [cart, setCart] = useState<Array<{room: RoomPresentation, guests: number}>>([]);
+  const [step, setStep] = useState<Step>(initial.step === "3" ? 3 : 1);
+  const [selectedRoom, setSelectedRoom] = useState(
+    rooms.find((r) => String(r.id) === initial.room_type_id) ?? rooms[0],
+  );
   const [calendarViewRoomId, setCalendarViewRoomId] = useState<number | null>(null);
   const [checkIn, setCheckIn] = useState(initial.check_in_date || businessDate);
   const [checkOut, setCheckOut] = useState(initial.check_out_date || addIsoDays(businessDate, 5));
   const [guests, setGuests] = useState(Math.max(1, Math.min(20, Number(initial.guest_count) || 2)));
-  const [requests, setRequests] = useState(Math.max(0, Math.min(5, Math.trunc(Number(initial.total_of_special_requests) || 0))));
-  const [error, setError] = useState('');
-  const validDates = /^\d{4}-\d{2}-\d{2}$/.test(checkIn) && /^\d{4}-\d{2}-\d{2}$/.test(checkOut)
-    && Number.isFinite(Date.parse(checkIn)) && Number.isFinite(Date.parse(checkOut))
-    && new Date(checkIn).toISOString().slice(0,10) === checkIn && new Date(checkOut).toISOString().slice(0,10) === checkOut
-    && checkIn >= businessDate && checkOut > checkIn;
-  const nights = validDates ? Math.round((Date.parse(checkOut) - Date.parse(checkIn))/86400000) : 0;
-  const input = selectedRoom && validDates && guests >= 1 && guests <= selectedRoom.guests && Number.isInteger(guests) && requests >= 0 && requests <= 5 && Number.isInteger(requests)
-    ? { room_type_id: selectedRoom.id, check_in_date: checkIn, check_out_date: checkOut, guest_count: guests, total_of_special_requests: requests } : null;
+  const [requests, setRequests] = useState(
+    Math.max(0, Math.min(5, Math.trunc(Number(initial.total_of_special_requests) || 0))),
+  );
+  const normalizedInitialCoupon = (initial.coupon_code ?? "").trim().toUpperCase();
+  const [couponInput, setCouponInput] = useState(normalizedInitialCoupon);
+  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(normalizedInitialCoupon || null);
+  const [couponHint, setCouponHint] = useState("");
+  const [availableCoupons, setAvailableCoupons] = useState<PublicCoupon[]>([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void getActiveCoupons(controller.signal)
+      .then((list) => {
+        if (!controller.signal.aborted) setAvailableCoupons(list);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  const STEPS = [
+    { n: 1, label: t("book_step_1") },
+    { n: 2, label: t("book_step_2") },
+    { n: 3, label: t("book_step_3") },
+    { n: 4, label: t("book_step_4") },
+  ];
+
+  const validDates =
+    /^\d{4}-\d{2}-\d{2}$/.test(checkIn) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(checkOut) &&
+    Number.isFinite(Date.parse(checkIn)) &&
+    Number.isFinite(Date.parse(checkOut)) &&
+    new Date(checkIn).toISOString().slice(0, 10) === checkIn &&
+    new Date(checkOut).toISOString().slice(0, 10) === checkOut &&
+    checkIn >= businessDate &&
+    checkOut > checkIn;
+
+  const nights = validDates ? Math.round((Date.parse(checkOut) - Date.parse(checkIn)) / 86400000) : 0;
+  const input =
+    selectedRoom &&
+    validDates &&
+    guests >= 1 &&
+    guests <= selectedRoom.guests &&
+    Number.isInteger(guests) &&
+    requests >= 0 &&
+    requests <= 5 &&
+    Number.isInteger(requests)
+      ? {
+          room_type_id: selectedRoom.id,
+          check_in_date: checkIn,
+          check_out_date: checkOut,
+          guest_count: guests,
+          total_of_special_requests: requests,
+          ...(appliedCoupon ? { coupon_code: appliedCoupon } : {}),
+        }
+      : null;
+
   const reservation = useReservation(input);
-  const { quote, result, loading, quoteError, expired, submitting, retryOnly, recoveryAccount, recoveryNeedsSignIn } = reservation;
+  const { quote, result, loading, quoteError, expired, submitting, retryOnly, recoveryAccount, recoveryNeedsSignIn, markQuoteVisible } =
+    reservation;
+  const priceSummaryRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const element = priceSummaryRef.current;
+    const quoteId = quote?.quote_id;
+    if (!element || !quoteId || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting && entry.intersectionRatio >= 0.5) {
+          markQuoteVisible(quoteId);
+        } else {
+          markQuoteVisible((prev) => (prev === quoteId ? null : prev));
+        }
+      },
+      { threshold: [0.5] },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [quote?.quote_id, markQuoteVisible]);
   const submitted = !!result;
-  const isMultiRoom = cart.length > 0;
-  const activeRoom = isMultiRoom ? cart[0].room : selectedRoom;
-  const roomTotal = (activeRoom?.price ?? 0) * nights;
-  const nightlyPrice = isMultiRoom ? cart.reduce((sum, c) => sum + c.room.price, 0) : (result?.nightly_price ?? quote?.nightly_price ?? selectedRoom?.price ?? 0);
-  const grandTotal = isMultiRoom ? (quote?.total_price ?? roomTotal) + cart.slice(1).reduce((sum, c) => sum + c.room.price * nights, 0) : (result?.total_price ?? quote?.total_price ?? roomTotal);
-  const returnUrl = `/book?${new URLSearchParams({ room_type_id: String(selectedRoom?.id ?? ''), check_in_date: checkIn, check_out_date: checkOut, guest_count: String(guests), total_of_special_requests: String(requests), destination: selectedDest.name, step: '3' })}`;
+
+  const roomTotal = (selectedRoom?.price ?? 0) * nights;
+  const nightlyPrice = result?.nightly_price ?? quote?.nightly_price ?? selectedRoom?.price ?? 0;
+  const preCouponNightly = quote?.pricing_breakdown?.pre_coupon_nightly_price ?? nightlyPrice;
+  const grandTotal = result?.total_price ?? quote?.total_price ?? roomTotal;
+  const preCouponTotal =
+    result?.pre_coupon_total_price ??
+    quote?.pre_coupon_total_price ??
+    quote?.pricing_breakdown?.pre_coupon_total_price ??
+    grandTotal;
+  const couponDiscountVnd =
+    result?.coupon_discount_vnd ??
+    quote?.coupon_discount_vnd ??
+    quote?.pricing_breakdown?.coupon_discount_total_vnd ??
+    0;
+  const isFloorClamped = Boolean(
+    result?.is_floor_price_clamped ??
+      quote?.is_floor_price_clamped ??
+      quote?.pricing_breakdown?.is_floor_price_clamped,
+  );
+  const isCeilingClamped = Boolean(quote?.pricing_breakdown?.is_ceiling_clamped);
+  const floorPriceVnd = quote?.pricing_breakdown?.floor_price_vnd ?? 452_000;
+
+  const returnParams = new URLSearchParams({
+    room_type_id: String(selectedRoom?.id ?? ""),
+    check_in_date: checkIn,
+    check_out_date: checkOut,
+    guest_count: String(guests),
+    total_of_special_requests: String(requests),
+    step: "3",
+  });
+  if (appliedCoupon) returnParams.set("coupon_code", appliedCoupon);
+  const returnUrl = `/book?${returnParams.toString()}`;
+
+  const applyCoupon = (rawCode: string) => {
+    if (submitting || retryOnly || submitted) return;
+    const code = rawCode.trim().toUpperCase();
+    setCouponHint("");
+    if (!code) {
+      reservation.changeSelection();
+      setAppliedCoupon(null);
+      setCouponInput("");
+      return;
+    }
+    if (!/^[A-Z0-9_-]{3,32}$/.test(code)) {
+      setCouponHint(
+        lang === "vi"
+          ? "Mã ưu đãi chỉ gồm 3–32 ký tự chữ in hoa, số, '-' hoặc '_'."
+          : "Coupon code must be 3–32 uppercase alphanumeric characters, '-' or '_'.",
+      );
+      return;
+    }
+    reservation.changeSelection();
+    setCouponInput(code);
+    setAppliedCoupon(code);
+  };
+
+  const clearCoupon = () => {
+    if (submitting || retryOnly || submitted) return;
+    reservation.changeSelection();
+    setCouponInput("");
+    setAppliedCoupon(null);
+    setCouponHint("");
+  };
+
   const goNext = () => {
     if (submitting || result || retryOnly) return;
-    if (!validDates) { setError('Choose valid arrival and departure dates.'); return; }
-    if (step >= 2 && !input) { setError('Choose a room with enough space for your guests.'); return; }
-    if (step === 3 && !user) { setError('Sign in to connect this reservation to your account.'); return; }
-    setError(''); setStep((value) => Math.min(4, value + 1) as Step);
+    if (!validDates) {
+      setError(t("rooms_checkin_label") + " / " + t("rooms_checkout_label"));
+      return;
+    }
+    if (step >= 2 && !input) {
+      setError(t("rooms_capacity_any"));
+      return;
+    }
+    if (step === 3 && !user) {
+      setError(t("book_step3_signin_notice"));
+      return;
+    }
+    setError("");
+    setStep((value) => Math.min(4, value + 1) as Step);
   };
-  const goBack = () => { if (submitting || result || retryOnly) return; setError(''); setStep((value) => Math.max(1, value - 1) as Step); };
-  const handleSubmit = () => { void reservation.confirm(); };
-  if (!selectedRoom) return <section className="px-5 md:px-16 pt-32 pb-24"><h1 className="font-display text-4xl mb-4">Begin Your Journey</h1><p>No rooms are available to book. Please try again later.</p><Link href="/rooms" className="inline-block mt-6 underline">Explore rooms</Link></section>;
+
+  const goBack = () => {
+    if (submitting || result || retryOnly) return;
+    setError("");
+    setStep((value) => Math.max(1, value - 1) as Step);
+  };
+
+  const handleSubmit = () => {
+    void reservation.confirm();
+  };
+
+  if (!selectedRoom) {
+    return (
+      <section className="px-5 md:px-16 pt-32 pb-24">
+        <h1 className="font-display text-4xl mb-4">{t("book_title")}</h1>
+        <p>{t("rooms_empty")}</p>
+        <Link href="/rooms" className="inline-block mt-6 underline">
+          {t("rooms_view_all")}
+        </Link>
+      </section>
+    );
+  }
 
   return (
     <>
@@ -83,11 +302,11 @@ export default function BookView({ rooms, businessDate, initial = {} }: { rooms:
         <div className="flex items-center gap-3 mb-4">
           <div className="h-px w-8" style={{ background: "var(--gold)" }} />
           <span className="text-[9px] tracking-[0.28em] uppercase" style={{ color: "var(--gold)" }}>
-            Reserve Your Escape
+            {t("book_eyebrow")}
           </span>
         </div>
         <h1 className="font-display text-4xl md:text-5xl" style={{ color: "var(--fg)" }}>
-          Begin Your Journey
+          {t("book_title")}
         </h1>
 
         {/* progress indicator */}
@@ -104,8 +323,8 @@ export default function BookView({ rooms, businessDate, initial = {} }: { rooms:
                       background: done
                         ? "var(--gold)"
                         : active
-                        ? "rgba(196,153,90,0.15)"
-                        : "transparent",
+                          ? "rgba(196,153,90,0.15)"
+                          : "transparent",
                       border: `1px solid ${done || active ? "var(--gold)" : "var(--border-gold)"}`,
                       color: done ? "var(--bg)" : active ? "var(--gold)" : "var(--dim)",
                     }}
@@ -135,87 +354,139 @@ export default function BookView({ rooms, businessDate, initial = {} }: { rooms:
       <div className="flex flex-col lg:flex-row min-h-[70vh]">
         {/* left: step content */}
         <div className="flex-1 px-5 md:px-10 lg:px-16 py-12">
-
-          {/* STEP 1: Choose destination */}
+          {/* STEP 1: Dates & White Sand Overview */}
           {step === 1 && (
             <div>
               <h2 className="font-display text-3xl mb-2" style={{ color: "var(--fg)" }}>
-                Choose your escape
+                {t("book_step1_title")}
               </h2>
               <p className="text-sm mb-8" style={{ color: "var(--muted)" }}>
-                Explore travel inspiration and set your dates. Destinations are editorial, not bookable hotel locations.
+                {t("book_step1_desc")}
               </p>
 
               {/* dates */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8 p-6" style={{ background: "var(--bg2)", border: "1px solid var(--border)" }}>
                 <div>
                   <label className="block text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: "var(--gold)" }}>
-                    Check In
+                    {t("book_checkin_label")}
                   </label>
                   <input
                     type="date"
-                    aria-label="Check in" min={businessDate} required value={checkIn}
-                    onChange={(e) => { if (e.target.value !== checkIn && !submitting && !retryOnly) { reservation.changeSelection(); setCheckIn(e.target.value); } }}
+                    aria-label="Check in"
+                    min={businessDate}
+                    required
+                    value={checkIn}
+                    onChange={(e) => {
+                      if (e.target.value !== checkIn && !submitting && !retryOnly) {
+                        reservation.changeSelection();
+                        setCheckIn(e.target.value);
+                      }
+                    }}
                     className="w-full bg-transparent text-sm outline-none pb-2 [color-scheme:dark]"
                     style={{ borderBottom: "1px solid var(--border-gold)", color: "var(--fg)" }}
                   />
                 </div>
                 <div>
                   <label className="block text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: "var(--gold)" }}>
-                    Check Out
+                    {t("book_checkout_label")}
                   </label>
                   <input
                     type="date"
-                    aria-label="Check out" min={/^\d{4}-\d{2}-\d{2}$/.test(checkIn) && Number.isFinite(Date.parse(checkIn)) ? addIsoDays(checkIn, 1) : businessDate} required value={checkOut}
-                    onChange={(e) => { if (e.target.value !== checkOut && !submitting && !retryOnly) { reservation.changeSelection(); setCheckOut(e.target.value); } }}
+                    aria-label="Check out"
+                    min={
+                      /^\d{4}-\d{2}-\d{2}$/.test(checkIn) && Number.isFinite(Date.parse(checkIn))
+                        ? addIsoDays(checkIn, 1)
+                        : businessDate
+                    }
+                    required
+                    value={checkOut}
+                    onChange={(e) => {
+                      if (e.target.value !== checkOut && !submitting && !retryOnly) {
+                        reservation.changeSelection();
+                        setCheckOut(e.target.value);
+                      }
+                    }}
                     className="w-full bg-transparent text-sm outline-none pb-2 [color-scheme:dark]"
                     style={{ borderBottom: "1px solid var(--border-gold)", color: "var(--fg)" }}
                   />
                 </div>
                 <div>
                   <label className="block text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: "var(--gold)" }}>
-                    Guests
+                    {t("book_guests_label")}
                   </label>
                   <div className="flex items-center gap-3 pb-2" style={{ borderBottom: "1px solid var(--border-gold)" }}>
-                    <button aria-label="Fewer guests" disabled={guests <= 1 || submitting || retryOnly} onClick={() => { reservation.changeSelection(); setGuests((g) => Math.max(1, g - 1)); }} className="text-lg leading-none" style={{ color: "var(--gold)" }}>−</button>
-                    <span className="text-sm tabular-nums" style={{ color: "var(--fg)" }}>{guests}</span>
-                    <button aria-label="More guests" disabled={guests >= 20 || submitting || retryOnly} onClick={() => { reservation.changeSelection(); setGuests((g) => Math.min(20, g + 1)); }} className="text-lg leading-none" style={{ color: "var(--gold)" }}>+</button>
+                    <button
+                      type="button"
+                      aria-label="Fewer guests"
+                      disabled={guests <= 1 || submitting || retryOnly}
+                      onClick={() => {
+                        reservation.changeSelection();
+                        setGuests((g) => Math.max(1, g - 1));
+                      }}
+                      className="text-lg leading-none"
+                      style={{ color: "var(--gold)" }}
+                    >
+                      −
+                    </button>
+                    <span className="text-sm tabular-nums" style={{ color: "var(--fg)" }}>
+                      {guests}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="More guests"
+                      disabled={guests >= 20 || submitting || retryOnly}
+                      onClick={() => {
+                        reservation.changeSelection();
+                        setGuests((g) => Math.min(20, g + 1));
+                      }}
+                      className="text-lg leading-none"
+                      style={{ color: "var(--gold)" }}
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
               </div>
 
-              {/* destination grid */}
+              {/* White Sand Boutique Hotel Facility Overview (Informational only) */}
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-[10px] tracking-[0.18em] uppercase" style={{ color: "var(--gold)" }}>
+                  White Sand Boutique Hotel · 89-91 Võ Văn Kiệt, Sơn Trà, TP. Đà Nẵng
+                </span>
+                <span className="text-[11px]" style={{ color: "var(--muted)" }}>
+                  15 tầng · 54 phòng · 6 hạng phòng
+                </span>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {destinations.slice(0, 6).map((dest) => {
-                  const sel = selectedDest.id === dest.id;
-                  return (
-                    <div
-                      key={dest.id}
-                      className="flex gap-4 p-4 cursor-pointer transition-all duration-200"
-                      style={{
-                        border: `1px solid ${sel ? "var(--gold)" : "var(--border)"}`,
-                        background: sel ? "rgba(196,153,90,0.06)" : "var(--bg2)",
-                      }}
-                      role="button" tabIndex={0} aria-pressed={sel} aria-label={`Choose ${dest.name} inspiration`} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedDest(dest); } }} onClick={() => setSelectedDest(dest)}
-                    >
-                      <div className="w-20 h-16 overflow-hidden shrink-0 rounded-sm">
-                        <img src={dest.img} alt={dest.name} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[9px] tracking-widest uppercase mb-0.5" style={{ color: "var(--gold)" }}>
-                          {dest.region}
-                        </div>
-                        <div className="font-display text-base" style={{ color: "var(--fg)" }}>{dest.name}</div>
-                        <div className="text-[10px] mt-1" style={{ color: "var(--muted)" }}>Travel inspiration</div>
-                      </div>
-                      {sel && (
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 self-center" style={{ background: "var(--gold)", color: "var(--bg)" }}>
-                          <CheckIcon />
-                        </div>
-                      )}
+                {WHITE_SAND_HIGHLIGHTS.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex gap-4 p-4"
+                    style={{
+                      border: "1px solid var(--border)",
+                      background: "var(--bg2)",
+                    }}
+                  >
+                    <div className="w-20 h-16 overflow-hidden shrink-0 rounded-sm">
+                      <img
+                        src={item.img}
+                        alt={lang === "vi" ? item.titleVi : item.titleEn}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                  );
-                })}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[9px] tracking-widest uppercase mb-0.5" style={{ color: "var(--gold)" }}>
+                        {item.floor}
+                      </div>
+                      <div className="font-display text-base" style={{ color: "var(--fg)" }}>
+                        {lang === "vi" ? item.titleVi : item.titleEn}
+                      </div>
+                      <div className="text-[11px] mt-1 leading-snug" style={{ color: "var(--muted)" }}>
+                        {lang === "vi" ? item.subVi : item.subEn}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -223,64 +494,91 @@ export default function BookView({ rooms, businessDate, initial = {} }: { rooms:
           {/* STEP 2: Choose room */}
           {step === 2 && (
             <div>
-              <div className="flex justify-between items-end mb-8">
+              <div className="flex flex-wrap justify-between items-end gap-4 mb-8">
                 <div>
                   <h2 className="font-display text-3xl mb-2" style={{ color: "var(--fg)" }}>
-                    Choose your room
+                    {t("book_step2_title")}
                   </h2>
                   <p className="text-sm" style={{ color: "var(--muted)" }}>
-                    {nights} nights · {checkIn} to {checkOut} · {selectedDest.name}
+                    {nights} {t("book_nights")} · {checkIn} → {checkOut} · White Sand Boutique Hotel Đà Nẵng
                   </p>
                 </div>
-                {cart.length > 0 && (
-                  <div className="text-right">
-                    <div className="text-sm text-[var(--gold)]">{cart.length} room(s) selected</div>
-                    <button onClick={() => goNext()} className="mt-2 text-xs uppercase tracking-wider bg-[var(--gold)] text-[var(--bg)] px-4 py-2 rounded-sm">Continue</button>
-                  </div>
-                )}
+                <p className="text-xs max-w-sm" style={{ color: "var(--muted)" }}>
+                  {lang === "vi"
+                    ? "Mỗi mã đặt phòng dành cho một phòng. Nếu cần thêm phòng, hãy tạo đặt phòng tiếp theo."
+                    : "Each reservation covers one room. Create another reservation if you need additional rooms."}
+                </p>
               </div>
-              
+
               <div className="flex flex-col gap-4">
                 {rooms.map((room) => {
-                  const inCartCount = cart.filter(c => c.room.id === room.id).length;
-                  const sel = selectedRoom?.id === room.id || inCartCount > 0;
-                  
+                  const sel = selectedRoom?.id === room.id;
+
                   return (
-                    <div key={room.id} className="flex flex-col gap-4 p-4 border transition-all duration-200" style={{ borderColor: sel ? "var(--gold)" : "var(--border)", background: sel ? "rgba(196,153,90,0.05)" : "var(--bg2)" }}>
-                      <div className="flex gap-4">
-                        <div className="w-36 shrink-0 overflow-hidden">
+                    <div
+                      key={room.id}
+                      className="flex flex-col gap-4 p-4 border transition-all duration-200"
+                      style={{
+                        borderColor: sel ? "var(--gold)" : "var(--border)",
+                        background: sel ? "rgba(196,153,90,0.05)" : "var(--bg2)",
+                      }}
+                    >
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="sm:w-36 h-28 sm:h-auto shrink-0 overflow-hidden">
                           <img src={room.img} alt={room.name} className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 flex flex-col justify-center">
-                          <div className="text-[9px] tracking-widest uppercase mb-1" style={{ color: "var(--gold)" }}>{room.category}</div>
+                          <div className="text-[9px] tracking-widest uppercase mb-1" style={{ color: "var(--gold)" }}>
+                            {room.category}{room.floor ? ` · ${room.floor}` : ""}
+                          </div>
                           <div className="font-display text-lg mb-1">{room.name}</div>
-                          <div className="text-[10px] text-[var(--muted)]">Up to {room.guests} guests </div>
-                        </div>
-                        <div className="flex flex-col justify-center items-end gap-2">
-                          <div className="text-lg font-medium">{formatCurrency(room.price)} <span className="text-[10px] text-[var(--muted)]">/ night</span></div>
-                          <button onClick={() => setCalendarViewRoomId(calendarViewRoomId === room.id ? null : room.id)} className="text-[10px] underline text-[var(--gold)]">View Calendar</button>
-                          <div className="flex items-center gap-2 mt-2">
-                            {inCartCount > 0 && (
-                              <button onClick={() => {
-                                const idx = cart.findIndex(c => c.room.id === room.id);
-                                if (idx > -1) setCart(cart.filter((_, i) => i !== idx));
-                              }} className="px-2 py-1 border border-[var(--border)] text-xs">-</button>
-                            )}
-                            {inCartCount > 0 && <span className="text-xs">{inCartCount}</span>}
-                            <button onClick={() => setCart([...cart, { room, guests: Math.min(guests, room.guests) }])} className="px-3 py-1 bg-[var(--gold)] text-[var(--bg)] text-xs">+ Add</button>
+                          <div className="text-[11px] text-[var(--muted)]">
+                            {room.guests} {t("rooms_max_guests")}
+                            {room.sqm ? ` · ${room.sqm} m²` : ""}
                           </div>
                         </div>
+                        <div className="flex flex-col justify-center sm:items-end gap-2">
+                          <div className="text-lg font-medium">
+                            {formatCurrency(room.price)}{" "}
+                            <span className="text-[10px] text-[var(--muted)]">{t("rooms_per_night")}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setCalendarViewRoomId(calendarViewRoomId === room.id ? null : room.id)}
+                            className="text-[10px] underline text-[var(--gold)] text-left sm:text-right"
+                          >
+                            {t("book_view_calendar")}
+                          </button>
+                          <button
+                            type="button"
+                            aria-pressed={sel}
+                            disabled={submitting || retryOnly || submitted}
+                            onClick={() => {
+                              reservation.changeSelection();
+                              setSelectedRoom(room);
+                              setGuests((value) => Math.min(value, room.guests));
+                            }}
+                            className="mt-2 px-3 py-2 bg-[var(--gold)] text-[var(--bg)] text-xs font-medium"
+                          >
+                            {sel ? (lang === "vi" ? "Đã chọn" : "Selected") : lang === "vi" ? "Chọn phòng" : "Select room"}
+                          </button>
+                        </div>
                       </div>
-                      
+
                       {calendarViewRoomId === room.id && (
                         <div className="mt-4 p-4 border border-[var(--border-gold)]">
-                           <CalendarPicker 
-                             roomTypeId={room.id} 
-                             businessDate={businessDate} 
-                             initialCheckIn={checkIn} 
-                             initialCheckOut={checkOut} 
-                             onDatesChange={(cin, cout) => { setCheckIn(cin); setCheckOut(cout); }} 
-                           />
+                          <CalendarPicker
+                            roomTypeId={room.id}
+                            businessDate={businessDate}
+                            initialCheckIn={checkIn}
+                            initialCheckOut={checkOut}
+                            onDatesChange={(cin, cout) => {
+                              if (submitting || retryOnly || submitted) return;
+                              reservation.changeSelection();
+                              setCheckIn(cin);
+                              setCheckOut(cout);
+                            }}
+                          />
                         </div>
                       )}
                     </div>
@@ -291,106 +589,275 @@ export default function BookView({ rooms, businessDate, initial = {} }: { rooms:
           )}
 
           {/* STEP 3: Guest details */}
-          {step === 3 && <div>
-            <h2 className="font-display text-3xl mb-2">Guest details</h2>
-            <p className="text-sm mb-8" style={{ color: 'var(--muted)' }}>Your reservation uses your hotel account details.</p>
-            {!ready ? <p role="status">Checking your account…</p> : !user ? <div className="p-6 max-w-xl" style={{ border: '1px solid var(--border-gold)', background: 'var(--bg2)' }}>
-              <p className="text-sm mb-6">Sign in or create an account to continue. Your room and dates will be kept.</p>
-              <Link href={`/login?next=${encodeURIComponent(returnUrl)}`} className="inline-block px-6 py-3 text-xs mr-4" style={{ background:'var(--gold)',color:'var(--bg)' }}>Sign in</Link>
-              <Link href={`/register?next=${encodeURIComponent(returnUrl)}`} className="text-xs underline">Create account</Link>
-            </div> : <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
-              {[{label:'Guest name', value:user.full_name}, {label:'Email',value:user.email}, {label:'Phone',value:user.phone ?? 'Not provided'}, {label:'Country',value:user.nationality ?? 'Not provided'}].map((field) => <div key={field.label}><p className="text-[9px] tracking-[.2em] uppercase mb-2" style={{color:'var(--gold)'}}>{field.label}</p><p className="text-sm pb-2 break-words" style={{borderBottom:'1px solid var(--border-gold)'}}>{field.value}</p></div>)}
-              <Link href="/profile" className="text-xs underline">Update account details</Link>
-            </div>}
-            <div className="mt-8 max-w-sm"><label htmlFor="booking-request-count" className="block text-[9px] tracking-[.2em] uppercase mb-2" style={{color:'var(--gold)'}}>Special requests</label><input id="booking-request-count" type="number" min={0} max={5} step={1} value={requests} onChange={(event) => { if (requests !== Number(event.target.value) && !submitting && !retryOnly) { reservation.changeSelection(); setRequests(Number(event.target.value)); } }} className="w-24 p-3 bg-transparent" style={{border:'1px solid var(--border-gold)'}} /><p className="mt-2 text-xs" style={{color:'var(--muted)'}}>Number of requests (0–5). Arrange the details with the hotel; additional services are not included in this reservation.</p></div>
-          </div>}
+          {step === 3 && (
+            <div>
+              <h2 className="font-display text-3xl mb-2">{t("book_step3_title")}</h2>
+              <p className="text-sm mb-8" style={{ color: "var(--muted)" }}>
+                {t("book_step3_desc")}
+              </p>
+              {!ready ? (
+                <p role="status">Checking account…</p>
+              ) : !user ? (
+                <div className="p-6 max-w-xl" style={{ border: "1px solid var(--border-gold)", background: "var(--bg2)" }}>
+                  <p className="text-sm mb-6">{t("book_step3_signin_notice")}</p>
+                  <Link
+                    href={`/login?next=${encodeURIComponent(returnUrl)}`}
+                    className="inline-block px-6 py-3 text-xs mr-4"
+                    style={{ background: "var(--gold)", color: "var(--bg)" }}
+                  >
+                    {t("nav_login")}
+                  </Link>
+                  <Link href={`/register?next=${encodeURIComponent(returnUrl)}`} className="text-xs underline">
+                    {t("nav_register")}
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
+                  {[
+                    { label: t("book_guest_name"), value: user.full_name },
+                    { label: t("book_email"), value: user.email },
+                    { label: t("book_phone"), value: user.phone ?? t("book_not_provided") },
+                    { label: t("book_country"), value: user.nationality ?? t("book_not_provided") },
+                  ].map((field) => (
+                    <div key={field.label}>
+                      <p className="text-[9px] tracking-[.2em] uppercase mb-2" style={{ color: "var(--gold)" }}>
+                        {field.label}
+                      </p>
+                      <p className="text-sm pb-2 break-words" style={{ borderBottom: "1px solid var(--border-gold)" }}>
+                        {field.value}
+                      </p>
+                    </div>
+                  ))}
+                  <Link href="/profile" className="text-xs underline text-[var(--gold)]">
+                    {t("book_update_profile")}
+                  </Link>
+                </div>
+              )}
+              <div className="mt-8 max-w-sm">
+                <label
+                  htmlFor="booking-request-count"
+                  className="block text-[9px] tracking-[.2em] uppercase mb-2"
+                  style={{ color: "var(--gold)" }}
+                >
+                  {t("book_special_requests")}
+                </label>
+                <input
+                  id="booking-request-count"
+                  type="number"
+                  min={0}
+                  max={5}
+                  step={1}
+                  value={requests}
+                  onChange={(event) => {
+                    if (requests !== Number(event.target.value) && !submitting && !retryOnly) {
+                      reservation.changeSelection();
+                      setRequests(Number(event.target.value));
+                    }
+                  }}
+                  className="w-24 p-3 bg-transparent"
+                  style={{ border: "1px solid var(--border-gold)" }}
+                />
+                <p className="mt-2 text-xs" style={{ color: "var(--muted)" }}>
+                  {t("book_special_requests_desc")}
+                </p>
+              </div>
+
+              <p className="mt-8 text-xs max-w-xl" style={{ color: "var(--muted)" }}>
+                {lang === "vi"
+                  ? "Giá này chỉ bao gồm phòng. Dịch vụ spa, xe đưa đón hoặc ăn uống cần được khách sạn xác nhận riêng."
+                  : "This quote covers the room. Spa, transfers and dining require separate confirmation from the hotel."}
+              </p>
+            </div>
+          )}
 
           {/* STEP 4: Confirmation */}
           {step === 4 && (
             <div>
               {result ? (
                 <div className="py-10 max-w-lg" role="status">
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center mb-8" style={{border:'1px solid var(--gold)',color:'var(--gold)'}}><CheckIcon /></div>
-                  <h2 className="font-display text-4xl mb-4">{result.booking.status === 'Confirmed' ? 'Reservation confirmed' : result.booking.status === 'Pending' ? 'Reservation awaiting deposit' : `Reservation: ${result.booking.status}`}</h2>
-                  <p className="text-sm mb-6" style={{color:'var(--muted)'}}>Your reservation is saved in My bookings. Payment is arranged with the hotel.</p>
-                  {result.booking.status === 'Pending' && <p className="text-sm mb-6" style={{color:'var(--gold)'}}>Required deposit: {formatCurrency(result.booking.deposit_required)}. Hold expires: {result.booking.pending_expires_at ? new Date(result.booking.pending_expires_at).toLocaleString('en-GB', {timeZone:'Asia/Bangkok'}) + ' (Bangkok)' : 'Check My bookings for your deadline'}.</p>}
-                  <div className="p-5 mb-6" style={{border:'1px solid var(--border-gold)',background:'var(--bg2)'}}><p className="text-[9px] tracking-[.2em] uppercase mb-3">Booking reference</p><p className="font-display text-xl break-all">{result.booking.booking_id}</p><p className="text-xs mt-3">Room(s) {result.room_number} · {isMultiRoom ? cart.map(c=>c.room.name).join(', ') : selectedRoom.name} · {nights} nights</p><p className="mt-3 text-sm">Total {formatCurrency(result.total_price ?? result.applied_price)} · Payment: {result.payment_status}</p></div>
-                  <Link href="/bookings" className="inline-block px-6 py-3 text-xs" style={{background:'var(--gold)',color:'var(--bg)'}}>View My bookings</Link>
+                  <div
+                    className="w-16 h-16 rounded-full flex items-center justify-center mb-8"
+                    style={{ border: "1px solid var(--gold)", color: "var(--gold)" }}
+                  >
+                    <CheckIcon />
+                  </div>
+                  <h2 className="font-display text-4xl mb-4">
+                    {result.booking.status === "Confirmed"
+                      ? t("book_confirmed_title")
+                      : result.booking.status === "Pending"
+                        ? t("book_pending_title")
+                        : `${t("book_summary_title")}: ${result.booking.status}`}
+                  </h2>
+                  <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
+                    {t("book_saved_notice")}
+                  </p>
+                  {result.booking.status === "Pending" && (
+                    <p className="text-sm mb-6" style={{ color: "var(--gold)" }}>
+                      {lang === "vi" ? "Tiền cọc yêu cầu: " : "Deposit: "}
+                      {formatCurrency(result.booking.deposit_required)}.{" "}
+                      {lang === "vi" ? "Thời hạn giữ phòng đến: " : "Hold expires: "}
+                      {result.booking.pending_expires_at
+                        ? new Date(result.booking.pending_expires_at).toLocaleString(lang === "vi" ? "vi-VN" : "en-GB", {
+                            timeZone: "Asia/Ho_Chi_Minh",
+                            dateStyle: "short",
+                            timeStyle: "medium",
+                          }) + (lang === "vi" ? " (Giờ Việt Nam)" : " (Vietnam Time)")
+                        : t("book_view_history")}
+                    </p>
+                  )}
+                  <div className="p-5 mb-6" style={{ border: "1px solid var(--border-gold)", background: "var(--bg2)" }}>
+                    <p className="text-[9px] tracking-[.2em] uppercase mb-3">{t("book_ref_code")}</p>
+                    <p className="font-display text-xl break-all">{result.booking.booking_id}</p>
+                    <p className="text-xs mt-3">
+                      {t("book_rooms_label")} {result.room_number} · {selectedRoom.name} · {nights} {t("book_nights")}
+                    </p>
+                    {result.coupon_code && (result.coupon_discount_vnd ?? 0) > 0 && (
+                      <p className="text-xs mt-1 text-purple-300">
+                        Coupon {result.coupon_code}: -{formatCurrency(result.coupon_discount_vnd ?? 0)}
+                      </p>
+                    )}
+                    <p className="mt-3 text-sm">
+                      {t("book_total")} {formatCurrency(result.total_price ?? result.applied_price)} · Payment:{" "}
+                      {result.payment_status}
+                    </p>
+                  </div>
+                  <Link
+                    href="/bookings"
+                    className="inline-block px-6 py-3 text-xs"
+                    style={{ background: "var(--gold)", color: "var(--bg)" }}
+                  >
+                    {t("book_view_history")}
+                  </Link>
                 </div>
               ) : (
                 <div>
                   <h2 className="font-display text-3xl mb-2" style={{ color: "var(--fg)" }}>
-                    Review & confirm
+                    {t("book_step4_title")}
                   </h2>
                   <p className="text-sm mb-8" style={{ color: "var(--muted)" }}>
-                    Please review your booking details before confirming.
+                    {t("book_step4_desc")}
                   </p>
 
                   <div className="space-y-4 max-w-xl">
                     {[
-                      { label: "Travel inspiration", value: `${selectedDest.name}, ${selectedDest.country}` },
-                      { label: "Rooms", value: isMultiRoom ? cart.map(c => c.room.name).join(', ') : selectedRoom.name },
-                      { label: "Check-in", value: checkIn },
-                      { label: "Check-out", value: checkOut },
-                      { label: "Duration", value: `${nights} night${nights > 1 ? "s" : ""}` },
-                      { label: "Guests", value: `${guests} guest${guests > 1 ? "s" : ""}` },
-                      { label: "Guest Name", value: user?.full_name ?? "—" },
-                      { label: "Email", value: user?.email ?? "—" },
+                      {
+                        label: lang === "vi" ? "Khách sạn" : "Hotel",
+                        value: "White Sand Boutique Hotel · 89-91 Võ Văn Kiệt, Sơn Trà, Đà Nẵng",
+                      },
+                      { label: t("book_rooms_label"), value: selectedRoom.name },
+                      { label: t("book_checkin_label"), value: checkIn },
+                      { label: t("book_checkout_label"), value: checkOut },
+                      { label: t("book_duration_label"), value: `${nights} ${t("book_nights")}` },
+                      { label: t("book_guests_label"), value: String(guests) },
+                      ...(quote?.coupon_code
+                        ? [
+                            {
+                              label: lang === "vi" ? "Mã ưu đãi" : "Coupon",
+                              value: `${quote.coupon_code} (-${formatCurrency(couponDiscountVnd)})`,
+                            },
+                          ]
+                        : []),
+                      { label: t("book_guest_name"), value: user?.full_name ?? "—" },
+                      { label: t("book_email"), value: user?.email ?? "—" },
                     ].map((row) => (
                       <div key={row.label} className="flex justify-between py-3" style={{ borderBottom: "1px solid var(--border)" }}>
-                        <span className="text-[10px] tracking-[0.12em] uppercase" style={{ color: "var(--muted)" }}>{row.label}</span>
-                        <span className="text-[11px] font-medium" style={{ color: "var(--fg)" }}>{row.value}</span>
+                        <span className="text-[10px] tracking-[0.12em] uppercase" style={{ color: "var(--muted)" }}>
+                          {row.label}
+                        </span>
+                        <span className="text-[11px] font-medium text-right" style={{ color: "var(--fg)" }}>
+                          {row.value}
+                        </span>
                       </div>
                     ))}
                     <div className="flex justify-between py-4">
-                      <span className="text-[10px] tracking-[0.12em] uppercase" style={{ color: "var(--gold)" }}>Total</span>
-                      <span className="font-display text-xl" style={{ color: "var(--gold)" }}>{formatCurrency(grandTotal)}</span>
+                      <span className="text-[10px] tracking-[0.12em] uppercase" style={{ color: "var(--gold)" }}>
+                        {t("book_total")}
+                      </span>
+                      <div className="text-right">
+                        {couponDiscountVnd > 0 && preCouponTotal > grandTotal && (
+                          <div className="text-xs line-through" style={{ color: "var(--muted)" }}>
+                            {formatCurrency(preCouponTotal)}
+                          </div>
+                        )}
+                        <span className="font-display text-xl" style={{ color: "var(--gold)" }}>
+                          {formatCurrency(grandTotal)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   <p className="text-[11px] mt-6 max-w-md" style={{ color: "var(--dim)" }}>
-                    The hotel will save your reservation when you confirm. Deposit requirements and any hold deadline are shown with the saved reservation. No card is charged here.
+                    {t("book_confirmation_notice")}
                   </p>
                 </div>
               )}
             </div>
           )}
 
-          {(error || reservation.error) && <p role="alert" className="mt-6 text-sm text-red-400">{error || reservation.error}</p>}
-          {step === 4 && recoveryNeedsSignIn && recoveryAccount && <ReservationRecoverySignIn account={recoveryAccount} />}
-          {retryOnly && !result && <p role="status" className="mt-4 text-xs">Keep this page open to recover the existing request. Check <Link href="/bookings" target="_blank" rel="noopener noreferrer" className="underline">My bookings in another tab</Link> before leaving or reloading.</p>}
+          {(error || reservation.error) && (
+            <p role="alert" className="mt-6 text-sm text-red-400">
+              {error || reservation.error}
+            </p>
+          )}
+          {step === 4 && recoveryNeedsSignIn && recoveryAccount && (
+            <ReservationRecoverySignIn account={recoveryAccount} />
+          )}
+          {retryOnly && !result && (
+            <p role="status" className="mt-4 text-xs">
+              Keep this page open to recover the existing request. Check{" "}
+              <Link href="/bookings" target="_blank" rel="noopener noreferrer" className="underline">
+                My bookings in another tab
+              </Link>{" "}
+              before leaving or reloading.
+            </p>
+          )}
+
           {/* navigation buttons */}
           {!submitted && (
             <div className="flex items-center gap-4 mt-12">
               {step > 1 && (
                 <button
-                  onClick={goBack} disabled={submitting || retryOnly}
+                  type="button"
+                  onClick={goBack}
+                  disabled={submitting || retryOnly}
                   className="text-[10px] tracking-[0.16em] uppercase px-8 py-3 transition-all duration-200"
                   style={{ border: "1px solid var(--border-gold)", color: "var(--muted)" }}
                 >
-                  ← Back
+                  {t("book_back")}
                 </button>
               )}
               {step < 4 ? (
                 <button
-                  onClick={goNext} disabled={submitting || retryOnly}
+                  type="button"
+                  onClick={goNext}
+                  disabled={submitting || retryOnly}
                   className="text-[10px] tracking-[0.16em] uppercase px-10 py-3 font-medium flex items-center gap-2 transition-all duration-200"
                   style={{ background: "var(--gold)", color: "var(--bg)" }}
                   onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--gold-hi)")}
                   onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--gold)")}
                 >
-                  Continue <ArrowRight />
+                  {t("book_continue")} <ArrowRight />
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={handleSubmit}
-                  disabled={!user || recoveryNeedsSignIn || !quote || loading || (!retryOnly && expired) || submitting || (!retryOnly && quote.rooms_available < 1)}
+                  disabled={
+                    !user ||
+                    recoveryNeedsSignIn ||
+                    !quote ||
+                    loading ||
+                    (!retryOnly && expired) ||
+                    submitting ||
+                    (!retryOnly && quote.rooms_available < 1)
+                  }
                   className="text-[10px] tracking-[0.16em] uppercase px-10 py-3 font-medium flex items-center gap-2 transition-all duration-200"
                   style={{ background: "var(--gold)", color: "var(--bg)" }}
                   onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--gold-hi)")}
                   onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--gold)")}
                 >
-                  {submitting ? "Saving reservation…" : retryOnly ? "Recover reservation" : "Confirm Reservation"} <ArrowRight />
+                  {submitting ? t("book_saving") : retryOnly ? "Recover reservation" : t("book_confirm_btn")}{" "}
+                  <ArrowRight />
                 </button>
               )}
             </div>
@@ -399,69 +866,239 @@ export default function BookView({ rooms, businessDate, initial = {} }: { rooms:
 
         {/* ── ORDER SUMMARY SIDEBAR ── */}
         <div
-          className="w-full lg:w-[300px] shrink-0"
+          className="w-full lg:w-[340px] shrink-0"
           style={{ borderLeft: "1px solid var(--border)", background: "var(--bg2)" }}
         >
-          <div className="lg:sticky lg:top-[60px] p-6">
+          <div className="lg:sticky lg:top-[60px] lg:max-h-[calc(100vh-70px)] lg:overflow-y-auto p-6 pb-24" style={{ scrollbarWidth: "none" }}>
             <div className="text-[9px] tracking-[0.25em] uppercase mb-5" style={{ color: "var(--gold)" }}>
-              Your Booking
+              {t("book_summary_title")}
             </div>
 
-            {/* destination thumb */}
+            {/* Room preview thumb */}
             <div className="aspect-[16/9] overflow-hidden mb-4 rounded-sm">
-              <img src={selectedRoom.img} alt={`${selectedRoom.name} illustrative photo`} className="w-full h-full object-cover" />
+              <img
+                src={selectedRoom.img}
+                alt={`${selectedRoom.name} - White Sand Boutique Hotel`}
+                className="w-full h-full object-cover"
+              />
             </div>
-            {isMultiRoom ? cart.map((c, i) => (
-              <div key={i} className="mb-2">
-                <div className="font-display text-base" style={{ color: "var(--fg)" }}>{c.room.name}</div>
-                <div className="text-[10px]" style={{ color: "var(--muted)" }}>{c.room.name} · {nights} nights</div>
-              </div>
-            )) : (
-              <>
-                <div className="font-display text-lg mb-0.5" style={{ color: "var(--fg)" }}>{selectedRoom.name}</div>
-                <div className="text-[10px] mb-5" style={{ color: "var(--muted)" }}>{selectedRoom.name} · {nights} nights</div>
-              </>
-            )}
+            <div className="font-display text-lg mb-0.5" style={{ color: "var(--fg)" }}>
+              {selectedRoom.name}
+            </div>
+            <div className="text-[10px] mb-5" style={{ color: "var(--muted)" }}>
+              {t("book_guests_label")}: {guests} · {nights} {t("book_nights")}
+            </div>
 
             <div className="h-px mb-5" style={{ background: "var(--border)" }} />
 
+            {/* Coupon Input & DB Quick Picks — Outside quote conditional for easy error recovery */}
+            <div className="mb-5 space-y-2 text-[11px]">
+              <div className="flex items-center justify-between">
+                <span className="uppercase tracking-[0.12em] text-[9px] font-semibold" style={{ color: "var(--gold)" }}>
+                  {lang === "vi" ? "Mã ưu đãi / Coupon" : "Promo Coupon"}
+                </span>
+                {(appliedCoupon || couponInput) && !submitted && !submitting && !retryOnly && (
+                  <button type="button" onClick={clearCoupon} className="text-[10px] text-rose-400 hover:underline">
+                    {lang === "vi" ? "Gỡ mã ưu đãi" : "Remove coupon"}
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="WHITESAND10..."
+                  value={couponInput}
+                  disabled={submitted || submitting || retryOnly}
+                  onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      applyCoupon(couponInput);
+                    }
+                  }}
+                  className="flex-1 px-2.5 py-1.5 text-xs uppercase font-mono bg-transparent"
+                  style={{ border: "1px solid var(--border-gold)", color: "var(--fg)" }}
+                />
+                <button
+                  type="button"
+                  disabled={submitted || submitting || retryOnly}
+                  onClick={() => applyCoupon(couponInput)}
+                  className="px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase font-medium"
+                  style={{ background: "var(--gold)", color: "var(--bg)" }}
+                >
+                  {lang === "vi" ? "Áp dụng" : "Apply"}
+                </button>
+              </div>
+              {availableCoupons.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {availableCoupons.map((c) => {
+                    const isActive = appliedCoupon === c.code;
+                    const ineligible = selectedRoom.id < c.min_room_type_id;
+                    return (
+                      <button
+                        key={c.code}
+                        type="button"
+                        disabled={submitted || submitting || retryOnly}
+                        onClick={() => applyCoupon(c.code)}
+                        title={c.description_vi}
+                        className="px-2 py-0.5 text-[10px] font-mono border transition"
+                        style={{
+                          borderColor: isActive ? "var(--gold)" : "var(--border)",
+                          background: isActive ? "rgba(196,153,90,0.16)" : "transparent",
+                          color: ineligible && !isActive ? "var(--dim)" : "var(--fg)",
+                        }}
+                      >
+                        {c.code} (-{Math.round(c.discount_pct * 100)}%)
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {couponHint && <p className="text-[10px] text-rose-400">{couponHint}</p>}
+            </div>
+
+            <div className="h-px mb-5" style={{ background: "var(--border)" }} />
+
+            <div ref={priceSummaryRef}>
             {/* price breakdown */}
             <div className="space-y-2.5 mb-5 text-[11px]">
               <div className="flex justify-between">
-                <span style={{ color: "var(--muted)" }}>{formatCurrency(nightlyPrice)} × {nights}n</span>
-                <span style={{ color: "var(--fg)" }}>{formatCurrency(grandTotal)}</span>
+                <span style={{ color: "var(--muted)" }}>
+                  {formatCurrency(preCouponNightly)} × {nights}n
+                </span>
+                <span style={{ color: "var(--fg)" }}>{formatCurrency(preCouponTotal)}</span>
               </div>
+              {couponDiscountVnd > 0 && (
+                <div className="flex justify-between text-purple-300">
+                  <span>{lang === "vi" ? `Ưu đãi (${quote?.coupon_code ?? appliedCoupon})` : `Coupon (${quote?.coupon_code ?? appliedCoupon})`}</span>
+                  <span>-{formatCurrency(couponDiscountVnd)}</span>
+                </div>
+              )}
               <div className="flex justify-between">
-                <span style={{ color: "var(--muted)" }}>Pricing</span>
-                <span style={{ color: "var(--fg)" }}>{quote ? quote.pricing_source === "ai" ? "AI quote" : "Base rate" : "Base estimate"}</span>
+                <span style={{ color: "var(--muted)" }}>{t("book_pricing_type")}</span>
+                <span style={{ color: "var(--fg)" }}>
+                  {quote
+                    ? quote.pricing_source === "ai"
+                      ? t("book_pricing_ai")
+                      : t("book_pricing_base")
+                    : t("book_pricing_base")}
+                </span>
               </div>
+              {isCeilingClamped && (
+                <div className="text-[10px] text-amber-300">
+                  {lang === "vi" ? "Đã áp dụng trần giá kê khai" : "Declared ceiling applied"}
+                </div>
+              )}
+              {isFloorClamped && (
+                <div className="text-[10px] text-rose-300">
+                  {lang === "vi"
+                    ? `Bảo vệ sàn biến phí tối thiểu (${formatCurrency(floorPriceVnd)}/đêm)`
+                    : `Contribution floor applied (${formatCurrency(floorPriceVnd)}/night)`}
+                </div>
+              )}
               <div className="flex justify-between">
-                <span style={{ color: "var(--muted)" }}>Availability</span>
-                <span style={{ color: "var(--fg)" }}>{quote ? `${quote.rooms_available} rooms for your dates` : "Check your dates"}</span>
+                <span style={{ color: "var(--muted)" }}>{t("book_availability_label")}</span>
+                <span style={{ color: "var(--fg)" }}>
+                  {quote ? `${quote.rooms_available} ${t("rooms_available_now")}` : t("rooms_check_final_btn")}
+                </span>
               </div>
             </div>
 
+            {quote && (
+              <div className="mb-5">
+                <GuestPriceExplanationCard
+                  quote={quote}
+                  basePrice={selectedRoom?.price}
+                  checkInDate={checkIn}
+                  checkOutDate={checkOut}
+                  guestCount={guests}
+                />
+              </div>
+            )}
             <div className="h-px mb-5" style={{ background: "var(--border)" }} />
             <div className="flex justify-between">
-              <span className="text-[11px] font-medium" style={{ color: "var(--fg)" }}>Total</span>
+              <span className="text-[11px] font-medium" style={{ color: "var(--fg)" }}>
+                {t("book_total")}
+              </span>
               <div className="text-right">
-                <div className="font-display text-2xl" style={{ color: "var(--gold)" }}>{formatCurrency(grandTotal)}</div>
-                <div className="text-[9px]" style={{ color: "var(--dim)" }}>{quote ? "hotel quote · VND" : "base estimate · VND"}</div>
+                {couponDiscountVnd > 0 && preCouponTotal > grandTotal && (
+                  <div className="text-[11px] line-through" style={{ color: "var(--muted)" }}>
+                    {formatCurrency(preCouponTotal)}
+                  </div>
+                )}
+                <div className="font-display text-2xl" style={{ color: "var(--gold)" }}>
+                  {formatCurrency(grandTotal)}
+                </div>
+                <div className="text-[9px]" style={{ color: "var(--dim)" }}>
+                  {quote ? "hotel quote · VND" : "base estimate · VND"}
+                </div>
               </div>
             </div>
 
-            <div className="mt-5 text-xs leading-relaxed" aria-live="polite" style={{color:'var(--muted)'}}>
-              {loading ? <p role="status">Checking availability and price…</p> : quoteError ? <p role="alert">We couldn’t get a price quote. The pricing service may be temporarily unavailable.</p> : expired ? <p role="alert">This quote has expired.</p> : quote ? <><p>Final price: {formatCurrency(quote.total_price)}</p><p>Valid until {new Date(quote.price_guaranteed_until).toLocaleTimeString('en-GB',{timeZone:'Asia/Bangkok'})} (Bangkok). Rooms are subject to availability until reserved.</p></> : <p>Select valid dates and a room that fits your party.</p>}
-              {!submitted && <button type="button" disabled={loading || submitting || retryOnly || !input} onClick={reservation.refreshQuote} className="mt-3 underline" style={{color:'var(--gold)'}}>Refresh price</button>}
+            <div className="mt-5 text-xs leading-relaxed" aria-live="polite" style={{ color: "var(--muted)" }}>
+              {loading ? (
+                <p role="status">{t("book_checking_price")}</p>
+              ) : quoteError ? (
+                <div role="alert" className="space-y-2">
+                  <p className="text-rose-400">{quoteError}</p>
+                  {appliedCoupon && !submitted && (
+                    <button type="button" onClick={clearCoupon} className="text-[11px] underline text-rose-300">
+                      {lang === "vi" ? `Gỡ mã ${appliedCoupon} và tính lại` : `Remove ${appliedCoupon} and retry`}
+                    </button>
+                  )}
+                </div>
+              ) : expired ? (
+                <p role="alert">This quote has expired.</p>
+              ) : quote ? (
+                <>
+                  <p>
+                    {lang === "vi" ? "Giá chốt" : "Final price"}: {formatCurrency(quote.total_price)}
+                  </p>
+                  <p>
+                    {lang === "vi" ? "Thời hạn giữ giá đến " : "Valid until "}
+                    {new Date(quote.price_guaranteed_until).toLocaleTimeString(lang === "vi" ? "vi-VN" : "en-GB", {
+                      timeZone: "Asia/Ho_Chi_Minh",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}{" "}
+                    ({lang === "vi" ? "Giờ Việt Nam" : "Vietnam Time"}).{" "}
+                    {lang === "vi"
+                      ? "Phòng chỉ được giữ sau khi hoàn tất đặt phòng."
+                      : "Rooms are subject to availability until reserved."}
+                  </p>
+                </>
+              ) : (
+                <p>Select valid dates and a room that fits your party.</p>
+              )}
+              {!submitted && (
+                <button
+                  type="button"
+                  disabled={loading || submitting || retryOnly || !input}
+                  onClick={reservation.refreshQuote}
+                  className="mt-3 underline"
+                  style={{ color: "var(--gold)" }}
+                >
+                  {t("book_refresh_price")}
+                </button>
+              )}
             </div>
-            <div className="mt-6 p-4" style={{ background: "rgba(196,153,90,0.06)", border: "1px solid var(--border-gold)" }}>
+            </div>
+            <div
+              className="mt-6 p-4"
+              style={{ background: "rgba(196,153,90,0.06)", border: "1px solid var(--border-gold)" }}
+            >
               <div className="text-[9px] tracking-[0.18em] uppercase mb-2" style={{ color: "var(--gold)" }}>
-                Your reservation
+                {t("book_features_title")}
               </div>
-              {["Account-linked reservation", "Date-specific availability", "Hotel price quote", "Booking history access"].map((item) => (
+              {[t("book_feat_1"), t("book_feat_2"), t("book_feat_3"), t("book_feat_4")].map((item) => (
                 <div key={item} className="flex items-center gap-2 py-1.5">
-                  <span style={{ color: "var(--gold)" }}><CheckIcon /></span>
-                  <span className="text-[10px]" style={{ color: "var(--muted)" }}>{item}</span>
+                  <span style={{ color: "var(--gold)" }}>
+                    <CheckIcon />
+                  </span>
+                  <span className="text-[10px]" style={{ color: "var(--muted)" }}>
+                    {item}
+                  </span>
                 </div>
               ))}
             </div>

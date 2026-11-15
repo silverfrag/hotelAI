@@ -8,6 +8,15 @@ import { PricingService } from './pricing.service';
 export class PricingController {
   constructor(private readonly pricing: PricingService) {}
 
+  @Get('coupons')
+  async getCoupons() {
+    return {
+      status: 'success',
+      message: 'Danh sách mã ưu đãi khả dụng.',
+      data: await this.pricing.getActiveCoupons(),
+    };
+  }
+
   @Get('calendar')
   async getCalendar(@Query() dto: CalendarQueryDto) {
     return {

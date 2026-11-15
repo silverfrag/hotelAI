@@ -5,26 +5,32 @@ import { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
+  Bell,
   Calendar,
+  CheckCheck,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Clock,
   CreditCard,
-  History,
   KeyRound,
   LoaderCircle,
   Moon,
   ReceiptText,
-  Sparkles,
-  XCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useBookingHistory } from '@/hooks/useBookingHistory';
-import { BookingServiceError, getBookingPayment } from '@/services/booking.service';
+import {
+  BookingServiceError,
+  getBookingPayment,
+  getOwnNotifications,
+  markOwnNotificationRead,
+} from '@/services/booking.service';
 import type {
   BookingPaymentSummary,
   BookingSummary,
+  CustomerNotification,
   PaymentMethod,
   PaymentStatus,
 } from '@/types/booking.type';
@@ -42,7 +48,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
   year: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
-  timeZone: 'Asia/Bangkok',
+  timeZone: 'Asia/Ho_Chi_Minh',
 });
 
 function formatHotelDate(value: string): string {
@@ -66,7 +72,7 @@ function statusDetails(status: string): { label: string; badgeStyle: string } {
     case 'confirmed':
       return {
         label: 'Đã xác nhận',
-        badgeStyle: 'border border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+        badgeStyle: 'border border-emerald-500/30 text-[var(--status-success)] bg-emerald-500/10',
       };
     case 'checkedin':
     case 'checked-in':
@@ -86,17 +92,17 @@ function statusDetails(status: string): { label: string; badgeStyle: string } {
     case 'cancelled':
       return {
         label: 'Đã hủy',
-        badgeStyle: 'border border-rose-500/30 text-rose-400 bg-rose-500/10',
+        badgeStyle: 'border border-rose-500/30 text-[var(--status-danger)] bg-rose-500/10',
       };
     case 'expired':
       return {
         label: 'Hết hạn giữ phòng',
-        badgeStyle: 'border border-amber-500/30 text-amber-400 bg-amber-500/10',
+        badgeStyle: 'border border-amber-500/30 text-[var(--status-warning)] bg-amber-500/10',
       };
     case 'noshow':
       return {
         label: 'Không đến nhận phòng',
-        badgeStyle: 'border border-rose-500/30 text-rose-400 bg-rose-500/10',
+        badgeStyle: 'border border-rose-500/30 text-[var(--status-danger)] bg-rose-500/10',
       };
     default:
       return {
@@ -109,7 +115,7 @@ function statusDetails(status: string): { label: string; badgeStyle: string } {
 const paymentStatusDetails: Record<PaymentStatus, { label: string; badgeStyle: string }> = {
   Unpaid: {
     label: 'Chưa thanh toán',
-    badgeStyle: 'border border-amber-500/30 text-amber-400 bg-amber-500/10',
+    badgeStyle: 'border border-amber-500/30 text-[var(--status-warning)] bg-amber-500/10',
   },
   PartiallyPaid: {
     label: 'Thanh toán một phần',
@@ -117,11 +123,11 @@ const paymentStatusDetails: Record<PaymentStatus, { label: string; badgeStyle: s
   },
   Paid: {
     label: 'Đã thanh toán',
-    badgeStyle: 'border border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+    badgeStyle: 'border border-emerald-500/30 text-[var(--status-success)] bg-emerald-500/10',
   },
   RefundPending: {
     label: 'Chờ hoàn tiền',
-    badgeStyle: 'border border-amber-500/30 text-amber-400 bg-amber-500/10',
+    badgeStyle: 'border border-amber-500/30 text-[var(--status-warning)] bg-amber-500/10',
   },
   PartiallyRefunded: {
     label: 'Đã hoàn một phần',
@@ -141,6 +147,37 @@ const paymentMethodLabels: Record<PaymentMethod, string> = {
 
 function canCancel(booking: BookingSummary): boolean {
   return booking.can_cancel;
+}
+
+function describeNotification(item: CustomerNotification): string {
+  const shortCode = `#${item.booking_id.slice(0, 8).toUpperCase()}`;
+  const rawDeposit = item.payload?.deposit_required;
+  const deposit = rawDeposit != null && Number.isFinite(Number(rawDeposit)) ? Number(rawDeposit) : null;
+  const deadline = item.payload?.pending_expires_at ? formatCreatedAt(String(item.payload.pending_expires_at)) : null;
+
+  switch (item.kind) {
+    case 'booking.pending.v1':
+      return `Booking ${shortCode} đang chờ cọc${deposit ? ` ${formatCurrency(deposit)}` : ''}${deadline ? ` (hạn giữ phòng: ${deadline})` : ''}.`;
+    case 'booking.confirmed.v1':
+      return `Booking ${shortCode} đã được xác nhận.`;
+    case 'booking.canceled.v1':
+      return `Booking ${shortCode} đã hủy.`;
+    case 'booking.expired.v1':
+      return `Booking ${shortCode} đã hết hạn giữ phòng do quá hạn thanh toán cọc.`;
+    case 'booking.no-show.v1':
+      return `Booking ${shortCode} được ghi nhận khách không đến nhận phòng (No-Show).`;
+    case 'booking.checked-in.v1':
+      return `Booking ${shortCode} đã hoàn tất thủ tục nhận phòng.`;
+    case 'booking.checked-out.v1':
+      return `Booking ${shortCode} đã hoàn tất trả phòng.`;
+    default:
+      return `Booking ${shortCode} cập nhật trạng thái: ${item.payload?.status ?? item.kind}.`;
+  }
+}
+
+function broadcastUnreadCount(unread: number) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('hotelai:notifications-updated', { detail: { unread } }));
 }
 
 interface BookingCardProps {
@@ -166,6 +203,8 @@ function BookingCard({
   onCancel,
   onTogglePayment,
 }: BookingCardProps) {
+  const [confirmingCancellation, setConfirmingCancellation] = useState(false);
+  const cancelTrigger = useRef<HTMLButtonElement>(null);
   const status = statusDetails(booking.status);
   const payment = paymentStatusDetails[booking.payment_status] ?? paymentStatusDetails.Unpaid;
 
@@ -206,7 +245,7 @@ function BookingCard({
       {/* Details Grid */}
       <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5 mb-6" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
         <div>
-          <dt className="text-[9px] tracking-[0.22em] uppercase font-semibold mb-1" style={{ color: 'var(--dim)' }}>
+          <dt className="text-[9px] tracking-[0.22em] uppercase font-semibold mb-1" style={{ color: 'var(--muted)' }}>
             Nhận phòng
           </dt>
           <dd className="text-sm font-medium" style={{ color: 'var(--fg)' }}>
@@ -214,7 +253,7 @@ function BookingCard({
           </dd>
         </div>
         <div>
-          <dt className="text-[9px] tracking-[0.22em] uppercase font-semibold mb-1" style={{ color: 'var(--dim)' }}>
+          <dt className="text-[9px] tracking-[0.22em] uppercase font-semibold mb-1" style={{ color: 'var(--muted)' }}>
             Trả phòng
           </dt>
           <dd className="text-sm font-medium" style={{ color: 'var(--fg)' }}>
@@ -222,7 +261,7 @@ function BookingCard({
           </dd>
         </div>
         <div>
-          <dt className="text-[9px] tracking-[0.22em] uppercase font-semibold mb-1" style={{ color: 'var(--dim)' }}>
+          <dt className="text-[9px] tracking-[0.22em] uppercase font-semibold mb-1" style={{ color: 'var(--muted)' }}>
             Thời gian
           </dt>
           <dd className="text-sm font-medium flex items-center gap-1.5" style={{ color: 'var(--fg)' }}>
@@ -231,7 +270,7 @@ function BookingCard({
           </dd>
         </div>
         <div>
-          <dt className="text-[9px] tracking-[0.22em] uppercase font-semibold mb-1" style={{ color: 'var(--dim)' }}>
+          <dt className="text-[9px] tracking-[0.22em] uppercase font-semibold mb-1" style={{ color: 'var(--muted)' }}>
             Giá mỗi đêm
           </dt>
           <dd className="text-sm font-medium" style={{ color: 'var(--gold)' }}>
@@ -256,7 +295,7 @@ function BookingCard({
             Booking đang chờ đủ tiền cọc <strong style={{ color: 'var(--gold)' }}>{formatCurrency(booking.deposit_required)}</strong>.
             {' '}Còn cần cọc <strong>{formatCurrency(Math.max(0, booking.deposit_required - booking.net_paid))}</strong>.
             {booking.pending_expires_at && (
-              <> Hạn giữ phòng: <span className="font-semibold text-white">{formatCreatedAt(booking.pending_expires_at)}</span> (giờ khách sạn).</>
+              <> Hạn giữ phòng: <span className="font-semibold text-[var(--fg)]">{formatCreatedAt(booking.pending_expires_at)}</span> (giờ khách sạn).</>
             )}
             {' '}Liên hệ khách sạn để được hướng dẫn thanh toán trước thời hạn. Trạng thái sẽ được cập nhật sau khi khoản cọc được ghi nhận.
           </div>
@@ -265,9 +304,9 @@ function BookingCard({
 
       {(booking.status === 'Expired' || booking.status === 'NoShow') && (
         <div
-          className="p-4 mb-6 border border-rose-500/30 bg-rose-500/10 text-xs text-rose-200/90 leading-relaxed flex items-start gap-3"
+          className="p-4 mb-6 border border-rose-500/30 bg-rose-500/10 text-xs text-[var(--status-danger)] leading-relaxed flex items-start gap-3"
         >
-          <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-400" />
+          <AlertCircle size={16} className="shrink-0 mt-0.5 text-[var(--status-danger)]" />
           <div>
             {booking.status === 'Expired' ? 'Thời hạn giữ phòng đã kết thúc.' : 'Booking đã được ghi nhận là khách không đến.'}
             {' '}Booking này không còn giữ phòng. Khoản hoàn tiền, nếu có, được theo dõi riêng trong lịch sử thanh toán.
@@ -278,19 +317,19 @@ function BookingCard({
       {/* Card Footer */}
       <footer className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
         <div>
-          <span className="block text-[9px] tracking-[0.22em] uppercase font-semibold mb-1" style={{ color: 'var(--dim)' }}>
+          <span className="block text-[9px] tracking-[0.22em] uppercase font-semibold mb-1" style={{ color: 'var(--muted)' }}>
             Tổng giá booking
           </span>
           <strong className="font-display text-2xl md:text-3xl" style={{ color: 'var(--gold)' }}>
             {formatCurrency(booking.total_price)}
           </strong>
           <div className="text-[11px] flex flex-wrap gap-x-3 gap-y-1 mt-2" style={{ color: 'var(--muted)' }}>
-            <span>Đã thu: <strong className="text-white">{formatCurrency(booking.paid_amount)}</strong></span>
-            {booking.balance_due > 0 && <span>· Còn phải thu: <strong className="text-amber-300">{formatCurrency(booking.balance_due)}</strong></span>}
-            {booking.refunded_amount > 0 && <span>· Đã hoàn: <strong className="text-emerald-300">{formatCurrency(booking.refunded_amount)}</strong></span>}
-            {booking.refund_due > 0 && <span>· Còn phải hoàn: <strong className="text-amber-300">{formatCurrency(booking.refund_due)}</strong></span>}
+            <span>Đã thu: <strong className="text-[var(--fg)]">{formatCurrency(booking.paid_amount)}</strong></span>
+            {booking.balance_due > 0 && <span>· Còn phải thu: <strong className="text-[var(--status-warning)]">{formatCurrency(booking.balance_due)}</strong></span>}
+            {booking.refunded_amount > 0 && <span>· Đã hoàn: <strong className="text-[var(--status-success)]">{formatCurrency(booking.refunded_amount)}</strong></span>}
+            {booking.refund_due > 0 && <span>· Còn phải hoàn: <strong className="text-[var(--status-warning)]">{formatCurrency(booking.refund_due)}</strong></span>}
           </div>
-          <small className="block text-[10px] mt-2" style={{ color: 'var(--dim)' }}>
+          <small className="block text-[10px] mt-2" style={{ color: 'var(--muted)' }}>
             Đặt lúc {formatCreatedAt(booking.created_at)}
           </small>
         </div>
@@ -314,10 +353,13 @@ function BookingCard({
 
           {canCancel(booking) && (
             <button
+              ref={cancelTrigger}
               disabled={actionDisabled}
-              onClick={() => onCancel(booking)}
+              onClick={() => setConfirmingCancellation(true)}
               type="button"
-              className="px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase font-semibold border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 transition-all duration-200"
+              aria-expanded={confirmingCancellation}
+              aria-controls={`cancel-${booking.booking_id}`}
+              className="px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase font-semibold border border-rose-500/40 text-[var(--status-danger)] hover:bg-rose-500/10 transition-all duration-200"
             >
               {cancelling ? (
                 <span className="flex items-center gap-1.5">
@@ -330,6 +372,44 @@ function BookingCard({
           )}
         </div>
       </footer>
+
+      {canCancel(booking) && confirmingCancellation && (
+        <section
+          id={`cancel-${booking.booking_id}`}
+          aria-label="Xác nhận hủy đặt phòng"
+          className="mt-5 p-5 border border-rose-500/30 bg-rose-500/5 text-sm"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && !actionDisabled) {
+              setConfirmingCancellation(false);
+              cancelTrigger.current?.focus();
+            }
+          }}
+        >
+          <h3 className="font-display text-xl text-[var(--fg)] mb-2">Hủy đặt phòng này?</h3>
+          <p className="text-[var(--muted)] leading-relaxed">
+            Phòng {booking.room_number} · {formatHotelDate(booking.check_in_date)} – {formatHotelDate(booking.check_out_date)}.
+            {' '}Sau khi hủy, booking này không còn giữ phòng. Khoản hoàn tiền, nếu có, được theo dõi riêng.
+          </p>
+          <div className="flex flex-wrap gap-3 mt-4">
+            <button
+              type="button"
+              autoFocus
+              disabled={actionDisabled}
+              className="border border-[var(--gold)] text-[var(--gold)] px-4 py-3"
+              onClick={() => {
+                setConfirmingCancellation(false);
+                cancelTrigger.current?.focus();
+              }}
+            >Giữ đặt phòng</button>
+            <button
+              type="button"
+              disabled={actionDisabled}
+              className="border border-rose-500/40 text-[var(--status-danger)] px-4 py-3 disabled:opacity-50"
+              onClick={() => onCancel(booking)}
+            >{cancelling ? 'Đang hủy…' : 'Xác nhận hủy'}</button>
+          </div>
+        </section>
+      )}
 
       {/* Payment Transactions Accordion */}
       {paymentOpen && (
@@ -349,7 +429,7 @@ function BookingCard({
               Đang tải lịch sử thanh toán…
             </div>
           ) : paymentError ? (
-            <div className="p-3.5 border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs" role="alert">
+            <div className="p-3.5 border border-rose-500/30 bg-rose-500/10 text-[var(--status-danger)] text-xs" role="alert">
               {paymentError}
             </div>
           ) : paymentSummary && paymentSummary.transactions.length > 0 ? (
@@ -368,7 +448,7 @@ function BookingCard({
                         {paymentMethodLabels[transaction.method]}
                       </span>
                     </div>
-                    <div className="text-[10px] mt-1" style={{ color: 'var(--dim)' }}>
+                    <div className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>
                       {formatCreatedAt(transaction.created_at)}
                       {(transaction.external_reference || transaction.note) && (
                         <span> · {transaction.external_reference || transaction.note}</span>
@@ -405,9 +485,18 @@ export function BookingHistory() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const paymentController = useRef<AbortController | null>(null);
+  const notificationsController = useRef<AbortController | null>(null);
+  const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState('');
+  const [markingNotificationId, setMarkingNotificationId] = useState<string | null>(null);
   const {
     bookings,
     loading,
+    refreshing,
+    loadFailed,
     error,
     actionMessage,
     cancellingId,
@@ -419,7 +508,95 @@ export function BookingHistory() {
     onUnauthorized: invalidateSession,
   });
 
-  useEffect(() => () => paymentController.current?.abort(), []);
+  useEffect(() => () => {
+    paymentController.current?.abort();
+    notificationsController.current?.abort();
+  }, []);
+
+  async function fetchNotifications() {
+    if (!ready || !isAuthenticated || !accessToken || typeof getOwnNotifications !== 'function') return;
+    notificationsController.current?.abort();
+    const controller = new AbortController();
+    notificationsController.current = controller;
+    setNotificationsLoading(true);
+    setNotificationsError('');
+    try {
+      const page = await getOwnNotifications({ limit: 20, offset: 0 }, controller.signal);
+      if (!controller.signal.aborted) {
+        setNotifications(page.data);
+        setUnreadCount(page.unread);
+        broadcastUnreadCount(page.unread);
+      }
+    } catch (caught) {
+      if (typeof DOMException !== 'undefined' && caught instanceof DOMException && caught.name === 'AbortError') return;
+      if (typeof BookingServiceError === 'function' && caught instanceof BookingServiceError && caught.status === 401) invalidateSession();
+      if (!controller.signal.aborted) {
+        setNotificationsError(caught instanceof Error ? caught.message : 'Không thể tải thông báo đặt phòng.');
+      }
+    } finally {
+      if (!controller.signal.aborted) setNotificationsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!ready || !isAuthenticated || !accessToken) {
+      setNotifications([]);
+      setUnreadCount(0);
+      setNotificationsError('');
+      return;
+    }
+    if (typeof window !== 'undefined' && window.location.hash === '#notifications') {
+      setNotificationsOpen(true);
+    }
+    void fetchNotifications();
+  }, [ready, isAuthenticated, accessToken]);
+
+  async function markOneRead(notificationId: string) {
+    if (typeof markOwnNotificationRead !== 'function') return;
+    setMarkingNotificationId(notificationId);
+    setNotificationsError('');
+    try {
+      const result = await markOwnNotificationRead(notificationId);
+      setNotifications((prev) => {
+        const next = prev.map((item) =>
+          item.notification_id === result.notification_id ? { ...item, read_at: result.read_at } : item,
+        );
+        const nextUnread = next.filter((item) => !item.read_at).length;
+        setUnreadCount(nextUnread);
+        broadcastUnreadCount(nextUnread);
+        return next;
+      });
+    } catch (caught) {
+      if (typeof BookingServiceError === 'function' && caught instanceof BookingServiceError && caught.status === 401) invalidateSession();
+      setNotificationsError(caught instanceof Error ? caught.message : 'Không thể đánh dấu đã đọc.');
+    } finally {
+      setMarkingNotificationId(null);
+    }
+  }
+
+  async function markAllRead() {
+    if (typeof markOwnNotificationRead !== 'function') return;
+    const unreadItems = notifications.filter((item) => !item.read_at);
+    if (unreadItems.length === 0) return;
+    setMarkingNotificationId('__all__');
+    setNotificationsError('');
+    try {
+      const results = await Promise.all(unreadItems.map((item) => markOwnNotificationRead(item.notification_id)));
+      const readMap = new Map(results.map((r) => [r.notification_id, r.read_at]));
+      setNotifications((prev) =>
+        prev.map((item) =>
+          readMap.has(item.notification_id) ? { ...item, read_at: readMap.get(item.notification_id) ?? item.read_at } : item,
+        ),
+      );
+      setUnreadCount(0);
+      broadcastUnreadCount(0);
+    } catch (caught) {
+      if (typeof BookingServiceError === 'function' && caught instanceof BookingServiceError && caught.status === 401) invalidateSession();
+      setNotificationsError(caught instanceof Error ? caught.message : 'Không thể đánh dấu tất cả thông báo.');
+    } finally {
+      setMarkingNotificationId(null);
+    }
+  }
 
   async function loadPayment(bookingId: string) {
     if (!accessToken) return;
@@ -457,14 +634,12 @@ export function BookingHistory() {
   }
 
   async function confirmCancellation(booking: BookingSummary) {
-    const confirmed = window.confirm(
-      `Bạn có chắc muốn hủy phòng ${booking.room_number} từ ${formatHotelDate(booking.check_in_date)} đến ${formatHotelDate(booking.check_out_date)}?`,
-    );
-    if (confirmed) {
-      const canceled = await cancel(booking.booking_id);
-      if (canceled && paymentBookingId === booking.booking_id) {
+    const canceled = await cancel(booking.booking_id);
+    if (canceled) {
+      if (paymentBookingId === booking.booking_id) {
         await loadPayment(booking.booking_id);
       }
+      void fetchNotifications();
     }
   }
 
@@ -483,7 +658,7 @@ export function BookingHistory() {
             Lịch sử đặt phòng
           </h1>
           <p className="text-sm max-w-xl leading-relaxed" style={{ color: 'var(--muted)' }}>
-            Theo dõi hành trình lưu trú, tiến độ đặt cọc và quản lý các booking của bạn tại Aurum.
+            Theo dõi hành trình lưu trú, tiến độ đặt cọc và quản lý các booking của bạn tại White Sand Boutique Hotel Đà Nẵng.
           </p>
         </div>
 
@@ -499,6 +674,123 @@ export function BookingHistory() {
           </Link>
         )}
       </div>
+
+      {/* ── CUSTOMER NOTIFICATIONS INBOX ── */}
+      {ready && isAuthenticated && (
+        <section
+          id="notifications"
+          aria-label="Thông báo đặt phòng"
+          className="mb-8 border backdrop-blur-xl transition-all"
+          style={{ background: 'var(--bg2)', borderColor: 'var(--border-gold)' }}
+        >
+          <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setNotificationsOpen((open) => !open)}
+              aria-expanded={notificationsOpen}
+              className="flex items-center gap-3 text-left"
+            >
+              <Bell size={16} style={{ color: 'var(--gold)' }} />
+              <span className="font-display text-lg text-[var(--fg)]">Thông báo đặt phòng</span>
+              {unreadCount > 0 ? (
+                <span
+                  className="text-[10px] tracking-[0.14em] uppercase font-semibold px-2.5 py-0.5 rounded-full border"
+                  style={{
+                    borderColor: 'var(--gold)',
+                    background: 'rgba(196,153,90,0.16)',
+                    color: 'var(--gold)',
+                  }}
+                >
+                  {unreadCount} chưa đọc
+                </span>
+              ) : (
+                <span className="text-[10px] tracking-[0.12em] uppercase" style={{ color: 'var(--muted)' }}>
+                  ({notifications.length} thông báo)
+                </span>
+              )}
+              {notificationsOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </button>
+
+            <div className="flex items-center gap-2">
+              {notificationsOpen && unreadCount > 0 && (
+                <button
+                  type="button"
+                  disabled={markingNotificationId !== null}
+                  onClick={() => void markAllRead()}
+                  className="px-3 py-1.5 text-[10px] tracking-[0.12em] uppercase border flex items-center gap-1.5 disabled:opacity-50"
+                  style={{ borderColor: 'var(--border-gold)', color: 'var(--gold)' }}
+                >
+                  <CheckCheck size={13} /> Đánh dấu đã đọc hết
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={notificationsLoading}
+                onClick={() => void fetchNotifications()}
+                className="px-3 py-1.5 text-[10px] tracking-[0.12em] uppercase border flex items-center gap-1.5 disabled:opacity-50"
+                style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+                aria-label="Tải lại thông báo"
+              >
+                <RefreshCw size={12} className={notificationsLoading ? 'animate-spin' : ''} /> Làm mới
+              </button>
+            </div>
+          </div>
+
+          {notificationsOpen && (
+            <div className="px-5 pb-5 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+              {notificationsError && (
+                <p role="alert" className="text-xs text-[var(--status-danger)] mb-3">
+                  {notificationsError}
+                </p>
+              )}
+              {notificationsLoading && notifications.length === 0 ? (
+                <p className="text-xs py-3" style={{ color: 'var(--muted)' }}>
+                  Đang tải thông báo…
+                </p>
+              ) : notifications.length === 0 ? (
+                <p className="text-xs py-3 italic" style={{ color: 'var(--muted)' }}>
+                  Chưa có thông báo đặt phòng nào.
+                </p>
+              ) : (
+                <ul className="divide-y divide-[rgba(196,153,90,0.12)]">
+                  {notifications.map((item) => {
+                    const isUnread = !item.read_at;
+                    return (
+                      <li key={item.notification_id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <span
+                            className="w-2 h-2 rounded-full mt-1.5 shrink-0"
+                            style={{ background: isUnread ? 'var(--gold)' : 'transparent', border: isUnread ? 'none' : '1px solid var(--border)' }}
+                          />
+                          <div className="min-w-0">
+                            <p className={`text-xs leading-relaxed ${isUnread ? 'font-semibold text-[var(--fg)]' : 'text-[var(--muted)]'}`}>
+                              {describeNotification(item)}
+                            </p>
+                            <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted)' }}>
+                              {formatCreatedAt(item.created_at)} · {isUnread ? 'Chưa đọc' : `Đã đọc lúc ${formatCreatedAt(item.read_at as string)}`}
+                            </p>
+                          </div>
+                        </div>
+                        {isUnread && (
+                          <button
+                            type="button"
+                            disabled={markingNotificationId !== null}
+                            onClick={() => void markOneRead(item.notification_id)}
+                            className="px-3 py-1.5 text-[10px] tracking-[0.12em] uppercase border shrink-0 disabled:opacity-50"
+                            style={{ borderColor: 'var(--border-gold)', color: 'var(--gold)' }}
+                          >
+                            {markingNotificationId === item.notification_id ? 'Đang lưu…' : 'Đánh dấu đã đọc'}
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ── STATE: CHECKING AUTH ── */}
       {!ready && (
@@ -534,7 +826,7 @@ export function BookingHistory() {
       )}
 
       {/* ── STATE: LOADING BOOKINGS ── */}
-      {ready && isAuthenticated && loading && (
+      {ready && isAuthenticated && loading && bookings.length === 0 && (
         <section className="py-20 flex flex-col items-center justify-center text-center" aria-live="polite">
           <div className="w-12 h-12 rounded-full border border-[var(--border-gold)] flex items-center justify-center mb-4">
             <LoaderCircle className="animate-spin" size={22} style={{ color: 'var(--gold)' }} />
@@ -547,11 +839,11 @@ export function BookingHistory() {
       {/* ── STATE: ERROR ── */}
       {ready && isAuthenticated && !loading && error && bookings.length === 0 && (
         <section className="p-10 md:p-12 backdrop-blur-xl border border-rose-500/30 text-center max-w-lg mx-auto" style={{ background: 'var(--bg2)' }} role="alert">
-          <div className="w-14 h-14 rounded-full border border-rose-500/40 bg-rose-500/10 flex items-center justify-center mx-auto mb-4 text-rose-400">
+          <div className="w-14 h-14 rounded-full border border-rose-500/40 bg-rose-500/10 flex items-center justify-center mx-auto mb-4 text-[var(--status-danger)]">
             <AlertCircle size={26} />
           </div>
           <h2 className="font-display text-2xl text-[var(--fg)] mb-2">Chưa tải được lịch sử đặt phòng</h2>
-          <p className="text-xs text-rose-300/80 mb-6">{error}</p>
+          <p className="text-xs text-[var(--status-danger)] mb-6">{error}</p>
           <button
             onClick={() => void reload()}
             type="button"
@@ -571,7 +863,7 @@ export function BookingHistory() {
           </div>
           <h2 className="font-display text-3xl text-[var(--fg)] mb-3">Bạn chưa có đặt phòng nào</h2>
           <p className="text-sm max-w-md mx-auto leading-relaxed mb-8" style={{ color: 'var(--muted)' }}>
-            Khám phá các hạng phòng nghỉ dưỡng sang trọng tại Aurum và để AI tối ưu mức giá tốt nhất cho kỳ nghỉ của bạn.
+            Khám phá các hạng phòng tại White Sand Boutique Hotel và kiểm tra giá cùng phòng trống theo ngày lưu trú của bạn.
           </p>
           <Link
             href="/rooms"
@@ -586,21 +878,33 @@ export function BookingHistory() {
       )}
 
       {/* ── STATE: BOOKINGS LIST ── */}
-      {ready && isAuthenticated && !loading && bookings.length > 0 && (
+      {ready && isAuthenticated && bookings.length > 0 && (
         <>
           <div className="space-y-3 mb-6" aria-live="polite">
-            {actionMessage && (
-              <div className="p-3.5 border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs flex items-center gap-2">
-                <CheckCircle2 size={15} className="shrink-0 text-emerald-400" />
+            {actionMessage && !error && (
+              <div className="p-3.5 border border-emerald-500/30 bg-emerald-500/10 text-[var(--status-success)] text-xs flex items-center gap-2">
+                <CheckCircle2 size={15} className="shrink-0 text-[var(--status-success)]" />
                 <span>{actionMessage}</span>
               </div>
             )}
             {error && (
-              <div className="p-3.5 border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs flex items-center gap-2" role="alert">
-                <AlertCircle size={15} className="shrink-0 text-rose-400" />
-                <span>{error}</span>
+              <div className="p-3.5 border border-rose-500/30 bg-rose-500/10 text-[var(--status-danger)] text-xs flex flex-wrap items-center gap-3" role="alert">
+                <AlertCircle size={15} className="shrink-0 text-[var(--status-danger)]" />
+                <div className="min-w-0 flex-1">
+                  <p>{error}</p>
+                  {loadFailed && <p className="mt-1">Danh sách bên dưới là dữ liệu đã tải trước đó; trạng thái có thể đã thay đổi.</p>}
+                </div>
+                <button
+                  type="button"
+                  disabled={refreshing || cancellingId !== null}
+                  onClick={() => void reload(false)}
+                  className="px-4 py-2 border border-current disabled:opacity-60"
+                >
+                  {refreshing ? 'Đang tải lại…' : 'Thử tải lại'}
+                </button>
               </div>
             )}
+            {refreshing && !error && <p className="text-xs text-[var(--muted)]" role="status">Đang cập nhật trạng thái đặt phòng…</p>}
           </div>
 
           <section className="space-y-6" aria-label="Danh sách đặt phòng">

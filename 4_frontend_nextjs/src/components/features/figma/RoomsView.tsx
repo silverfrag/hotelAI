@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { RoomPresentation } from "@/types/room-presentation.type";
 import { addIsoDays } from "@/utils/businessDate";
 import { useTranslation } from "@/contexts/LanguageContext";
+import { CatalogUnavailable } from './CatalogUnavailable';
 
 function isCalendarDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -30,7 +31,7 @@ function CheckIcon() {
 
 const NIGHTS_OPTIONS = [1, 2, 3, 5, 7, 14];
 
-export default function RoomsView({ rooms, businessDate }: { rooms: RoomPresentation[]; businessDate: string }) {
+export default function RoomsView({ rooms, businessDate, catalogError = false }: { rooms: RoomPresentation[]; businessDate: string; catalogError?: boolean }) {
   const { t, formatPrice } = useTranslation();
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
@@ -60,7 +61,7 @@ export default function RoomsView({ rooms, businessDate }: { rooms: RoomPresenta
     return (
       <section className="px-5 md:px-10 lg:px-16 pt-32 pb-24">
         <h1 className="font-display text-4xl mb-4">{t("rooms_title")}</h1>
-        <p style={{ color: "var(--muted)" }}>{t("rooms_empty")}</p>
+        {catalogError ? <CatalogUnavailable /> : <p style={{ color: "var(--muted)" }}>{t("rooms_empty")}</p>}
       </section>
     );
   }
@@ -336,8 +337,8 @@ export default function RoomsView({ rooms, businessDate }: { rooms: RoomPresenta
           style={{ borderLeft: "1px solid var(--border)" }}
         >
           <div
-            className="lg:sticky lg:top-[60px] p-6"
-            style={{ background: "var(--bg2)" }}
+            className="lg:sticky lg:top-[60px] lg:max-h-[calc(100vh-70px)] lg:overflow-y-auto p-6 pb-24"
+            style={{ background: "var(--bg2)", scrollbarWidth: "none" }}
           >
             {/* selected room preview */}
             <div className="mb-6 overflow-hidden" style={{ borderRadius: "4px" }}>

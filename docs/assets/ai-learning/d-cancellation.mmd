@@ -1,0 +1,9 @@
+flowchart TD
+    input["Thông tin booking; không nhận nhãn hủy hay ADR thật"] --> encode["Điền thiếu và mã hóa bằng bộ đã học"]
+    encode --> weighted["Hồi quy logistic cộng các đầu vào theo trọng số đã học"]
+    weighted --> probability["Đổi điểm tổng thành số từ 0 đến 1"]
+    probability --> display["Hiện nguy cơ hủy cùng cảnh báo độ tin cậy"]
+    probability --> threshold["Khi chấm điểm: dùng ngưỡng 0,5 cố định"]
+    threshold --> compare["Đối chiếu nhãn hủy thật 0 hoặc 1"]
+    compare --> right["Có trường hợp phân loại đúng"]
+    compare --> wrong["Có trường hợp bỏ sót hoặc báo nhầm"]

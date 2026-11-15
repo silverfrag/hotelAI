@@ -87,12 +87,12 @@ async function register(fullName, email) {
   return { id, token };
 }
 
-async function createRoomType(name, basePrice = 731000) {
+async function createRoomType(name, basePrice = 731000, capacity = 2) {
   const result = await database.query(
     `INSERT INTO room_types (name, base_price, capacity)
-     VALUES ($1, $2, 2)
+     VALUES ($1, $2, $3)
      RETURNING type_id, name, base_price`,
-    [name, basePrice],
+    [name, basePrice, capacity],
   );
   const roomType = result.rows[0];
   state.roomTypeIds.push(Number(roomType.type_id));
@@ -874,6 +874,62 @@ try {
     'Housekeeping ledger does not preserve the expected transition order.',
   );
 
+  // Cross-type complimentary upgrades retain the original quote/price, enforce
+  // party capacity, and still allow a later move within the upgraded room type.
+  const upgradeSourceType = await createRoomType(`Upgrade source ${runId}`, 8100000);
+  const tooSmallType = await createRoomType(`Upgrade small ${runId}`, 8200000, 1);
+  const dirtyUpgradeType = await createRoomType(`Upgrade dirty ${runId}`, 8250000);
+  const upgradeTargetType = await createRoomType(`Upgrade target ${runId}`, 8300000);
+  await createRooms(upgradeSourceType.type_id, [{ roomNumber: `${roomPrefix}U0` }]);
+  const [tooSmallRoom] = await createRooms(tooSmallType.type_id, [{ roomNumber: `${roomPrefix}US` }]);
+  await createRooms(dirtyUpgradeType.type_id, [{ roomNumber: `${roomPrefix}UD`, housekeepingStatus: 'Dirty' }]);
+  const [upgradeTarget, upgradedMoveTarget] = await createRooms(upgradeTargetType.type_id, [
+    { roomNumber: `${roomPrefix}U1` }, { roomNumber: `${roomPrefix}U2` },
+  ]);
+  const upgradeQuoteInput = { room_type_id: Number(upgradeSourceType.type_id),
+    check_in_date: today, check_out_date: tomorrow, guest_count: 2, total_of_special_requests: 0 };
+  const upgradeQuote = await createQuote(upgradeQuoteInput);
+  await exposeQuote(upgradeQuote.quote_id);
+  const upgradeBooking = await createBooking(guest.token, { ...upgradeQuoteInput, quote_id: upgradeQuote.quote_id });
+  const upgradeBookingId = upgradeBooking.booking.booking_id;
+  const beforeUpgrade = await assignmentSnapshot(upgradeBookingId);
+  const smallUpgrade = await request('/admin/allocations/execute-upgrade', {
+    method: 'POST', token: adminToken, headers: { 'Idempotency-Key': `upgrade-small:${randomUUID()}` },
+    json: { booking_id: upgradeBookingId, target_room_id: Number(tooSmallRoom.room_id),
+      expected_assignment_version: 1, reason: 'Reject a higher-price room with insufficient capacity' },
+  });
+  ensure(smallUpgrade.response.status === 409, `Undersized upgrade returned ${describeResult(smallUpgrade)}.`);
+  const suggestedUpgrades = await request('/admin/allocations/upgrade-recommendations', { token: adminToken });
+  ensure(suggestedUpgrades.response.status === 200, `Upgrade recommendations returned ${describeResult(suggestedUpgrades)}.`);
+  for (const rec of suggestedUpgrades.body.data) {
+    ensure(rec.confidence_score === null && rec.recommendation_source === 'rule_based', 'Upgrade rules claimed an unsupported model confidence.');
+  }
+  const suggestion = suggestedUpgrades.body.data.find((rec) => rec.booking_id === upgradeBookingId);
+  ensure(suggestion && Number(suggestion.recommended_room.type_id) === Number(upgradeTargetType.type_id),
+    'Same-day recommendation selected an undersized/dirty room or omitted the eligible upgrade.');
+  const upgradeKey = `upgrade-success:${randomUUID()}`;
+  const upgradePayload = { booking_id: upgradeBookingId, target_room_id: Number(upgradeTarget.room_id),
+    expected_assignment_version: 1, reason: 'Complimentary upgrade validation with immutable quoted price' };
+  const upgraded = await request('/admin/allocations/execute-upgrade', {
+    method: 'POST', token: adminToken, headers: { 'Idempotency-Key': upgradeKey }, json: upgradePayload,
+  });
+  ensure(upgraded.response.status === 201, `Upgrade returned ${describeResult(upgraded)}.`);
+  const upgradeReplay = await request('/admin/allocations/execute-upgrade', {
+    method: 'POST', token: adminToken, headers: { 'Idempotency-Key': upgradeKey }, json: upgradePayload,
+  });
+  ensure(upgradeReplay.response.status === 201 && upgradeReplay.body.data.event_id === upgraded.body.data.event_id,
+    'Upgrade retry did not return the original event.');
+  const movedAfterUpgrade = await request(`/admin/bookings/${upgradeBookingId}/reassign-room`, {
+    method: 'POST', token: adminToken, headers: { 'Idempotency-Key': `upgrade-move:${randomUUID()}` },
+    json: { target_room_id: Number(upgradedMoveTarget.room_id), expected_assignment_version: 2,
+      reason: 'Move within upgraded room type without rewriting the original quote' },
+  });
+  ensure(movedAfterUpgrade.response.status === 201, `Move after upgrade returned ${describeResult(movedAfterUpgrade)}.`);
+  const afterUpgrade = await assignmentSnapshot(upgradeBookingId);
+  ensure(Number(afterUpgrade.applied_price) === Number(beforeUpgrade.applied_price)
+    && afterUpgrade.quote_id === beforeUpgrade.quote_id,
+    'Complimentary upgrade or subsequent move changed the accepted price/quote.');
+
   console.log(JSON.stringify({
     status: 'ok',
     housekeeping_sequence: finalCheckoutEvents.rows.map((event) => `${event.from_status}->${event.to_status}`),
@@ -884,6 +940,8 @@ try {
     concurrent_reassignment_statuses: assignmentStatuses,
     confirmed_price_and_ai_lineage_preserved: true,
     checked_in_move_atomic: true,
+    upgrade_capacity_and_readiness_checked: true,
+    upgrade_and_followup_move_keep_quote: true,
     ledgers_append_only: true,
     overlap_fixture_booking_id: overlapBooking.bookingId,
   }));

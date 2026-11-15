@@ -1,5 +1,5 @@
-/* Source Figma Make design tokens, scoped to the public shell. */
-.figma-site {
+/* Source Figma Make design tokens, available globally and scoped to public shell */
+:root, .figma-site {
   --bg:          #0c0905;
   --bg2:         #0f0b07;
   --bg3:         #13100b;
@@ -10,6 +10,9 @@
   --dim2:        #2e1e0e;
   --gold:        #c4995a;
   --gold-hi:     #ddb06a;
+  --status-danger: #fda4af;
+  --status-success: #6ee7b7;
+  --status-warning: #fcd34d;
   --border:      rgba(196,153,90,0.10);
   --border-gold: rgba(196,153,90,0.22);
   --nav-bg:      rgba(12,9,5,0.88);
@@ -19,7 +22,7 @@
 }
 
 
-[data-theme='light'] .figma-site {
+[data-theme='light'], [data-theme='light'] .figma-site {
   --bg:          #f5ede0;
   --bg2:         #ede3d0;
   --bg3:         #e4d8c4;
@@ -30,6 +33,9 @@
   --dim2:        #d0bfa0;
   --gold:        #8a5e1e;
   --gold-hi:     #a87030;
+  --status-danger: #a01636;
+  --status-success: #086246;
+  --status-warning: #78500a;
   --border:      rgba(140,100,50,0.14);
   --border-gold: rgba(140,100,50,0.28);
   --nav-bg:      rgba(245,237,224,0.92);

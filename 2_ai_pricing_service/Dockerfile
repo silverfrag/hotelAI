@@ -10,6 +10,8 @@ RUN addgroup --system appuser \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=appuser:appuser app ./app
+RUN mkdir -p /app/.tmp/market-evidence /app/.tmp/market-decisions /app/.tmp/market-context \
+    && chown -R appuser:appuser /app/.tmp
 
 EXPOSE 8000
 USER appuser

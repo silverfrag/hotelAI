@@ -29,6 +29,7 @@ export interface AdminRoomType {
   type_name: string;
   base_price: number;
   capacity: number;
+  declared_max_price?: number | null;
   room_count: number;
 }
 
@@ -46,6 +47,7 @@ export interface RoomTypeInput {
   name: string;
   base_price: number;
   capacity: number;
+  declared_max_price?: number | null;
 }
 
 export interface PricingSettings {
@@ -170,6 +172,60 @@ export interface ReassignRoomInput {
   target_room_id: number;
   expected_assignment_version: number;
   reason: string;
+  is_upgrade?: boolean;
+}
+
+export interface AdminBookingPolicy {
+  policy_id: number;
+  version: number;
+  deposit_percent: number;
+  pending_ttl_minutes: number;
+  require_full_payment_at_checkout: boolean;
+  updated_at: string;
+  updated_by: string | null;
+  reason: string;
+}
+
+export interface UpdateAdminBookingPolicyInput {
+  expected_version: number;
+  reason: string;
+  deposit_percent?: number;
+  pending_ttl_minutes?: number;
+  require_full_payment_at_checkout?: boolean;
+}
+
+export interface AdminWorkflowReadiness {
+  pending_count: number;
+  expired_backlog: number;
+  oldest_expired_at: string | null;
+  expiry_worker: string;
+  last_expiry_run_at: string | null;
+  notification_channel: string;
+}
+
+export interface AdminExpirePendingResult {
+  expired_count: number;
+  booking_ids: string[];
+}
+
+export interface AdminBookingWorkflowActionResult {
+  replayed: boolean;
+  booking: import('@/types/booking.type').BookingFinancialStatus;
+}
+
+export interface AdminCreditAuthorization {
+  authorization_id: string;
+  booking_id: string;
+  authorized_amount: number;
+  reason: string;
+  idempotency_key: string;
+  authorized_by: string;
+  created_at: string;
+}
+
+export interface AdminCreditAuthorizationResult {
+  replayed: boolean;
+  authorization: AdminCreditAuthorization;
 }
 
 export interface AdminRoomReassignment {
@@ -232,9 +288,11 @@ export interface AdminDashboardSummary {
   booking_value: number;
   customer_count: number;
   room_count: number;
-  revpar: number;
+  revpar: number | null;
+  booking_value_per_room: number;
   occupancy_rate: number;
-  forecasted_demand: number;
+  forecasted_demand: number | null;
+  forecast_status: 'not_available';
 }
 
 export interface AdminMonthlyBookingValue {
@@ -334,7 +392,8 @@ export interface SmartUpgradeRecommendation {
   };
   upgrade_delta_value: number;
   occupancy_boost_reason: string;
-  confidence_score: number;
+  confidence_score: number | null;
+  recommendation_source?: 'rule_based';
 }
 
 export interface ExecuteUpgradeInput {
@@ -406,4 +465,260 @@ export interface TapeChartView {
   rooms: TapeChartRoomRow[];
 }
 
+export interface AiModelLineage {
+  model_version: string | null;
+  training_run_id: string | null;
+  feature_contract_version: string | null;
+}
 
+export interface AiShadowSettings {
+  shadow_enabled: boolean;
+  champion: AiModelLineage;
+  challenger: AiModelLineage;
+  guardrails: {
+    minimum_multiplier: number;
+    maximum_multiplier: number;
+    maximum_change_ratio_from_champion: number;
+  };
+  readiness_gates: {
+    minimum_confirmed_exposures: number;
+    minimum_conversions: number;
+    minimum_non_conversions: number;
+    minimum_shadow_days: number;
+    minimum_inference_coverage_ratio: number;
+    maximum_inference_error_ratio: number;
+  };
+  version: number;
+  updated_at: string;
+  updated_by: string | null;
+  mode: 'shadow_only';
+  automatic_promotion: false;
+}
+
+export interface UpdateAiShadowSettingsInput {
+  expected_version: number;
+  change_reason: string;
+  shadow_enabled?: boolean;
+  champion_model_version?: string | null;
+  champion_training_run_id?: string | null;
+  champion_feature_contract_version?: string | null;
+  challenger_model_version?: string | null;
+  challenger_training_run_id?: string | null;
+  challenger_feature_contract_version?: string | null;
+  guardrail_min_multiplier?: number;
+  guardrail_max_multiplier?: number;
+  guardrail_max_change_ratio?: number;
+  minimum_confirmed_exposures?: number;
+  minimum_conversions?: number;
+  minimum_non_conversions?: number;
+  minimum_shadow_days?: number;
+  minimum_inference_coverage_ratio?: number;
+  maximum_inference_error_ratio?: number;
+}
+
+export type AiShadowReadinessStatus =
+  | 'retired'
+  | 'paused'
+  | 'out_of_window_attempts'
+  | 'collecting'
+  | 'lineage_mismatch'
+  | 'excess_inference_errors'
+  | 'insufficient_inference_coverage'
+  | 'insufficient_shadow_days'
+  | 'data_quality_exclusions'
+  | 'insufficient_confirmed_exposures'
+  | 'insufficient_conversions'
+  | 'insufficient_non_conversions'
+  | 'ready_for_offline_review'
+  | string;
+
+export interface AiShadowReadiness {
+  control_version: number;
+  is_current_control: boolean;
+  challenger_model_version: string | null;
+  challenger_training_run_id: string | null;
+  challenger_feature_contract_version: string | null;
+  shadow_enabled: boolean;
+  minimum_confirmed_exposures: number;
+  minimum_conversions: number;
+  minimum_non_conversions: number;
+  minimum_shadow_days: number;
+  minimum_inference_coverage_ratio: number;
+  maximum_inference_error_ratio: number;
+  total_opportunity_quotes: number;
+  total_attempts: number;
+  in_window_attempts: number;
+  out_of_window_attempts: number;
+  succeeded_attempts: number;
+  succeeded_attempts_with_decisions: number;
+  orphan_succeeded_attempts: number;
+  failed_attempts: number;
+  lineage_mismatch_attempts: number;
+  inference_coverage_ratio: number | null;
+  inference_error_ratio: number | null;
+  total_decisions: number;
+  shadow_observation_days: number;
+  confirmed_exposure_decisions: number;
+  matured_labeled_decisions: number;
+  eligible_matured_decisions: number;
+  accepted_decisions: number;
+  non_accepted_decisions: number;
+  excluded_data_quality_decisions: number;
+  guardrail_adjusted_decisions: number;
+  mean_absolute_multiplier_delta: number | null;
+  conversion_brier_score: number | null;
+  readiness_status: AiShadowReadinessStatus;
+  last_attempt_at: string | null;
+  last_decision_at: string | null;
+}
+
+export interface AiShadowAudit {
+  audit_id: string;
+  setting_id: number;
+  shadow_enabled: boolean;
+  champion_model_version: string | null;
+  champion_training_run_id: string | null;
+  champion_feature_contract_version: string | null;
+  challenger_model_version: string | null;
+  challenger_training_run_id: string | null;
+  challenger_feature_contract_version: string | null;
+  guardrail_min_multiplier: number;
+  guardrail_max_multiplier: number;
+  guardrail_max_change_ratio: number;
+  minimum_confirmed_exposures: number;
+  minimum_conversions: number;
+  minimum_non_conversions: number;
+  minimum_shadow_days: number;
+  minimum_inference_coverage_ratio: number;
+  maximum_inference_error_ratio: number;
+  version: number;
+  change_reason: string;
+  changed_at: string;
+  changed_by: string | null;
+  is_current_control: boolean;
+}
+
+export interface AiShadowRuntimeStatus {
+  mode: 'shadow_only';
+  automatic_promotion: false;
+  causality_warning: string;
+  champion_artifact: {
+    status: 'ready' | 'unavailable';
+    model_version: string | null;
+    training_run_id: string | null;
+    feature_contract_version: string | null;
+  };
+  challenger_artifact: {
+    status: 'ready' | 'unavailable';
+    lifecycle_stage: 'shadow_only' | null;
+    model_version: string | null;
+    training_run_id: string | null;
+    feature_contract_version: string | null;
+    reason_vi: string;
+  };
+  attempt_summary: {
+    total_attempts: number;
+    succeeded_attempts: number;
+    failed_attempts: number;
+    unavailable_attempts: number;
+    timeout_attempts: number;
+    lineage_mismatch_attempts: number;
+    total_decisions: number;
+    last_attempt_at: string | null;
+  };
+}
+
+export interface UncertaintyInterval {
+  method: string;
+  calibration_rows: number;
+  ensemble_p10: number;
+  ensemble_p50: number;
+  ensemble_p90: number;
+  ensemble_std: number;
+  conformal_alpha: number;
+  target_coverage: number;
+  empirical_holdout_coverage: number | null;
+  conformal_low: number;
+  conformal_high: number;
+  ood_distance: number;
+  ood_p95_threshold: number | null;
+  ood_p99_threshold: number | null;
+  ood_status: 'in_distribution' | 'border' | 'out_of_distribution';
+  ood_notes: string[];
+}
+
+export interface FeatureDriftItem {
+  feature: string;
+  psi: number;
+  status: 'stable' | 'warning' | 'drift_detected';
+  baseline_mean: number;
+  current_mean: number;
+  baseline_std: number;
+  current_std: number;
+  ks_stat?: number;
+  ks_pvalue?: number;
+  wasserstein_distance?: number;
+  baseline_median?: number;
+  current_median?: number;
+  baseline_rows?: number;
+  baseline_source?: string;
+}
+
+export interface AdminDriftMonitoring {
+  status: 'ready' | 'unavailable';
+  observation_source: 'live_pricing_quotes' | 'baseline_diagnostic_sample';
+  baseline_source?: string;
+  sample_count: number;
+  total_quotes_in_db: number;
+  assessed_at: string;
+  overall_status: 'healthy' | 'degraded' | 'drift_alert' | null;
+  total_features_monitored: number;
+  features_with_drift: number;
+  features_with_warning: number;
+  reports: FeatureDriftItem[];
+  recommendations: string[];
+  note_vi: string;
+}
+
+export interface ExplainPricingSampleInput {
+  lead_time: number;
+  check_in_date: string;
+  check_out_date: string;
+  guest_count: number;
+}
+
+export interface PriceExplanationFeatureAttribution {
+  feature: string;
+  value: number | string;
+  attribution: number;
+  pct_contribution: number;
+  category: 'demand' | 'temporal';
+  human_label: string;
+  interpretation: string;
+}
+
+export interface PriceExplanationPayload {
+  primary_driver: string;
+  demand_share_pct: number;
+  temporal_share_pct: number;
+  attributions: PriceExplanationFeatureAttribution[];
+  counterfactual: string;
+  ai_vs_script_note: string;
+}
+
+export type AdminExplainSampleResult =
+  | {
+      available: true;
+      ai_multiplier: number;
+      model_version: string;
+      training_run_id: string;
+      feature_contract_version: string;
+      features: Record<string, number>;
+      uncertainty?: UncertaintyInterval | null;
+      explanation: PriceExplanationPayload;
+    }
+  | {
+      available: false;
+      status_code: number | null;
+      reason_vi: string;
+    };

@@ -15,6 +15,11 @@ import {
 } from 'lucide-react';
 import { PageContainer } from '@/components/common/PageContainer';
 import { PageHeader } from '@/components/common/PageHeader';
+import { AdminExplainSamplePanel } from '@/components/features/admin/AdminExplainSamplePanel';
+import { AiDriftMonitorPanel } from '@/components/features/admin/AiDriftMonitorPanel';
+import { AiShadowControlPanel } from '@/components/features/admin/AiShadowControlPanel';
+import { BanditPolicyLabPanel } from '@/components/features/admin/BanditPolicyLabPanel';
+import { PricingIntelligencePanel } from '@/components/features/admin/PricingIntelligencePanel';
 import {
   Badge,
   Button,
@@ -175,6 +180,7 @@ export function AdminPricingManager() {
   const [notice, setNotice] = useState('');
   const [updating, setUpdating] = useState(false);
   const [confirmDisable, setConfirmDisable] = useState(false);
+  const [panelRefreshSignal, setPanelRefreshSignal] = useState(0);
 
   const loadSettings = useCallback(async () => {
     if (!accessToken) return;
@@ -213,6 +219,7 @@ export function AdminPricingManager() {
 
   const refreshAll = useCallback(async () => {
     setRefreshing(true);
+    setPanelRefreshSignal((prev) => prev + 1);
     await Promise.all([loadSettings(), loadLogs(offset)]);
     setRefreshing(false);
   }, [loadLogs, loadSettings, offset]);
@@ -226,8 +233,8 @@ export function AdminPricingManager() {
       const nextSettings = await updatePricingSettings(accessToken, aiEnabled, settings.version);
       setSettings(nextSettings);
       setNotice(aiEnabled
-        ? 'AI Pricing đã được kích hoạt. Báo giá mới sẽ tự động tính theo hệ số động.'
-        : 'AI Pricing đã tắt. Báo giá mới sẽ dùng giá cơ sở chuẩn.');
+        ? 'Đã bật cấu hình dùng AI cho báo giá mới.'
+        : 'Đã tắt cấu hình dùng AI. Báo giá mới sẽ dùng giá cơ sở chuẩn.');
       setConfirmDisable(false);
     } catch (caught) {
       if (caught instanceof AdminApiError && caught.status === 409) {
@@ -254,7 +261,7 @@ export function AdminPricingManager() {
     <PageContainer>
       <PageHeader
         title="Định giá & Doanh thu"
-        description="Điều khiển mô hình AI Pricing và kiểm toán truy vết mức giá đã áp dụng cho từng đặt phòng."
+        description="Cấu hình nguồn giá cho báo giá mới và xem lịch sử giá đã áp dụng cho từng đặt phòng."
         actions={
           <Button variant="outline" onClick={() => void refreshAll()} disabled={refreshing}>
             <RefreshCw className={cn('size-4', refreshing && 'animate-spin text-amber-400')} />
@@ -280,15 +287,15 @@ export function AdminPricingManager() {
                   <div className="flex size-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-sm">
                     <Bot className="size-4.5" />
                   </div>
-                  Mô hình AI Dynamic Pricing
+                  Cấu hình AI Pricing
                 </CardTitle>
                 <CardDescription className="mt-1.5">
-                  Tự động điều chỉnh hệ số giá linh hoạt dựa trên dữ liệu lịch sử đặt phòng và thời gian thực.
+                  Cho phép báo giá mới sử dụng mô hình tham chiếu học từ giá phòng lịch sử.
                 </CardDescription>
               </div>
               {!settingsLoading && settings && (
-                <Badge variant={settings.ai_enabled ? 'success' : 'neutral'} dot>
-                  {settings.ai_enabled ? 'Đang hoạt động' : 'Tạm dừng'}
+                <Badge variant={settings.ai_enabled ? 'primary' : 'neutral'}>
+                  {settings.ai_enabled ? 'Đã bật cấu hình' : 'Đã tắt cấu hình'}
                 </Badge>
               )}
             </div>
@@ -304,11 +311,11 @@ export function AdminPricingManager() {
                 <div className="flex flex-col gap-4 rounded-xl border border-white/[0.08] bg-slate-900/60 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0 flex-1 pr-4">
                     <p className="text-sm font-semibold text-slate-100">
-                      {settings.ai_enabled ? 'Mô hình học máy đang tính giá động' : 'Đang áp dụng hệ số chuẩn'}
+                      {settings.ai_enabled ? 'Cho phép dùng AI cho báo giá mới' : 'Báo giá mới dùng giá cơ sở'}
                     </p>
                     <p className="mt-1 text-xs leading-relaxed text-slate-400">
                       {settings.ai_enabled
-                        ? 'Giá cơ sở của loại phòng được nhân với hệ số dự đoán theo ngày đến, lead-time, số đêm, cuối tuần và số khách.'
+                        ? 'Báo giá cần kết quả hợp lệ từ mô hình. Xem trạng thái dịch vụ và phạm vi kiểm chứng tại bảng Dữ liệu điều hành AI bên dưới.'
                         : 'Báo giá mới đang áp dụng hệ số chuẩn 1.000 từ giá cơ sở của loại phòng.'}
                     </p>
                   </div>
@@ -346,7 +353,7 @@ export function AdminPricingManager() {
                   )}
                   <span className="flex items-center gap-1.5">
                     <span className="size-1.5 rounded-full bg-slate-500" />
-                    Phiên bản: <strong className="font-mono font-medium text-slate-300">v{settings.version}</strong>
+                    Phiên bản cấu hình: <strong className="font-mono font-medium text-slate-300">v{settings.version}</strong>
                   </span>
                 </div>
               </>
@@ -392,6 +399,16 @@ export function AdminPricingManager() {
         </Card>
       </div>
 
+      <PricingIntelligencePanel />
+
+      <AiShadowControlPanel refreshSignal={panelRefreshSignal} />
+
+      <BanditPolicyLabPanel refreshSignal={panelRefreshSignal} />
+
+      <AiDriftMonitorPanel refreshSignal={panelRefreshSignal} />
+
+      <AdminExplainSamplePanel refreshSignal={panelRefreshSignal} />
+
       {/* Audit Log Table */}
       <Card>
         <CardHeader className="flex-row items-start justify-between gap-4 border-b border-white/[0.08] pb-4">
@@ -403,7 +420,7 @@ export function AdminPricingManager() {
               Nhật ký kiểm toán định giá
             </CardTitle>
             <CardDescription className="mt-1">
-              Mỗi bản ghi ghi lại đầy đủ các tham số và hệ số AI tại thời điểm khách hàng yêu cầu báo giá.
+              Thông số và hệ số giá đã lưu cho từng đặt phòng, kèm nguồn giá áp dụng.
             </CardDescription>
           </div>
           {!logsLoading && (
@@ -465,7 +482,7 @@ export function AdminPricingManager() {
         description="Thay đổi áp dụng cho báo giá mới. Các báo giá còn hiệu lực và booking đã lưu vẫn giữ nguyên giá."
         footer={
           <>
-            <Button variant="outline" onClick={() => setConfirmDisable(false)} disabled={updating}>Giữ AI hoạt động</Button>
+            <Button variant="outline" onClick={() => setConfirmDisable(false)} disabled={updating}>Giữ cấu hình hiện tại</Button>
             <Button variant="danger" onClick={() => void applyAiSetting(false)} disabled={updating}>
               {updating && <LoaderCircle className="animate-spin" />}
               Tắt AI Pricing

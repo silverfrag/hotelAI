@@ -1,11 +1,13 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -127,6 +129,106 @@ export type SmartUpgradeRecommendation = {
   };
   upgrade_delta_value: number;
   occupancy_boost_reason: string;
-  confidence_score: number;
+  confidence_score: number | null;
+  recommendation_source: 'rule_based';
 };
 
+export class AllocationQueueQueryDto {
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  start_date?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  end_date?: string;
+}
+
+export class OptimizeBookingQueueDto {
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  booking_ids?: string[];
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  start_date?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  end_date?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  allow_upgrades?: boolean;
+}
+
+export type AdminAllocationQueueItem = {
+  booking_id: string;
+  customer_id: string;
+  customer_name: string;
+  loyalty_tier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+  status: string;
+  check_in_date: string;
+  check_out_date: string;
+  nights: number;
+  guest_count: number;
+  total_price: number;
+  current_room_id: number;
+  current_room_number: string;
+  current_type_id: number;
+  current_type_name: string;
+  current_base_price: number;
+  room_current_status: string;
+  housekeeping_status: string;
+  room_assignment_version: number;
+  requires_ready_now: boolean;
+  can_optimize: boolean;
+};
+
+export type AdminQueueOptimizationRecommendation = {
+  booking_id: string;
+  customer_name: string;
+  loyalty_tier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+  check_in_date: string;
+  check_out_date: string;
+  nights: number;
+  guest_count: number;
+  total_price: number;
+  expected_assignment_version: number;
+  requires_ready_now: boolean;
+  status: 'ASSIGNED' | 'REJECTED_NO_CAPACITY';
+  changed: boolean;
+  is_upgrade: boolean;
+  upgrade_delta_value: number;
+  current_room: {
+    room_id: number;
+    room_number: string;
+    type_id: number;
+    type_name: string;
+    base_price: number;
+  };
+  recommended_room: {
+    room_id: number;
+    room_number: string;
+    type_id: number;
+    type_name: string;
+    base_price: number;
+  } | null;
+  reason_vi: string;
+};
+
+export type AdminQueueOptimizationResult = {
+  status: string;
+  solver_time_ms: number;
+  total_assigned_revenue: number;
+  evaluated_bookings: number;
+  changed_count: number;
+  upgrade_count: number;
+  unassigned_request_ids: string[];
+  audit_notes: string[];
+  window_start: string;
+  window_end: string;
+  existing_occupancy_count: number;
+  provenance: string;
+  recommendations: AdminQueueOptimizationRecommendation[];
+};

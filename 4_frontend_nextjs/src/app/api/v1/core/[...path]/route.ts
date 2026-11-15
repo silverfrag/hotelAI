@@ -64,8 +64,9 @@ async function forward(request: Request, context: Context): Promise<Response> {
     const body = unsafe ? await readBody(request) : undefined;
     const target = `${getBackendApiUrl()}/${path.map(encodeURIComponent).join('/')}${url.search}`;
     if (new URL(target).origin === url.origin) return apiError(503, 'Hotel service is not configured.');
+    const timeout = path.join('/') === 'revenue/market-decision' ? 50000 : 15000;
     const upstream = await fetch(target, {
-      method: request.method, headers, body, cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(15000),
+      method: request.method, headers, body, cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(timeout),
     });
     if (upstream.status >= 300 && upstream.status < 400) return apiError(502, 'Hotel service returned an unexpected redirect.');
     const responseHeaders = new Headers({ 'Cache-Control': 'no-store' });

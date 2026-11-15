@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.schemas.pricing_schema import (
+    ExplainPricingResponse,
     HealthResponse,
     ModelInfoResponse,
     PricingFeatures,
@@ -74,8 +75,11 @@ def model_info(
 @router.post(
     "/api/v1/predict-price",
     response_model=PricingResponse,
+    response_model_exclude_none=True,
     responses={503: {"description": "Pricing model is unavailable."}},
     tags=["pricing"],
+    summary="Tính giá động AI",
+    description="Historical ADR benchmark using the released V2 temporal contract.",
 )
 def predict_dynamic_price(
     payload: PricingRequest,
@@ -100,4 +104,42 @@ def predict_dynamic_price(
         training_run_id=prediction.training_run_id,
         feature_contract_version=prediction.feature_contract_version,
         features=PricingFeatures(**prediction.features),
+        uncertainty=prediction.uncertainty,
+    )
+
+
+@router.post(
+    "/api/v1/explain-price",
+    response_model=ExplainPricingResponse,
+    responses={503: {"description": "Pricing model is unavailable."}},
+    tags=["pricing"],
+    summary="Giải thích quyết định giá AI",
+    description="Saabas Tree Interpreter decomposition when tree estimators are available; returns 503 if unvalidated.",
+)
+def explain_dynamic_price(
+    payload: PricingRequest,
+    service: PricingInferenceService = Depends(get_inference_service),
+) -> ExplainPricingResponse:
+    """Explain Random Forest V2 prediction via Saabas Tree Interpreter or return controlled 503."""
+    try:
+        prediction, explanation = service.explain_prediction(payload)
+    except ModelUnavailableError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+    except InferenceError as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Pricing inference failed.",
+        ) from error
+
+    return ExplainPricingResponse(
+        ai_multiplier=prediction.multiplier,
+        model_version=prediction.model_version,
+        training_run_id=prediction.training_run_id,
+        feature_contract_version=prediction.feature_contract_version,
+        features=PricingFeatures(**prediction.features),
+        uncertainty=prediction.uncertainty,
+        explanation=explanation,
     )

@@ -7,6 +7,7 @@ import { Room } from '../bookings/entities/room.entity';
 import { RoomType } from '../rooms/entities/room.entity';
 import { AdminPricingController } from './admin-pricing.controller';
 import { AdminPricingService } from './admin-pricing.service';
+import { AdminPricingIntelligenceService } from './admin-pricing-intelligence.service';
 import { AdminOperationsController } from './admin-operations.controller';
 import { AdminOperationsService } from './admin-operations.service';
 import { AdminRoomsController } from './admin-rooms.controller';
@@ -18,10 +19,13 @@ import { AdminAiShadowController } from './admin-ai-shadow.controller';
 import { AdminAiShadowService } from './admin-ai-shadow.service';
 import { AdminRoomTurnoverController } from './admin-room-turnover.controller';
 import { AdminRoomTurnoverService } from './admin-room-turnover.service';
+import { AdminCouponsController } from './admin-coupons.controller';
+import { AdminCouponsService } from './admin-coupons.service';
 import { BookingWorkflowModule } from '../booking-workflow/booking-workflow.module';
+import { RevenueModule } from '../revenue/revenue.module';
 
 @Module({
-  imports: [AuthModule, BookingWorkflowModule, TypeOrmModule.forFeature([Customer, DailyPricingLog, PricingSetting, Room, RoomType])],
+  imports: [AuthModule, BookingWorkflowModule, RevenueModule, TypeOrmModule.forFeature([Customer, DailyPricingLog, PricingSetting, Room, RoomType])],
   controllers: [
     AdminRoomsController,
     AdminPricingController,
@@ -29,14 +33,17 @@ import { BookingWorkflowModule } from '../booking-workflow/booking-workflow.modu
     AdminUsersController,
     AdminAiShadowController,
     AdminRoomTurnoverController,
+    AdminCouponsController,
   ],
   providers: [
     AdminRoomsService,
     AdminPricingService,
+    AdminPricingIntelligenceService,
     AdminOperationsService,
     AdminUsersService,
     AdminAiShadowService,
     AdminRoomTurnoverService,
+    AdminCouponsService,
   ],
 })
 export class AdminModule {}

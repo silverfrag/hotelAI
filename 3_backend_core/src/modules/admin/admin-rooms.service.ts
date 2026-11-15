@@ -14,6 +14,7 @@ export type AdminRoomTypeView = {
   type_name: string;
   base_price: number;
   capacity: number;
+  declared_max_price: number | null;
   room_count: number;
 };
 
@@ -47,19 +48,28 @@ export class AdminRoomsService {
               room_type.name AS type_name,
               room_type.base_price,
               room_type.capacity,
+              room_type.declared_max_price,
               COUNT(room.room_id)::int AS room_count
        FROM room_types room_type
        LEFT JOIN rooms room ON room.type_id = room_type.type_id
-       GROUP BY room_type.type_id, room_type.name, room_type.base_price, room_type.capacity
+       GROUP BY room_type.type_id, room_type.name, room_type.base_price, room_type.capacity, room_type.declared_max_price
        ORDER BY room_type.base_price ASC, room_type.type_id ASC`,
     );
     return rows.map((row: Record<string, unknown>) => this.mapRoomType(row));
   }
 
   async createRoomType(dto: CreateRoomTypeDto): Promise<AdminRoomTypeView> {
+    if (dto.declared_max_price != null && dto.declared_max_price < dto.base_price) {
+      throw new BadRequestException('Giá trần kê khai không thể nhỏ hơn giá cơ sở.');
+    }
     try {
       const saved = await this.roomTypes.save(
-        this.roomTypes.create({ type_name: dto.name, base_price: dto.base_price, capacity: dto.capacity }),
+        this.roomTypes.create({
+          type_name: dto.name,
+          base_price: dto.base_price,
+          capacity: dto.capacity,
+          declared_max_price: dto.declared_max_price ?? null,
+        }),
       );
       await this.cache.delete(ROOM_TYPES_CACHE_KEY);
       return this.getRoomType(saved.type_id);
@@ -73,9 +83,16 @@ export class AdminRoomsService {
     const roomType = await this.roomTypes.findOne({ where: { type_id: typeId } });
     if (!roomType) throw new NotFoundException('Không tìm thấy loại phòng.');
 
+    const nextBase = dto.base_price !== undefined ? dto.base_price : roomType.base_price;
+    const nextMax = dto.declared_max_price !== undefined ? dto.declared_max_price : roomType.declared_max_price;
+    if (nextMax != null && nextMax < nextBase) {
+      throw new BadRequestException('Giá trần kê khai không thể nhỏ hơn giá cơ sở.');
+    }
+
     if (dto.name !== undefined) roomType.type_name = dto.name;
     if (dto.base_price !== undefined) roomType.base_price = dto.base_price;
     if (dto.capacity !== undefined) roomType.capacity = dto.capacity;
+    if (dto.declared_max_price !== undefined) roomType.declared_max_price = dto.declared_max_price;
 
     try {
       await this.roomTypes.save(roomType);
@@ -255,11 +272,12 @@ export class AdminRoomsService {
               room_type.name AS type_name,
               room_type.base_price,
               room_type.capacity,
+              room_type.declared_max_price,
               COUNT(room.room_id)::int AS room_count
        FROM room_types room_type
        LEFT JOIN rooms room ON room.type_id = room_type.type_id
        WHERE room_type.type_id = $1
-       GROUP BY room_type.type_id, room_type.name, room_type.base_price, room_type.capacity`,
+       GROUP BY room_type.type_id, room_type.name, room_type.base_price, room_type.capacity, room_type.declared_max_price`,
       [typeId],
     );
     if (!rows.length) throw new NotFoundException('Không tìm thấy loại phòng.');
@@ -295,6 +313,7 @@ export class AdminRoomsService {
       type_name: String(row.type_name),
       base_price: Number(row.base_price),
       capacity: Number(row.capacity),
+      declared_max_price: row.declared_max_price == null ? null : Number(row.declared_max_price),
       room_count: Number(row.room_count),
     };
   }

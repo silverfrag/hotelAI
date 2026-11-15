@@ -4,15 +4,23 @@ import {
   HttpException,
   Injectable,
   NotFoundException,
+  Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, EntityManager } from 'typeorm';
 import { getPostgresErrorCode } from '../../common/utils/postgres-error';
 import { OutboxService } from '../../infrastructure/outbox.service';
+import { RevenueService } from '../revenue/revenue.service';
 import {
+  AdminAllocationQueueItem,
+  AdminQueueOptimizationRecommendation,
+  AdminQueueOptimizationResult,
+  AllocationQueueQueryDto,
   ExecuteUpgradeDto,
   HousekeepingQueueQueryDto,
   HousekeepingStatus,
+  OptimizeBookingQueueDto,
   ReassignRoomDto,
   SmartUpgradeRecommendation,
   UpdateHousekeepingStatusDto,
@@ -60,6 +68,7 @@ type LockedBookingAssignment = {
   booking_id: string;
   customer_id: string;
   status: string;
+  guest_count: number | string;
   check_in_date: string;
   check_out_date: string;
   booking_detail_id: string;
@@ -130,6 +139,7 @@ export class AdminRoomTurnoverService {
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
     private readonly outbox: OutboxService,
+    @Optional() private readonly revenueService?: RevenueService,
   ) {}
 
   async listHousekeeping(query: HousekeepingQueueQueryDto): Promise<{
@@ -348,6 +358,9 @@ export class AdminRoomTurnoverService {
           const sourceType = roomTypes.find((t) => Number(t.type_id) === Number(sourceRoom.type_id));
           const targetType = roomTypes.find((t) => Number(t.type_id) === Number(targetRoom.type_id));
           if (!sourceType || !targetType) throw new NotFoundException('Không tìm thấy thông tin loại phòng.');
+          if (Number(targetType.capacity) < Number(assignment.guest_count)) {
+            throw new ConflictException('Phòng nâng hạng không đủ sức chứa cho số khách của booking.');
+          }
           if (Number(targetType.base_price) < Number(sourceType.base_price)) {
             throw new ConflictException('Nâng hạng phòng yêu cầu loại phòng đích có giá trị bằng hoặc cao hơn.');
           }
@@ -356,12 +369,8 @@ export class AdminRoomTurnoverService {
           if (Number(sourceRoom.type_id) !== Number(targetRoom.type_id)) {
             throw new ConflictException('Phòng đích phải cùng loại với phòng hiện tại.');
           }
-          if (
-            assignment.pricing_type_id !== null
-            && Number(assignment.pricing_type_id) !== Number(targetRoom.type_id)
-          ) {
-            throw new ConflictException('Loại phòng đích không khớp snapshot định giá của booking.');
-          }
+          // A complimentary upgrade preserves the original pricing snapshot.
+          // Subsequent moves must match the currently assigned room type.
         }
         if (targetRoom.current_status === 'Maintenance') {
           throw new ConflictException('Không thể đổi booking sang phòng đang bảo trì.');
@@ -420,7 +429,9 @@ export class AdminRoomTurnoverService {
            SET room_id = $2,
                room_number_snapshot = $3,
                room_assignment_version = $4,
-               room_type_name_snapshot = COALESCE((SELECT name FROM room_types WHERE type_id = $7), room_type_name_snapshot)
+                room_type_name_snapshot = CASE WHEN $8::boolean
+                  THEN COALESCE((SELECT name FROM room_types WHERE type_id = $7), room_type_name_snapshot)
+                  ELSE room_type_name_snapshot END
            WHERE detail_id = $1::uuid
              AND room_id = $5
              AND room_assignment_version = $6
@@ -433,6 +444,7 @@ export class AdminRoomTurnoverService {
             sourceRoomId,
             dto.expected_assignment_version,
             Number(targetRoom.type_id),
+            dto.is_upgrade === true,
           ],
         );
         if (this.affectedRows(updatedDetails) !== 1) {
@@ -614,6 +626,7 @@ export class AdminRoomTurnoverService {
       `SELECT booking.booking_id,
               booking.customer_id,
               booking.status,
+              booking.guest_count,
               booking.check_in_date::text,
               booking.check_out_date::text,
               detail.detail_id AS booking_detail_id,
@@ -946,7 +959,440 @@ export class AdminRoomTurnoverService {
     return `${values.year}-${values.month}-${values.day}`;
   }
 
+  private addDays(dateStr: string, days: number): string {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(Date.UTC(y, m - 1, d));
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  }
+
+  private loyaltyPriority(tier: string): number {
+    switch (tier) {
+      case 'Platinum':
+        return 4;
+      case 'Gold':
+        return 3;
+      case 'Silver':
+        return 2;
+      default:
+        return 1;
+    }
+  }
+
+  async getAllocationQueue(query: AllocationQueueQueryDto): Promise<{
+    business_date: string;
+    start_date: string;
+    end_date: string;
+    items: AdminAllocationQueueItem[];
+  }> {
+    const businessDate = this.getBusinessDate();
+    const startDate = query.start_date || businessDate;
+    const endDate = query.end_date || this.addDays(startDate, 60);
+    if (endDate <= startDate) {
+      throw new BadRequestException('Ngày kết thúc cửa sổ hàng đợi phải sau ngày bắt đầu.');
+    }
+
+    const rows = (await this.dataSource.query(
+      `SELECT b.booking_id,
+              b.customer_id,
+              c.full_name AS customer_name,
+              c.loyalty_tier,
+              b.status,
+              to_char(b.check_in_date, 'YYYY-MM-DD') AS check_in_date,
+              to_char(b.check_out_date, 'YYYY-MM-DD') AS check_out_date,
+              (b.check_out_date - b.check_in_date)::int AS nights,
+              b.guest_count,
+              (bd.applied_price * (b.check_out_date - b.check_in_date))::numeric AS total_price,
+              bd.room_id AS current_room_id,
+              bd.room_assignment_version,
+              r.room_number AS current_room_number,
+              r.type_id AS current_type_id,
+              rt.name AS current_type_name,
+              rt.base_price AS current_base_price,
+              r.current_status AS room_current_status,
+              r.housekeeping_status
+       FROM bookings b
+       INNER JOIN customers c ON b.customer_id = c.customer_id
+       INNER JOIN booking_details bd ON b.booking_id = bd.booking_id
+       INNER JOIN rooms r ON bd.room_id = r.room_id
+       INNER JOIN room_types rt ON r.type_id = rt.type_id
+       WHERE (b.status IN ('Confirmed', 'CheckedIn')
+         OR (b.status = 'Pending' AND b.pending_expires_at > clock_timestamp()))
+         AND b.check_in_date < $2::date
+         AND b.check_out_date > $1::date
+         AND (SELECT COUNT(*) FROM booking_details d WHERE d.booking_id = b.booking_id) = 1
+       ORDER BY b.check_in_date ASC, b.created_at ASC, b.booking_id ASC
+       LIMIT 100`,
+      [startDate, endDate],
+    )) as Array<Record<string, unknown>>;
+
+    const items: AdminAllocationQueueItem[] = rows.map((row) => {
+      const status = String(row.status);
+      const checkInDate = String(row.check_in_date);
+      const checkOutDate = String(row.check_out_date);
+      return {
+        booking_id: String(row.booking_id),
+        customer_id: String(row.customer_id),
+        customer_name: String(row.customer_name),
+        loyalty_tier: (String(row.loyalty_tier || 'Bronze') as AdminAllocationQueueItem['loyalty_tier']),
+        status,
+        check_in_date: checkInDate,
+        check_out_date: checkOutDate,
+        nights: Number(row.nights),
+        guest_count: Number(row.guest_count),
+        total_price: Number(row.total_price),
+        current_room_id: Number(row.current_room_id),
+        current_room_number: String(row.current_room_number),
+        current_type_id: Number(row.current_type_id),
+        current_type_name: String(row.current_type_name),
+        current_base_price: Number(row.current_base_price),
+        room_current_status: String(row.room_current_status),
+        housekeeping_status: String(row.housekeeping_status),
+        room_assignment_version: Number(row.room_assignment_version),
+        requires_ready_now: status === 'CheckedIn' || (checkInDate <= businessDate && checkOutDate > businessDate),
+        can_optimize: status === 'Confirmed',
+      };
+    });
+
+    return {
+      business_date: businessDate,
+      start_date: startDate,
+      end_date: endDate,
+      items,
+    };
+  }
+
+  async optimizeBookingQueue(dto: OptimizeBookingQueueDto): Promise<AdminQueueOptimizationResult> {
+    if (!this.revenueService) {
+      throw new ServiceUnavailableException('Revenue optimizer service chưa sẵn sàng.');
+    }
+
+    const businessDate = this.getBusinessDate();
+    const startDate = dto.start_date || businessDate;
+    const endDate = dto.end_date || this.addDays(startDate, 60);
+    if (endDate <= startDate) {
+      throw new BadRequestException('Ngày kết thúc tối ưu phải sau ngày bắt đầu.');
+    }
+
+    let targetRows: Array<Record<string, unknown>>;
+    if (dto.booking_ids && dto.booking_ids.length > 0) {
+      const uniqueIds = [...new Set(dto.booking_ids)];
+      targetRows = (await this.dataSource.query(
+        `SELECT b.booking_id,
+                c.full_name AS customer_name,
+                c.loyalty_tier,
+                to_char(b.check_in_date, 'YYYY-MM-DD') AS check_in_date,
+                to_char(b.check_out_date, 'YYYY-MM-DD') AS check_out_date,
+                (b.check_out_date - b.check_in_date)::int AS nights,
+                b.guest_count,
+                (bd.applied_price * (b.check_out_date - b.check_in_date))::numeric AS total_price,
+                bd.room_id AS current_room_id,
+                bd.room_assignment_version,
+                r.room_number AS current_room_number,
+                r.type_id AS current_type_id,
+                rt.name AS current_type_name,
+                rt.base_price AS current_base_price
+         FROM bookings b
+         INNER JOIN customers c ON b.customer_id = c.customer_id
+         INNER JOIN booking_details bd ON b.booking_id = bd.booking_id
+         INNER JOIN rooms r ON bd.room_id = r.room_id
+         INNER JOIN room_types rt ON r.type_id = rt.type_id
+         WHERE b.booking_id = ANY($1::uuid[])
+           AND b.status = 'Confirmed'
+           AND (SELECT COUNT(*) FROM booking_details d WHERE d.booking_id = b.booking_id) = 1
+         ORDER BY b.check_in_date ASC, b.created_at ASC, b.booking_id ASC`,
+        [uniqueIds],
+      )) as Array<Record<string, unknown>>;
+
+      if (targetRows.length !== uniqueIds.length) {
+        throw new BadRequestException(
+          'Chỉ tối ưu được các booking đang ở trạng thái Confirmed một phòng.',
+        );
+      }
+    } else {
+      targetRows = (await this.dataSource.query(
+        `SELECT b.booking_id,
+                c.full_name AS customer_name,
+                c.loyalty_tier,
+                to_char(b.check_in_date, 'YYYY-MM-DD') AS check_in_date,
+                to_char(b.check_out_date, 'YYYY-MM-DD') AS check_out_date,
+                (b.check_out_date - b.check_in_date)::int AS nights,
+                b.guest_count,
+                (bd.applied_price * (b.check_out_date - b.check_in_date))::numeric AS total_price,
+                bd.room_id AS current_room_id,
+                bd.room_assignment_version,
+                r.room_number AS current_room_number,
+                r.type_id AS current_type_id,
+                rt.name AS current_type_name,
+                rt.base_price AS current_base_price
+         FROM bookings b
+         INNER JOIN customers c ON b.customer_id = c.customer_id
+         INNER JOIN booking_details bd ON b.booking_id = bd.booking_id
+         INNER JOIN rooms r ON bd.room_id = r.room_id
+         INNER JOIN room_types rt ON r.type_id = rt.type_id
+         WHERE b.status = 'Confirmed'
+           AND b.check_in_date < $2::date
+           AND b.check_out_date > $1::date
+           AND (SELECT COUNT(*) FROM booking_details d WHERE d.booking_id = b.booking_id) = 1
+         ORDER BY b.check_in_date ASC, b.created_at ASC, b.booking_id ASC
+         LIMIT 80`,
+        [startDate, endDate],
+      )) as Array<Record<string, unknown>>;
+    }
+
+    if (targetRows.length === 0) {
+      return {
+        status: 'OPTIMAL',
+        solver_time_ms: 0,
+        total_assigned_revenue: 0,
+        evaluated_bookings: 0,
+        changed_count: 0,
+        upgrade_count: 0,
+        unassigned_request_ids: [],
+        audit_notes: [
+          `Không tìm thấy booking Confirmed một phòng trong khoảng ${startDate} → ${endDate}.`,
+        ],
+        window_start: startDate,
+        window_end: endDate,
+        existing_occupancy_count: 0,
+        provenance: '(B) SIMULATED_SYSTEM_STATE + (D) BUSINESS_RULE (Google OR-Tools CP-SAT)',
+        recommendations: [],
+      };
+    }
+
+    const targetBookingIds = targetRows.map((row) => String(row.booking_id));
+    const minCheckIn = targetRows
+      .map((row) => String(row.check_in_date))
+      .reduce((a, b) => (a < b ? a : b));
+    const maxCheckOut = targetRows
+      .map((row) => String(row.check_out_date))
+      .reduce((a, b) => (a > b ? a : b));
+
+    const [roomRows, occupancyRows] = await Promise.all([
+      this.dataSource.query(
+        `SELECT r.room_id,
+                r.room_number,
+                r.type_id,
+                rt.name AS type_name,
+                rt.base_price,
+                rt.capacity,
+                r.current_status,
+                r.occupancy_booking_id,
+                r.housekeeping_status
+         FROM rooms r
+         INNER JOIN room_types rt ON rt.type_id = r.type_id
+         ORDER BY r.type_id ASC, r.room_number ASC`,
+      ) as Promise<Array<Record<string, unknown>>>,
+      this.dataSource.query(
+        `SELECT bd.room_id,
+                to_char(b.check_in_date, 'YYYY-MM-DD') AS check_in_date,
+                to_char(b.check_out_date, 'YYYY-MM-DD') AS check_out_date,
+                b.booking_id::text AS booking_id
+         FROM booking_details bd
+         INNER JOIN bookings b ON b.booking_id = bd.booking_id
+         WHERE (b.status IN ('Confirmed', 'CheckedIn')
+           OR (b.status = 'Pending' AND b.pending_expires_at > clock_timestamp()))
+           AND b.check_in_date < $2::date
+           AND b.check_out_date > $1::date
+           AND NOT (b.booking_id = ANY($3::uuid[]))
+         ORDER BY b.check_in_date ASC`,
+        [minCheckIn, maxCheckOut, targetBookingIds],
+      ) as Promise<Array<Record<string, unknown>>>,
+    ]);
+
+    const roomCatalogById = new Map<
+      number,
+      { room_id: number; room_number: string; type_id: number; type_name: string; base_price: number }
+    >();
+
+    const availableRooms = roomRows.map((r) => {
+      const roomId = Number(r.room_id);
+      const item = {
+        room_id: roomId,
+        room_number: String(r.room_number),
+        type_id: Number(r.type_id),
+        type_name: String(r.type_name),
+        base_price: Number(r.base_price),
+      };
+      roomCatalogById.set(roomId, item);
+      const effectiveStatus =
+        r.occupancy_booking_id !== null && String(r.current_status) === 'Available'
+          ? 'Occupied'
+          : String(r.current_status);
+      return {
+        room_id: roomId,
+        room_number: item.room_number,
+        type_id: item.type_id,
+        capacity: Number(r.capacity),
+        current_status: effectiveStatus,
+        housekeeping_status: String(r.housekeeping_status),
+        base_price: item.base_price,
+      };
+    });
+
+    const solverRequests = targetRows.map((row) => {
+      const checkIn = String(row.check_in_date);
+      const checkOut = String(row.check_out_date);
+      const loyaltyTier = String(row.loyalty_tier || 'Bronze');
+      return {
+        request_id: String(row.booking_id),
+        room_type_id: Number(row.current_type_id),
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        guest_count: Number(row.guest_count),
+        revenue_value: Number(row.total_price),
+        vip_priority: this.loyaltyPriority(loyaltyTier),
+        requested_base_price: Number(row.current_base_price),
+        current_room_id: Number(row.current_room_id),
+        requires_ready_room: checkIn <= businessDate && checkOut > businessDate,
+      };
+    });
+
+    const existingOccupancies = occupancyRows.map((occ) => ({
+      room_id: Number(occ.room_id),
+      check_in_date: String(occ.check_in_date),
+      check_out_date: String(occ.check_out_date),
+      booking_id: String(occ.booking_id),
+    }));
+
+    const solverResult = (await this.revenueService.optimizeAllocation({
+      requests: solverRequests,
+      available_rooms: availableRooms,
+      existing_occupancies: existingOccupancies,
+      allow_upgrades: dto.allow_upgrades ?? true,
+    })) as {
+      status: string;
+      solver_time_ms: number;
+      total_assigned_revenue: number;
+      assignments: Array<{
+        request_id: string;
+        room_id: number;
+        room_number: string;
+        assigned_type_id: number;
+        is_upgrade: boolean;
+        status: 'ASSIGNED' | 'REJECTED_NO_CAPACITY';
+      }>;
+      unassigned_request_ids: string[];
+      audit_notes: string[];
+    };
+
+    const assignmentById = new Map(
+      (solverResult.assignments ?? []).map((a) => [a.request_id, a]),
+    );
+
+    const mappedRecommendations: AdminQueueOptimizationRecommendation[] = targetRows.map((row) => {
+      const bookingId = String(row.booking_id);
+      const currentRoom = {
+        room_id: Number(row.current_room_id),
+        room_number: String(row.current_room_number),
+        type_id: Number(row.current_type_id),
+        type_name: String(row.current_type_name),
+        base_price: Number(row.current_base_price),
+      };
+      const nights = Number(row.nights);
+      const checkInDate = String(row.check_in_date);
+      const checkOutDate = String(row.check_out_date);
+      const requiresReadyNow = checkInDate <= businessDate && checkOutDate > businessDate;
+      const assignment = assignmentById.get(bookingId);
+
+      if (!assignment || assignment.status !== 'ASSIGNED' || assignment.room_id <= 0) {
+        return {
+          booking_id: bookingId,
+          customer_name: String(row.customer_name),
+          loyalty_tier: (String(row.loyalty_tier || 'Bronze') as AdminQueueOptimizationRecommendation['loyalty_tier']),
+          check_in_date: checkInDate,
+          check_out_date: checkOutDate,
+          nights,
+          guest_count: Number(row.guest_count),
+          total_price: Number(row.total_price),
+          expected_assignment_version: Number(row.room_assignment_version),
+          requires_ready_now: requiresReadyNow,
+          status: 'REJECTED_NO_CAPACITY',
+          changed: false,
+          is_upgrade: false,
+          upgrade_delta_value: 0,
+          current_room: currentRoom,
+          recommended_room: null,
+          reason_vi: requiresReadyNow
+            ? 'Không có phòng Available + Ready đáp ứng cho nhận phòng hôm nay; cần buồng phòng dọn xong phòng.'
+            : 'Không tìm thấy phòng thay thế thỏa mãn ràng buộc sức chứa và chống trùng lịch.',
+        };
+      }
+
+      const targetRoomMeta = roomCatalogById.get(Number(assignment.room_id)) ?? {
+        room_id: Number(assignment.room_id),
+        room_number: String(assignment.room_number),
+        type_id: Number(assignment.assigned_type_id),
+        type_name: currentRoom.type_name,
+        base_price: currentRoom.base_price,
+      };
+      const changed = targetRoomMeta.room_id !== currentRoom.room_id;
+      const isUpgrade = changed && targetRoomMeta.type_id !== currentRoom.type_id;
+      const deltaPerNight = Math.max(0, targetRoomMeta.base_price - currentRoom.base_price);
+
+      return {
+        booking_id: bookingId,
+        customer_name: String(row.customer_name),
+        loyalty_tier: (String(row.loyalty_tier || 'Bronze') as AdminQueueOptimizationRecommendation['loyalty_tier']),
+        check_in_date: checkInDate,
+        check_out_date: checkOutDate,
+        nights,
+        guest_count: Number(row.guest_count),
+        total_price: Number(row.total_price),
+        expected_assignment_version: Number(row.room_assignment_version),
+        requires_ready_now: requiresReadyNow,
+        status: 'ASSIGNED',
+        changed,
+        is_upgrade: isUpgrade,
+        upgrade_delta_value: changed ? deltaPerNight * nights : 0,
+        current_room: currentRoom,
+        recommended_room: targetRoomMeta,
+        reason_vi: !changed
+          ? `Giữ nguyên phòng ${currentRoom.room_number} (tối ưu sẵn sàng & đồng nhất hạng ${currentRoom.type_name}).`
+          : isUpgrade
+            ? `OR-Tools đề xuất nâng hạng miễn phí sang ${targetRoomMeta.room_number} (${targetRoomMeta.type_name}) để tối ưu sức chứa / sẵn sàng.`
+            : `OR-Tools đề xuất điều chuyển cùng hạng sang phòng ${targetRoomMeta.room_number} (ưu tiên Ready / giảm phân mảnh).`,
+      };
+    });
+
+    // Order changed moves so moves freeing destination rooms appear before dependent moves
+    const changedMoves = mappedRecommendations.filter((item) => item.changed && item.recommended_room);
+    const unchangedOrRejected = mappedRecommendations.filter((item) => !item.changed || !item.recommended_room);
+    const orderedChanges: AdminQueueOptimizationRecommendation[] = [];
+    const remaining = [...changedMoves];
+    while (remaining.length > 0) {
+      const occupiedByPending = new Set(remaining.map((m) => m.current_room.room_id));
+      const freeIndex = remaining.findIndex(
+        (m) => m.recommended_room && !occupiedByPending.has(m.recommended_room.room_id),
+      );
+      if (freeIndex >= 0) {
+        orderedChanges.push(remaining.splice(freeIndex, 1)[0]);
+      } else {
+        orderedChanges.push(...remaining.splice(0));
+      }
+    }
+
+    const orderedRecommendations = [...orderedChanges, ...unchangedOrRejected];
+
+    return {
+      status: solverResult.status,
+      solver_time_ms: solverResult.solver_time_ms,
+      total_assigned_revenue: solverResult.total_assigned_revenue,
+      evaluated_bookings: targetRows.length,
+      changed_count: changedMoves.length,
+      upgrade_count: changedMoves.filter((item) => item.is_upgrade).length,
+      unassigned_request_ids: solverResult.unassigned_request_ids ?? [],
+      audit_notes: solverResult.audit_notes ?? [],
+      window_start: minCheckIn,
+      window_end: maxCheckOut,
+      existing_occupancy_count: existingOccupancies.length,
+      provenance: '(B) SIMULATED_SYSTEM_STATE + (D) BUSINESS_RULE (Google OR-Tools CP-SAT)',
+      recommendations: orderedRecommendations,
+    };
+  }
+
   async getSmartUpgradeRecommendations(): Promise<SmartUpgradeRecommendation[]> {
+    const businessDate = this.getBusinessDate();
     const upcomingBookings = (await this.dataSource.query(
       `SELECT b.booking_id,
               c.full_name AS customer_name,
@@ -966,10 +1412,12 @@ export class AdminRoomTurnoverService {
        INNER JOIN rooms r ON bd.room_id = r.room_id
        INNER JOIN room_types rt ON r.type_id = rt.type_id
        WHERE b.status = 'Confirmed'
-         AND b.check_in_date >= CURRENT_DATE
-         AND b.check_in_date <= CURRENT_DATE + INTERVAL '60 days'
+          AND b.check_in_date >= $1::date
+          AND b.check_in_date <= $1::date + INTERVAL '60 days'
+          AND (SELECT COUNT(*) FROM booking_details detail WHERE detail.booking_id = b.booking_id) = 1
        ORDER BY b.check_in_date ASC
-       LIMIT 40`,
+        LIMIT 40`,
+      [businessDate],
     )) as Array<{
       booking_id: string;
       customer_name: string;
@@ -1001,12 +1449,18 @@ export class AdminRoomTurnoverService {
          INNER JOIN room_types rt ON r.type_id = rt.type_id
          WHERE rt.base_price > $1
            AND rt.capacity >= $2
-           AND r.current_status <> 'Maintenance'
+            AND r.current_status <> 'Maintenance'
+            AND ($3::date > $5::date OR (
+              r.current_status = 'Available'
+              AND r.occupancy_booking_id IS NULL
+              AND r.housekeeping_status = 'Ready'
+            ))
            AND r.room_id NOT IN (
              SELECT bd.room_id
              FROM booking_details bd
              INNER JOIN bookings b ON bd.booking_id = b.booking_id
-             WHERE b.status IN ('Confirmed', 'CheckedIn')
+              WHERE (b.status IN ('Confirmed', 'CheckedIn')
+                OR (b.status = 'Pending' AND b.pending_expires_at > clock_timestamp()))
                AND b.check_in_date < $4::date
                AND b.check_out_date > $3::date
            )
@@ -1016,7 +1470,8 @@ export class AdminRoomTurnoverService {
           Number(item.current_base_price),
           Number(item.guest_count),
           item.check_in_date,
-          item.check_out_date,
+           item.check_out_date,
+           businessDate,
         ],
       )) as Array<{
         room_id: number;
@@ -1053,8 +1508,9 @@ export class AdminRoomTurnoverService {
             base_price: Number(availableRoom.base_price),
           },
           upgrade_delta_value: delta,
-          occupancy_boost_reason: `Giải phóng phòng ${item.current_type_name} để đón lượt đặt mới mùa cao điểm và nâng tầm trải nghiệm phòng lên ${availableRoom.type_name}`,
-          confidence_score: 0.94,
+          occupancy_boost_reason: `Phòng ${availableRoom.type_name} có giá cơ bản cao hơn, đủ sức chứa và không trùng đặt phòng trong kỳ lưu trú. Lễ tân cần xác nhận trước khi nâng hạng.`,
+          confidence_score: null,
+          recommendation_source: 'rule_based',
         });
       }
 
@@ -1093,5 +1549,4 @@ export class AdminRoomTurnoverService {
     throw error;
   }
 }
-
 

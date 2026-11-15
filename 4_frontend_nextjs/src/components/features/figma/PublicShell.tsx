@@ -67,6 +67,15 @@ export default function PublicShell({ children }: { children: React.ReactNode })
   }, [pathname]);
 
   useEffect(() => {
+    // Match Tailwind's md breakpoint so a hidden mobile menu cannot keep the page inert.
+    const desktop = window.matchMedia("(min-width: 48rem)");
+    const closeOnDesktop = () => { if (desktop.matches) setMenuOpen(false); };
+    closeOnDesktop();
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
+  }, []);
+
+  useEffect(() => {
     if (!menuOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -77,7 +86,6 @@ export default function PublicShell({ children }: { children: React.ReactNode })
 
   const navLinks = [
     { label: t('nav_home'), to: "/" },
-    { label: t('nav_destinations'), to: "/destinations" },
     { label: t('nav_rooms'), to: "/rooms" },
     { label: t('nav_about'), to: "/about" },
   ];
@@ -106,7 +114,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
         }}
       >
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 shrink-0">
+        <Link href="/" onClick={() => setMenuOpen(false)} className="flex items-center gap-2.5 shrink-0">
           <div
             className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
             style={{ border: "1px solid var(--gold)" }}
@@ -120,7 +128,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
             className="font-display text-[1.05rem]"
             style={{ letterSpacing: "0.22em", color: "var(--fg2)" }}
           >
-            AURUM
+            WHITE SAND
           </span>
         </Link>
 
@@ -216,6 +224,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
             <Link
               key={l.to}
               href={l.to}
+              onClick={() => setMenuOpen(false)}
               className="font-display text-3xl transition-colors"
               style={{ color: isActive(l.to) ? "var(--gold)" : "var(--fg)" }}
             >
@@ -230,6 +239,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
 
           <Link
             href="/book"
+            onClick={() => setMenuOpen(false)}
             className="mt-2 text-[11px] tracking-[0.2em] uppercase px-8 py-3 border font-medium"
             style={{ borderColor: "var(--gold)", color: "var(--gold)" }}
           >
@@ -261,10 +271,10 @@ export default function PublicShell({ children }: { children: React.ReactNode })
                 className="font-display text-base"
                 style={{ letterSpacing: "0.22em", color: "var(--fg2)" }}
               >
-                AURUM
+                WHITE SAND
               </span>
             </div>
-            <p className="text-[11px] leading-relaxed max-w-[190px]" style={{ color: "var(--dim)" }}>
+            <p className="text-[11px] leading-relaxed max-w-[210px]" style={{ color: "var(--dim)" }}>
               {t('footer_tagline')}
             </p>
             <div className="flex gap-3 mt-6">
@@ -294,16 +304,16 @@ export default function PublicShell({ children }: { children: React.ReactNode })
 
           {[
             {
-              title: t('nav_destinations'),
+              title: "White Sand Đà Nẵng",
               links: [
-                { label: "Đà Nẵng", href: "/destinations?q=Đà%20Nẵng" },
-                { label: "Phú Quốc", href: "/destinations?q=Phú%20Quốc" },
-                { label: "Vịnh Ninh Vân", href: "/destinations?q=Ninh%20Vân" },
-                { label: "Côn Đảo", href: "/destinations?q=Côn%20Đảo" },
+                { label: "89-91 Võ Văn Kiệt, Sơn Trà", href: "/about" },
+                { label: "6 hạng phòng · 54 phòng", href: "/rooms" },
+                { label: "Tiện ích 1F – 15F", href: "/about" },
+                { label: "Đặt phòng trực tuyến", href: "/book" },
               ],
             },
             {
-              title: t('hero_stat_stay'),
+              title: t('footer_account'),
               links: [
                 { label: t('nav_rooms'), href: "/rooms" },
                 { label: t('cta_plan_btn'), href: "/book" },
@@ -315,7 +325,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
               title: t('footer_experience'),
               links: [
                 { label: t('nav_about'), href: "/about" },
-                { label: t('nav_destinations'), href: "/destinations" },
+                { label: t('account_price_quote'), href: "/checkout" },
                 { label: t('nav_login'), href: "/login" },
                 { label: t('nav_register'), href: "/register" },
               ],

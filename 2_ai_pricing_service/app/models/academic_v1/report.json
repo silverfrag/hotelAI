@@ -1,0 +1,3429 @@
+{
+  "schema_version": "1.0.0",
+  "model_version": "academic-v1-2e41bc467a6d1302",
+  "training_run_id": "2e41bc467a6d1302",
+  "feature_contract_version": "academic-booking-v1",
+  "features": [
+    "lead_time",
+    "arrival_month",
+    "arrival_day",
+    "arrival_weekday",
+    "stay_nights",
+    "weekend_share",
+    "adults",
+    "children",
+    "babies",
+    "hotel",
+    "reserved_room_type",
+    "meal",
+    "market_segment",
+    "distribution_channel",
+    "customer_type"
+  ],
+  "config": {
+    "seed": 42,
+    "validation_start": "2016-07-01",
+    "test_start": "2017-01-01",
+    "evaluation_as_of": "2017-09-16",
+    "forest_trees": 100,
+    "boosting_iterations": 120
+  },
+  "data": {
+    "sha256": "7c2ae42a7353905ea136e5c2287f17c92c5435826598bfbb8491c6f0c7b1fc06",
+    "source_rows": 119390,
+    "exact_duplicate_rows_removed": 31994,
+    "invalid_context_rows_removed": 976,
+    "eligible_rows": 86420,
+    "hotel_counts": {
+      "City Hotel": 52824,
+      "Resort Hotel": 33596
+    },
+    "missing": {
+      "children": 4,
+      "country": 488,
+      "agent": 16340,
+      "company": 112593
+    },
+    "adr_quantiles": {
+      "0.0": -6.38,
+      "0.01": 0.0,
+      "0.5": 94.575,
+      "0.95": 193.5,
+      "0.99": 252.0,
+      "1.0": 5400.0
+    },
+    "adr_nonpositive_rows": 1960,
+    "duplicate_policy": "unique raw records; may collapse real identical group bookings; no identity-level deduplication claim",
+    "column_review": {
+      "hotel": "input: anonymized property category; never a Vietnam property identifier",
+      "is_canceled": "classification target / regression cohort filter only; never X",
+      "lead_time": "input: creation-intended advance interval; snapshot-stability assumption",
+      "arrival_date_year": "date construction/split only; not a numeric trend predictor",
+      "arrival_date_month": "input: planned arrival month; mutable snapshot caveat",
+      "arrival_date_week_number": "excluded: redundant calendar representation",
+      "arrival_date_day_of_month": "input: planned date -> weekday; mutable snapshot caveat",
+      "stays_in_weekend_nights": "input: planned stay total only; recompute weekend share from date",
+      "stays_in_week_nights": "input: planned stay total; mutable snapshot caveat",
+      "adults": "input: declared guests; mutable snapshot caveat",
+      "children": "input: declared guests; missing stays missing for train-only imputation",
+      "babies": "input: declared guests; mutable snapshot caveat",
+      "meal": "input: selected meal; mutable snapshot caveat",
+      "country": "excluded: nationality may be confirmed at check-in; no identity proxy",
+      "market_segment": "input: booking acquisition context; snapshot caveat",
+      "distribution_channel": "input: booking acquisition channel; snapshot caveat",
+      "is_repeated_guest": "excluded: guest history cannot be verified as-of creation",
+      "previous_cancellations": "excluded: history timestamps unavailable",
+      "previous_bookings_not_canceled": "excluded: history timestamps unavailable",
+      "reserved_room_type": "input: reserved anonymized code; no invented luxury-room mapping",
+      "assigned_room_type": "excluded: operational assignment after initial request",
+      "booking_changes": "excluded: accumulates after creation",
+      "deposit_type": "excluded: deposit timing and policy assignment not verified as-of creation",
+      "agent": "excluded: sparse anonymized ID, not an appropriate demo feature",
+      "company": "excluded: sparse anonymized ID, not an appropriate demo feature",
+      "days_in_waiting_list": "excluded: future waiting duration",
+      "customer_type": "input: declared booking party type; mutable snapshot caveat",
+      "adr": "regression target only; excluded from cancellation X and ADR X",
+      "required_car_parking_spaces": "excluded: request may be added after creation",
+      "total_of_special_requests": "excluded: requests may accumulate after creation",
+      "reservation_status": "outcome/cohort sanity check only; never X",
+      "reservation_status_date": "label maturity metadata only; never X"
+    },
+    "caveats": [
+      "Public Portuguese hotel data, arrivals 2015\u20132017; Aurum is a simulated resort.",
+      "ADR is a historical reference in original EUR units, not an optimal price or revenue uplift.",
+      "Creation-intended retrospective proxy: source snapshots are near arrival; initial attribute values are unavailable.",
+      "Creation date is derived from arrival minus lead_time; mutable arrival/lead_time can affect this proxy.",
+      "The arrival-window cohort is truncated; results do not represent every booking created in each month.",
+      "is_canceled includes No-Show; cancellation risk is not quote conversion or causal price elasticity.",
+      "Explanation changes show model associations, not causal effects."
+    ]
+  },
+  "caveats": [
+    "Public Portuguese hotel data, arrivals 2015\u20132017; Aurum is a simulated resort.",
+    "ADR is a historical reference in original EUR units, not an optimal price or revenue uplift.",
+    "Creation-intended retrospective proxy: source snapshots are near arrival; initial attribute values are unavailable.",
+    "Creation date is derived from arrival minus lead_time; mutable arrival/lead_time can affect this proxy.",
+    "The arrival-window cohort is truncated; results do not represent every booking created in each month.",
+    "is_canceled includes No-Show; cancellation risk is not quote conversion or causal price elasticity.",
+    "Explanation changes show model associations, not causal effects."
+  ],
+  "code_sha256": "7d3ced54825cd849052e2045dbf305d11cd9a3a6a76eacb6010214bf7e8b3c9e",
+  "runtime": {
+    "python": "3.12.14",
+    "sklearn": "1.9.0",
+    "pandas": "3.0.5",
+    "numpy": "2.5.2"
+  },
+  "adr": {
+    "selected": "hist_gradient_boosting",
+    "selection_partition": "validation",
+    "selection_metric": "mae",
+    "selection_frozen_before_test": true,
+    "fit_partition": "train only; no refit on validation/test",
+    "split": {
+      "train": {
+        "rows": 24327,
+        "purged_unmatured_labels": 7113,
+        "creation_range": [
+          "2014-03-18",
+          "2016-06-29"
+        ],
+        "latest_label_available": "2016-07-01",
+        "label_cutoff": "2016-07-01"
+      },
+      "validation": {
+        "rows": 9140,
+        "purged_unmatured_labels": 4738,
+        "creation_range": [
+          "2016-07-01",
+          "2016-12-30"
+        ],
+        "latest_label_available": "2017-01-01",
+        "label_cutoff": "2017-01-01"
+      },
+      "test": {
+        "rows": 16294,
+        "purged_unmatured_labels": 0,
+        "creation_range": [
+          "2017-01-01",
+          "2017-08-31"
+        ],
+        "latest_label_available": "2017-09-15",
+        "label_cutoff": "2017-09-16"
+      }
+    },
+    "validation": {
+      "calendar_rule": {
+        "mae": 41.75203172866521,
+        "rmse": 56.14396677994659,
+        "r2": -0.15286433017234202
+      },
+      "seasonal_room_median": {
+        "mae": 29.661328774617072,
+        "rmse": 40.96325673681628,
+        "r2": 0.3862931520861589
+      },
+      "random_forest": {
+        "mae": 24.836682895740154,
+        "rmse": 34.60691883465949,
+        "r2": 0.5619760238130856
+      },
+      "hist_gradient_boosting": {
+        "mae": 22.78109525421639,
+        "rmse": 31.317965877555007,
+        "r2": 0.6412770952486102
+      }
+    },
+    "test": {
+      "calendar_rule": {
+        "mae": 47.45275009205842,
+        "rmse": 64.42481051685418,
+        "r2": -0.3353391307689728
+      },
+      "seasonal_room_median": {
+        "mae": 32.73660212348104,
+        "rmse": 44.70030627814202,
+        "r2": 0.35715499510991466
+      },
+      "random_forest": {
+        "mae": 26.737921450007644,
+        "rmse": 37.833105171720604,
+        "r2": 0.539500406299533
+      },
+      "hist_gradient_boosting": {
+        "mae": 27.072904084378816,
+        "rmse": 37.19010378631789,
+        "r2": 0.5550204457492558
+      }
+    },
+    "slices": {
+      "hotel": {
+        "City Hotel": {
+          "rows": 10129,
+          "mae": 27.680313888907996,
+          "rmse": 36.271244451958005,
+          "r2": 0.3273198617798194
+        },
+        "Resort Hotel": {
+          "rows": 6165,
+          "mae": 26.074939135461367,
+          "rmse": 38.65237819473691,
+          "r2": 0.6968450088224833
+        }
+      },
+      "reserved_room_type": {
+        "A": {
+          "rows": 10262,
+          "mae": 22.75171674754802,
+          "rmse": 31.387754362100868,
+          "r2": 0.46131839878417313
+        },
+        "B": {
+          "rows": 39,
+          "mae": 31.689476934106015,
+          "rmse": 38.53752349799506,
+          "r2": -0.6250541322981156
+        },
+        "C": {
+          "rows": 245,
+          "mae": 49.036424360984725,
+          "rmse": 60.508712256016246,
+          "r2": 0.2418354466174104
+        },
+        "D": {
+          "rows": 3494,
+          "mae": 29.233354697116837,
+          "rmse": 37.80797920376064,
+          "r2": 0.4107340893260676
+        },
+        "E": {
+          "rows": 1259,
+          "mae": 34.46477513983802,
+          "rmse": 45.599013768365694,
+          "r2": 0.44093450980804316
+        },
+        "F": {
+          "rows": 546,
+          "mae": 46.23138083823607,
+          "rmse": 58.27753672236185,
+          "r2": 0.2684386961104398
+        },
+        "G": {
+          "rows": 364,
+          "mae": 52.08700983821768,
+          "rmse": 65.21124141505672,
+          "r2": 0.28948075045203336
+        },
+        "H": {
+          "rows": 85,
+          "mae": 54.86434808339762,
+          "rmse": 73.30597614088451,
+          "r2": 0.2872328313085163
+        }
+      },
+      "arrival_month": {
+        "1": {
+          "rows": 1164,
+          "mae": 9.261759869167562,
+          "rmse": 13.709396834691848,
+          "r2": 0.7774600161758258
+        },
+        "2": {
+          "rows": 1854,
+          "mae": 11.18781033817257,
+          "rmse": 15.885049607321834,
+          "r2": 0.7782612992086494
+        },
+        "3": {
+          "rows": 1992,
+          "mae": 13.574553179075773,
+          "rmse": 19.738859348063762,
+          "r2": 0.6313007742808547
+        },
+        "4": {
+          "rows": 1954,
+          "mae": 25.777190796825636,
+          "rmse": 32.2269415343235,
+          "r2": 0.4652583350724634
+        },
+        "5": {
+          "rows": 2329,
+          "mae": 23.199042389806028,
+          "rmse": 31.399577716261135,
+          "r2": 0.5258298318952903
+        },
+        "6": {
+          "rows": 2124,
+          "mae": 24.65333113195568,
+          "rmse": 31.189213136381497,
+          "r2": 0.42599199227979956
+        },
+        "7": {
+          "rows": 2397,
+          "mae": 42.65730616805902,
+          "rmse": 50.968595407313664,
+          "r2": 0.07879752154099195
+        },
+        "8": {
+          "rows": 2480,
+          "mae": 49.818573230443384,
+          "rmse": 58.388546343980494,
+          "r2": 0.09024449055414219
+        }
+      },
+      "market_segment": {
+        "Aviation": {
+          "rows": 83,
+          "mae": 11.204507594080175,
+          "rmse": 17.830864243924566,
+          "r2": 0.18222373475517972
+        },
+        "Complementary": {
+          "rows": 11,
+          "mae": 42.10779672723121,
+          "rmse": 50.3659570724015,
+          "r2": -1.1799614782030283
+        },
+        "Corporate": {
+          "rows": 997,
+          "mae": 11.37896299708852,
+          "rmse": 17.472125873267885,
+          "r2": 0.7006378925828591
+        },
+        "Direct": {
+          "rows": 3186,
+          "mae": 30.254386491352534,
+          "rmse": 41.710864796396855,
+          "r2": 0.5635156874075837
+        },
+        "Groups": {
+          "rows": 410,
+          "mae": 25.06920412432879,
+          "rmse": 35.00241396907141,
+          "r2": 0.16097333633625266
+        },
+        "Offline TA/TO": {
+          "rows": 2098,
+          "mae": 16.16310295154233,
+          "rmse": 24.977731326932517,
+          "r2": 0.6076387507960581
+        },
+        "Online TA": {
+          "rows": 9509,
+          "mae": 30.266996961163443,
+          "rmse": 39.48268927228754,
+          "r2": 0.4448785216253205
+        }
+      }
+    },
+    "baseline_reference": "seasonal_room_median",
+    "test_improvement_over_reference": 5.663698039102226,
+    "ml_beats_reference_on_test": true,
+    "target": "adr",
+    "adr_unit": "EUR",
+    "cohort": "positive ADR, Check-Out/non-canceled only; conditional-on-completion bias",
+    "largest_errors": [
+      {
+        "row_id": "booking-111403",
+        "arrival_date": "2017-05-09T00:00:00.000",
+        "creation_date": "2017-05-09T00:00:00.000",
+        "lead_time": 0,
+        "arrival_month": 5,
+        "arrival_day": 9,
+        "arrival_weekday": 1,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "City Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Offline TA/TO",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient",
+        "adr": 510.0,
+        "observed": 510.0,
+        "prediction_calendar_rule": 84.0,
+        "prediction_seasonal_room_median": 105.0,
+        "prediction_random_forest": 100.0735328543,
+        "prediction_hist_gradient_boosting": 90.5713732638,
+        "prediction": 90.5713732638,
+        "error": 419.4286267362
+      },
+      {
+        "row_id": "booking-39155",
+        "arrival_date": "2017-08-01T00:00:00.000",
+        "creation_date": "2017-07-01T00:00:00.000",
+        "lead_time": 31,
+        "arrival_month": 8,
+        "arrival_day": 1,
+        "arrival_weekday": 1,
+        "stay_nights": 8,
+        "weekend_share": 0.25,
+        "adults": 2,
+        "children": 2.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "G",
+        "meal": "Undefined",
+        "market_segment": "Direct",
+        "distribution_channel": "Direct",
+        "customer_type": "Transient",
+        "adr": 426.25,
+        "observed": 426.25,
+        "prediction_calendar_rule": 92.4,
+        "prediction_seasonal_room_median": 210.715,
+        "prediction_random_forest": 205.8281969416,
+        "prediction_hist_gradient_boosting": 219.7059909569,
+        "prediction": 219.7059909569,
+        "error": 206.5440090431
+      },
+      {
+        "row_id": "booking-38802",
+        "arrival_date": "2017-07-23T00:00:00.000",
+        "creation_date": "2017-03-23T00:00:00.000",
+        "lead_time": 122,
+        "arrival_month": 7,
+        "arrival_day": 23,
+        "arrival_weekday": 6,
+        "stay_nights": 7,
+        "weekend_share": 0.2857142857,
+        "adults": 2,
+        "children": 2.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "G",
+        "meal": "BB",
+        "market_segment": "Online TA",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient",
+        "adr": 360.0,
+        "observed": 360.0,
+        "prediction_calendar_rule": 92.4,
+        "prediction_seasonal_room_median": 185.75,
+        "prediction_random_forest": 158.8664650315,
+        "prediction_hist_gradient_boosting": 170.5390533235,
+        "prediction": 170.5390533235,
+        "error": 189.4609466765
+      },
+      {
+        "row_id": "booking-107548",
+        "arrival_date": "2017-03-14T00:00:00.000",
+        "creation_date": "2017-02-21T00:00:00.000",
+        "lead_time": 21,
+        "arrival_month": 3,
+        "arrival_day": 14,
+        "arrival_weekday": 1,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "City Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Groups",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient-Party",
+        "adr": 251.0,
+        "observed": 251.0,
+        "prediction_calendar_rule": 84.0,
+        "prediction_seasonal_room_median": 81.9,
+        "prediction_random_forest": 78.5946227746,
+        "prediction_hist_gradient_boosting": 67.8237290934,
+        "prediction": 67.8237290934,
+        "error": 183.1762709066
+      },
+      {
+        "row_id": "booking-107577",
+        "arrival_date": "2017-03-14T00:00:00.000",
+        "creation_date": "2017-02-21T00:00:00.000",
+        "lead_time": 21,
+        "arrival_month": 3,
+        "arrival_day": 14,
+        "arrival_weekday": 1,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "City Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Groups",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient-Party",
+        "adr": 251.0,
+        "observed": 251.0,
+        "prediction_calendar_rule": 84.0,
+        "prediction_seasonal_room_median": 81.9,
+        "prediction_random_forest": 78.5946227746,
+        "prediction_hist_gradient_boosting": 67.8237290934,
+        "prediction": 67.8237290934,
+        "error": 183.1762709066
+      },
+      {
+        "row_id": "booking-111441",
+        "arrival_date": "2017-05-10T00:00:00.000",
+        "creation_date": "2017-05-10T00:00:00.000",
+        "lead_time": 0,
+        "arrival_month": 5,
+        "arrival_day": 10,
+        "arrival_weekday": 2,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "City Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Direct",
+        "distribution_channel": "Direct",
+        "customer_type": "Transient",
+        "adr": 285.0,
+        "observed": 285.0,
+        "prediction_calendar_rule": 84.0,
+        "prediction_seasonal_room_median": 105.0,
+        "prediction_random_forest": 120.0170046761,
+        "prediction_hist_gradient_boosting": 105.4947834017,
+        "prediction": 105.4947834017,
+        "error": 179.5052165983
+      },
+      {
+        "row_id": "booking-111463",
+        "arrival_date": "2017-05-10T00:00:00.000",
+        "creation_date": "2017-05-10T00:00:00.000",
+        "lead_time": 0,
+        "arrival_month": 5,
+        "arrival_day": 10,
+        "arrival_weekday": 2,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "City Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Direct",
+        "distribution_channel": "Direct",
+        "customer_type": "Transient",
+        "adr": 285.0,
+        "observed": 285.0,
+        "prediction_calendar_rule": 84.0,
+        "prediction_seasonal_room_median": 105.0,
+        "prediction_random_forest": 120.0170046761,
+        "prediction_hist_gradient_boosting": 105.4947834017,
+        "prediction": 105.4947834017,
+        "error": 179.5052165983
+      },
+      {
+        "row_id": "booking-107537",
+        "arrival_date": "2017-03-13T00:00:00.000",
+        "creation_date": "2017-03-09T00:00:00.000",
+        "lead_time": 4,
+        "arrival_month": 3,
+        "arrival_day": 13,
+        "arrival_weekday": 0,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "City Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Groups",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient-Party",
+        "adr": 241.25,
+        "observed": 241.25,
+        "prediction_calendar_rule": 84.0,
+        "prediction_seasonal_room_median": 81.9,
+        "prediction_random_forest": 79.383648634,
+        "prediction_hist_gradient_boosting": 70.0519354216,
+        "prediction": 70.0519354216,
+        "error": 171.1980645784
+      },
+      {
+        "row_id": "booking-27404",
+        "arrival_date": "2017-08-08T00:00:00.000",
+        "creation_date": "2017-05-03T00:00:00.000",
+        "lead_time": 97,
+        "arrival_month": 8,
+        "arrival_day": 8,
+        "arrival_weekday": 1,
+        "stay_nights": 7,
+        "weekend_share": 0.2857142857,
+        "adults": 2,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "F",
+        "meal": "HB",
+        "market_segment": "Direct",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient",
+        "adr": 349.0,
+        "observed": 349.0,
+        "prediction_calendar_rule": 92.4,
+        "prediction_seasonal_room_median": 188.46,
+        "prediction_random_forest": 190.7354014975,
+        "prediction_hist_gradient_boosting": 180.3535881901,
+        "prediction": 180.3535881901,
+        "error": 168.6464118099
+      },
+      {
+        "row_id": "booking-39006",
+        "arrival_date": "2017-07-31T00:00:00.000",
+        "creation_date": "2017-07-30T00:00:00.000",
+        "lead_time": 1,
+        "arrival_month": 7,
+        "arrival_day": 31,
+        "arrival_weekday": 0,
+        "stay_nights": 5,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 2.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "E",
+        "meal": "HB",
+        "market_segment": "Online TA",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient",
+        "adr": 339.4,
+        "observed": 339.4,
+        "prediction_calendar_rule": 84.0,
+        "prediction_seasonal_room_median": 145.0,
+        "prediction_random_forest": 178.3225521486,
+        "prediction_hist_gradient_boosting": 175.0957708615,
+        "prediction": 175.0957708615,
+        "error": 164.3042291385
+      }
+    ],
+    "smallest_errors": [
+      {
+        "row_id": "booking-35997",
+        "arrival_date": "2017-05-05T00:00:00.000",
+        "creation_date": "2017-04-29T00:00:00.000",
+        "lead_time": 6,
+        "arrival_month": 5,
+        "arrival_day": 5,
+        "arrival_weekday": 4,
+        "stay_nights": 2,
+        "weekend_share": 0.5,
+        "adults": 2,
+        "children": 1.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "HB",
+        "market_segment": "Offline TA/TO",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient",
+        "adr": 95.0,
+        "observed": 95.0,
+        "prediction_calendar_rule": 92.4,
+        "prediction_seasonal_room_median": 60.0,
+        "prediction_random_forest": 110.2262736209,
+        "prediction_hist_gradient_boosting": 95.0004919248,
+        "prediction": 95.0004919248,
+        "error": 0.0004919248
+      },
+      {
+        "row_id": "booking-36186",
+        "arrival_date": "2017-05-06T00:00:00.000",
+        "creation_date": "2017-02-11T00:00:00.000",
+        "lead_time": 84,
+        "arrival_month": 5,
+        "arrival_day": 6,
+        "arrival_weekday": 5,
+        "stay_nights": 7,
+        "weekend_share": 0.2857142857,
+        "adults": 2,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "D",
+        "meal": "BB",
+        "market_segment": "Offline TA/TO",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Contract",
+        "adr": 52.85,
+        "observed": 52.85,
+        "prediction_calendar_rule": 92.4,
+        "prediction_seasonal_room_median": 72.0,
+        "prediction_random_forest": 50.636942088,
+        "prediction_hist_gradient_boosting": 52.854192972,
+        "prediction": 52.854192972,
+        "error": 0.004192972
+      },
+      {
+        "row_id": "booking-37687",
+        "arrival_date": "2017-06-20T00:00:00.000",
+        "creation_date": "2017-02-16T00:00:00.000",
+        "lead_time": 124,
+        "arrival_month": 6,
+        "arrival_day": 20,
+        "arrival_weekday": 1,
+        "stay_nights": 6,
+        "weekend_share": 0.3333333333,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "F",
+        "meal": "BB",
+        "market_segment": "Online TA",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient",
+        "adr": 117.04,
+        "observed": 117.04,
+        "prediction_calendar_rule": 92.4,
+        "prediction_seasonal_room_median": 148.55,
+        "prediction_random_forest": 123.2317247276,
+        "prediction_hist_gradient_boosting": 117.0326352209,
+        "prediction": 117.0326352209,
+        "error": 0.0073647791
+      },
+      {
+        "row_id": "booking-111903",
+        "arrival_date": "2017-05-14T00:00:00.000",
+        "creation_date": "2017-01-23T00:00:00.000",
+        "lead_time": 111,
+        "arrival_month": 5,
+        "arrival_day": 14,
+        "arrival_weekday": 6,
+        "stay_nights": 3,
+        "weekend_share": 0.3333333333,
+        "adults": 2,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "City Hotel",
+        "reserved_room_type": "D",
+        "meal": "BB",
+        "market_segment": "Online TA",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient",
+        "adr": 117.6,
+        "observed": 117.6,
+        "prediction_calendar_rule": 92.4,
+        "prediction_seasonal_room_median": 135.0,
+        "prediction_random_forest": 118.8756169182,
+        "prediction_hist_gradient_boosting": 117.6098543421,
+        "prediction": 117.6098543421,
+        "error": 0.0098543421
+      },
+      {
+        "row_id": "booking-33352",
+        "arrival_date": "2017-02-16T00:00:00.000",
+        "creation_date": "2017-01-17T00:00:00.000",
+        "lead_time": 30,
+        "arrival_month": 2,
+        "arrival_day": 16,
+        "arrival_weekday": 3,
+        "stay_nights": 5,
+        "weekend_share": 0.4,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Direct",
+        "distribution_channel": "Direct",
+        "customer_type": "Transient-Party",
+        "adr": 40.5,
+        "observed": 40.5,
+        "prediction_calendar_rule": 92.4,
+        "prediction_seasonal_room_median": 43.0,
+        "prediction_random_forest": 41.9439181312,
+        "prediction_hist_gradient_boosting": 40.4873089878,
+        "prediction": 40.4873089878,
+        "error": 0.0126910122
+      }
+    ]
+  },
+  "cancellation": {
+    "selected": "logistic_regression",
+    "selection_partition": "validation",
+    "selection_metric": "log_loss",
+    "selection_frozen_before_test": true,
+    "fit_partition": "train only; no refit on validation/test",
+    "split": {
+      "train": {
+        "rows": 34513,
+        "purged_unmatured_labels": 8585,
+        "creation_range": [
+          "2014-03-18",
+          "2016-06-30"
+        ],
+        "latest_label_available": "2016-07-01",
+        "label_cutoff": "2016-07-01"
+      },
+      "validation": {
+        "rows": 14209,
+        "purged_unmatured_labels": 6220,
+        "creation_range": [
+          "2016-07-01",
+          "2016-12-31"
+        ],
+        "latest_label_available": "2017-01-01",
+        "label_cutoff": "2017-01-01"
+      },
+      "test": {
+        "rows": 22893,
+        "purged_unmatured_labels": 0,
+        "creation_range": [
+          "2017-01-01",
+          "2017-08-31"
+        ],
+        "latest_label_available": "2017-09-15",
+        "label_cutoff": "2017-09-16"
+      }
+    },
+    "validation": {
+      "constant_prevalence": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "roc_auc": 0.5,
+        "pr_auc": 0.34647054683651207,
+        "brier": 0.2307043049024261,
+        "log_loss": 0.655378605551917,
+        "confusion_matrix": [
+          [
+            9286,
+            0
+          ],
+          [
+            4923,
+            0
+          ]
+        ],
+        "threshold": 0.5,
+        "calibration": [
+          {
+            "bin": 2,
+            "rows": 14209,
+            "mean_probability": 0.28108249065569485,
+            "observed_rate": 0.34647054683651207
+          }
+        ]
+      },
+      "logistic_regression": {
+        "precision": 0.7576749897666804,
+        "recall": 0.3759902498476539,
+        "f1": 0.5025794189519414,
+        "roc_auc": 0.7694051498832615,
+        "pr_auc": 0.6921007540500179,
+        "brier": 0.17562012513734476,
+        "log_loss": 0.5299682946062841,
+        "confusion_matrix": [
+          [
+            8694,
+            592
+          ],
+          [
+            3072,
+            1851
+          ]
+        ],
+        "threshold": 0.5,
+        "calibration": [
+          {
+            "bin": 0,
+            "rows": 1564,
+            "mean_probability": 0.07174825663205747,
+            "observed_rate": 0.11572890025575447
+          },
+          {
+            "bin": 1,
+            "rows": 2998,
+            "mean_probability": 0.15220361613222352,
+            "observed_rate": 0.1324216144096064
+          },
+          {
+            "bin": 2,
+            "rows": 2195,
+            "mean_probability": 0.2512900572972511,
+            "observed_rate": 0.2555808656036446
+          },
+          {
+            "bin": 3,
+            "rows": 2947,
+            "mean_probability": 0.3491714949920204,
+            "observed_rate": 0.33864947404139806
+          },
+          {
+            "bin": 4,
+            "rows": 2062,
+            "mean_probability": 0.4439209271445216,
+            "observed_rate": 0.453443258971872
+          },
+          {
+            "bin": 5,
+            "rows": 1039,
+            "mean_probability": 0.5434424907463677,
+            "observed_rate": 0.5851780558229066
+          },
+          {
+            "bin": 6,
+            "rows": 539,
+            "mean_probability": 0.644985015880023,
+            "observed_rate": 0.7439703153988868
+          },
+          {
+            "bin": 7,
+            "rows": 349,
+            "mean_probability": 0.7476114844463326,
+            "observed_rate": 0.9398280802292264
+          },
+          {
+            "bin": 8,
+            "rows": 361,
+            "mean_probability": 0.8512428579028637,
+            "observed_rate": 0.9944598337950139
+          },
+          {
+            "bin": 9,
+            "rows": 155,
+            "mean_probability": 0.9260667942390797,
+            "observed_rate": 1.0
+          }
+        ]
+      },
+      "hist_gradient_boosting": {
+        "precision": 0.7571115973741794,
+        "recall": 0.2811293926467601,
+        "f1": 0.4100133313583173,
+        "roc_auc": 0.7924365292268104,
+        "pr_auc": 0.6765852794626924,
+        "brier": 0.17991077605294498,
+        "log_loss": 0.5329558595601575,
+        "confusion_matrix": [
+          [
+            8842,
+            444
+          ],
+          [
+            3539,
+            1384
+          ]
+        ],
+        "threshold": 0.5,
+        "calibration": [
+          {
+            "bin": 0,
+            "rows": 2436,
+            "mean_probability": 0.06585060027513953,
+            "observed_rate": 0.07471264367816093
+          },
+          {
+            "bin": 1,
+            "rows": 3568,
+            "mean_probability": 0.14421673614605443,
+            "observed_rate": 0.15667040358744394
+          },
+          {
+            "bin": 2,
+            "rows": 3259,
+            "mean_probability": 0.25248626904216637,
+            "observed_rate": 0.3415158023933722
+          },
+          {
+            "bin": 3,
+            "rows": 2116,
+            "mean_probability": 0.34396065222844724,
+            "observed_rate": 0.48015122873345933
+          },
+          {
+            "bin": 4,
+            "rows": 1002,
+            "mean_probability": 0.4450901867618898,
+            "observed_rate": 0.6676646706586826
+          },
+          {
+            "bin": 5,
+            "rows": 517,
+            "mean_probability": 0.5449389025803671,
+            "observed_rate": 0.758220502901354
+          },
+          {
+            "bin": 6,
+            "rows": 549,
+            "mean_probability": 0.6490242137272141,
+            "observed_rate": 0.6375227686703097
+          },
+          {
+            "bin": 7,
+            "rows": 318,
+            "mean_probability": 0.7459571152903502,
+            "observed_rate": 0.6855345911949685
+          },
+          {
+            "bin": 8,
+            "rows": 173,
+            "mean_probability": 0.8473876222290336,
+            "observed_rate": 0.884393063583815
+          },
+          {
+            "bin": 9,
+            "rows": 271,
+            "mean_probability": 0.9573028874674471,
+            "observed_rate": 1.0
+          }
+        ]
+      }
+    },
+    "test": {
+      "constant_prevalence": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "roc_auc": 0.5,
+        "pr_auc": 0.27903726029790765,
+        "brier": 0.20117965063056178,
+        "log_loss": 0.5920521117551577,
+        "confusion_matrix": [
+          [
+            16505,
+            0
+          ],
+          [
+            6388,
+            0
+          ]
+        ],
+        "threshold": 0.5,
+        "calibration": [
+          {
+            "bin": 2,
+            "rows": 22893,
+            "mean_probability": 0.2810824906556949,
+            "observed_rate": 0.27903726029790765
+          }
+        ]
+      },
+      "logistic_regression": {
+        "precision": 0.4646324549237171,
+        "recall": 0.31465247338760177,
+        "f1": 0.37521000560014933,
+        "roc_auc": 0.6900282679372506,
+        "pr_auc": 0.42533774865517215,
+        "brier": 0.1903166896993372,
+        "log_loss": 0.562413188413949,
+        "confusion_matrix": [
+          [
+            14189,
+            2316
+          ],
+          [
+            4378,
+            2010
+          ]
+        ],
+        "threshold": 0.5,
+        "calibration": [
+          {
+            "bin": 0,
+            "rows": 3376,
+            "mean_probability": 0.06492334563573887,
+            "observed_rate": 0.09804502369668247
+          },
+          {
+            "bin": 1,
+            "rows": 4483,
+            "mean_probability": 0.14739932901680192,
+            "observed_rate": 0.1521302699085434
+          },
+          {
+            "bin": 2,
+            "rows": 3904,
+            "mean_probability": 0.2535633059855412,
+            "observed_rate": 0.22720286885245902
+          },
+          {
+            "bin": 3,
+            "rows": 4196,
+            "mean_probability": 0.34719634176879866,
+            "observed_rate": 0.3486653956148713
+          },
+          {
+            "bin": 4,
+            "rows": 2608,
+            "mean_probability": 0.44594505274598545,
+            "observed_rate": 0.3891871165644172
+          },
+          {
+            "bin": 5,
+            "rows": 1864,
+            "mean_probability": 0.5455752686034036,
+            "observed_rate": 0.434549356223176
+          },
+          {
+            "bin": 6,
+            "rows": 1348,
+            "mean_probability": 0.6502553769529396,
+            "observed_rate": 0.47774480712166173
+          },
+          {
+            "bin": 7,
+            "rows": 913,
+            "mean_probability": 0.7425581587472941,
+            "observed_rate": 0.4994523548740416
+          },
+          {
+            "bin": 8,
+            "rows": 198,
+            "mean_probability": 0.8282901105364628,
+            "observed_rate": 0.5
+          },
+          {
+            "bin": 9,
+            "rows": 3,
+            "mean_probability": 0.9089904923233014,
+            "observed_rate": 0.3333333333333333
+          }
+        ]
+      },
+      "hist_gradient_boosting": {
+        "precision": 0.43829171190734706,
+        "recall": 0.3791484032561052,
+        "f1": 0.40658049353701525,
+        "roc_auc": 0.7030715868154032,
+        "pr_auc": 0.4173225105604204,
+        "brier": 0.21304483388714288,
+        "log_loss": 0.6380310302520558,
+        "confusion_matrix": [
+          [
+            13401,
+            3104
+          ],
+          [
+            3966,
+            2422
+          ]
+        ],
+        "threshold": 0.5,
+        "calibration": [
+          {
+            "bin": 0,
+            "rows": 4041,
+            "mean_probability": 0.06405579299928028,
+            "observed_rate": 0.07151695124969067
+          },
+          {
+            "bin": 1,
+            "rows": 4469,
+            "mean_probability": 0.1448880935642114,
+            "observed_rate": 0.14074737077646005
+          },
+          {
+            "bin": 2,
+            "rows": 1983,
+            "mean_probability": 0.24825640364360024,
+            "observed_rate": 0.22390317700453857
+          },
+          {
+            "bin": 3,
+            "rows": 3930,
+            "mean_probability": 0.357077418701567,
+            "observed_rate": 0.3559796437659033
+          },
+          {
+            "bin": 4,
+            "rows": 2944,
+            "mean_probability": 0.43981723313006366,
+            "observed_rate": 0.4093070652173913
+          },
+          {
+            "bin": 5,
+            "rows": 1019,
+            "mean_probability": 0.5445703740172427,
+            "observed_rate": 0.4200196270853778
+          },
+          {
+            "bin": 6,
+            "rows": 700,
+            "mean_probability": 0.6502557347530628,
+            "observed_rate": 0.44142857142857145
+          },
+          {
+            "bin": 7,
+            "rows": 833,
+            "mean_probability": 0.7556527521058084,
+            "observed_rate": 0.44657863145258103
+          },
+          {
+            "bin": 8,
+            "rows": 1385,
+            "mean_probability": 0.8523240877904115,
+            "observed_rate": 0.43104693140794226
+          },
+          {
+            "bin": 9,
+            "rows": 1589,
+            "mean_probability": 0.9362327565714065,
+            "observed_rate": 0.4505978602894902
+          }
+        ]
+      }
+    },
+    "slices": {
+      "hotel": {
+        "City Hotel": {
+          "rows": 14590,
+          "precision": 0.4428612968886304,
+          "recall": 0.3524647072436936,
+          "f1": 0.3925257731958763,
+          "roc_auc": 0.6655476589711309,
+          "pr_auc": 0.41707154065009233,
+          "brier": 0.20542698177340074,
+          "log_loss": 0.597727559800899,
+          "confusion_matrix": [
+            [
+              8353,
+              1916
+            ],
+            [
+              2798,
+              1523
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 732,
+              "mean_probability": 0.07564632354684933,
+              "observed_rate": 0.12568306010928962
+            },
+            {
+              "bin": 1,
+              "rows": 2326,
+              "mean_probability": 0.1424785439530149,
+              "observed_rate": 0.13413585554600171
+            },
+            {
+              "bin": 2,
+              "rows": 2608,
+              "mean_probability": 0.25974670177577214,
+              "observed_rate": 0.17638036809815952
+            },
+            {
+              "bin": 3,
+              "rows": 3424,
+              "mean_probability": 0.3468292707968483,
+              "observed_rate": 0.3399532710280374
+            },
+            {
+              "bin": 4,
+              "rows": 2061,
+              "mean_probability": 0.44576779776133946,
+              "observed_rate": 0.3736050460941291
+            },
+            {
+              "bin": 5,
+              "rows": 1477,
+              "mean_probability": 0.5458934365519772,
+              "observed_rate": 0.41909275558564657
+            },
+            {
+              "bin": 6,
+              "rows": 1040,
+              "mean_probability": 0.650859443617999,
+              "observed_rate": 0.4548076923076923
+            },
+            {
+              "bin": 7,
+              "rows": 759,
+              "mean_probability": 0.7420895585638533,
+              "observed_rate": 0.463768115942029
+            },
+            {
+              "bin": 8,
+              "rows": 162,
+              "mean_probability": 0.8284157339921144,
+              "observed_rate": 0.4876543209876543
+            },
+            {
+              "bin": 9,
+              "rows": 1,
+              "mean_probability": 0.9036494468761868,
+              "observed_rate": 0.0
+            }
+          ]
+        },
+        "Resort Hotel": {
+          "rows": 8303,
+          "precision": 0.5490417136414881,
+          "recall": 0.235607160135462,
+          "f1": 0.3297224102911307,
+          "roc_auc": 0.7402305014223637,
+          "pr_auc": 0.4656813512062385,
+          "brier": 0.1637649419743478,
+          "log_loss": 0.5003589094141179,
+          "confusion_matrix": [
+            [
+              5836,
+              400
+            ],
+            [
+              1580,
+              487
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 2644,
+              "mean_probability": 0.0619546543229806,
+              "observed_rate": 0.09039334341906202
+            },
+            {
+              "bin": 1,
+              "rows": 2157,
+              "mean_probability": 0.15270565542309236,
+              "observed_rate": 0.1715345387111729
+            },
+            {
+              "bin": 2,
+              "rows": 1296,
+              "mean_probability": 0.24112017618544707,
+              "observed_rate": 0.32947530864197533
+            },
+            {
+              "bin": 3,
+              "rows": 772,
+              "mean_probability": 0.3488243871158947,
+              "observed_rate": 0.3873056994818653
+            },
+            {
+              "bin": 4,
+              "rows": 547,
+              "mean_probability": 0.44661291841939543,
+              "observed_rate": 0.44789762340036565
+            },
+            {
+              "bin": 5,
+              "rows": 387,
+              "mean_probability": 0.5443609687066511,
+              "observed_rate": 0.4935400516795866
+            },
+            {
+              "bin": 6,
+              "rows": 308,
+              "mean_probability": 0.6482156713306609,
+              "observed_rate": 0.5551948051948052
+            },
+            {
+              "bin": 7,
+              "rows": 154,
+              "mean_probability": 0.7448676882228241,
+              "observed_rate": 0.6753246753246753
+            },
+            {
+              "bin": 8,
+              "rows": 36,
+              "mean_probability": 0.8277248049860313,
+              "observed_rate": 0.5555555555555556
+            },
+            {
+              "bin": 9,
+              "rows": 2,
+              "mean_probability": 0.9116610150468588,
+              "observed_rate": 0.5
+            }
+          ]
+        }
+      },
+      "reserved_room_type": {
+        "A": {
+          "rows": 13861,
+          "precision": 0.4470766129032258,
+          "recall": 0.2561362980075079,
+          "f1": 0.3256838626767028,
+          "roc_auc": 0.6878152921186947,
+          "pr_auc": 0.39561357473983155,
+          "brier": 0.17846204709279953,
+          "log_loss": 0.5359993665859798,
+          "confusion_matrix": [
+            [
+              9301,
+              1097
+            ],
+            [
+              2576,
+              887
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 2388,
+              "mean_probability": 0.06465715899392435,
+              "observed_rate": 0.09882747068676717
+            },
+            {
+              "bin": 1,
+              "rows": 3062,
+              "mean_probability": 0.14563546561859142,
+              "observed_rate": 0.14761593729588504
+            },
+            {
+              "bin": 2,
+              "rows": 2592,
+              "mean_probability": 0.2542556683028403,
+              "observed_rate": 0.20949074074074073
+            },
+            {
+              "bin": 3,
+              "rows": 2495,
+              "mean_probability": 0.3454497613978199,
+              "observed_rate": 0.35150300601202406
+            },
+            {
+              "bin": 4,
+              "rows": 1340,
+              "mean_probability": 0.44482910957059046,
+              "observed_rate": 0.3492537313432836
+            },
+            {
+              "bin": 5,
+              "rows": 921,
+              "mean_probability": 0.5457235362288476,
+              "observed_rate": 0.40716612377850164
+            },
+            {
+              "bin": 6,
+              "rows": 586,
+              "mean_probability": 0.651193175917275,
+              "observed_rate": 0.4761092150170648
+            },
+            {
+              "bin": 7,
+              "rows": 402,
+              "mean_probability": 0.742753053901442,
+              "observed_rate": 0.4900497512437811
+            },
+            {
+              "bin": 8,
+              "rows": 75,
+              "mean_probability": 0.8230952103230407,
+              "observed_rate": 0.48
+            }
+          ]
+        },
+        "B": {
+          "rows": 51,
+          "precision": 0.2857142857142857,
+          "recall": 0.2,
+          "f1": 0.23529411764705882,
+          "roc_auc": 0.7390243902439025,
+          "pr_auc": 0.41228727234824797,
+          "brier": 0.1525288615473897,
+          "log_loss": 0.4725073503127122,
+          "confusion_matrix": [
+            [
+              36,
+              5
+            ],
+            [
+              8,
+              2
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 6,
+              "mean_probability": 0.07522164350886894,
+              "observed_rate": 0.0
+            },
+            {
+              "bin": 1,
+              "rows": 16,
+              "mean_probability": 0.1601864472688166,
+              "observed_rate": 0.125
+            },
+            {
+              "bin": 2,
+              "rows": 16,
+              "mean_probability": 0.2409675082677701,
+              "observed_rate": 0.0625
+            },
+            {
+              "bin": 3,
+              "rows": 5,
+              "mean_probability": 0.3402009600117812,
+              "observed_rate": 0.8
+            },
+            {
+              "bin": 4,
+              "rows": 1,
+              "mean_probability": 0.4013390583997113,
+              "observed_rate": 1.0
+            },
+            {
+              "bin": 5,
+              "rows": 2,
+              "mean_probability": 0.5204673347052458,
+              "observed_rate": 0.0
+            },
+            {
+              "bin": 6,
+              "rows": 3,
+              "mean_probability": 0.6380823610065561,
+              "observed_rate": 0.6666666666666666
+            },
+            {
+              "bin": 7,
+              "rows": 2,
+              "mean_probability": 0.7147115683851823,
+              "observed_rate": 0.0
+            }
+          ]
+        },
+        "C": {
+          "rows": 424,
+          "precision": 0.562874251497006,
+          "recall": 0.5310734463276836,
+          "f1": 0.5465116279069767,
+          "roc_auc": 0.6903520208604955,
+          "pr_auc": 0.5237238058814846,
+          "brier": 0.22334776314125881,
+          "log_loss": 0.6360326530483184,
+          "confusion_matrix": [
+            [
+              174,
+              73
+            ],
+            [
+              83,
+              94
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 21,
+              "mean_probability": 0.07711032025139651,
+              "observed_rate": 0.0
+            },
+            {
+              "bin": 1,
+              "rows": 50,
+              "mean_probability": 0.14772849693864662,
+              "observed_rate": 0.14
+            },
+            {
+              "bin": 2,
+              "rows": 37,
+              "mean_probability": 0.2499887515108017,
+              "observed_rate": 0.16216216216216217
+            },
+            {
+              "bin": 3,
+              "rows": 87,
+              "mean_probability": 0.3534203353316741,
+              "observed_rate": 0.42528735632183906
+            },
+            {
+              "bin": 4,
+              "rows": 62,
+              "mean_probability": 0.45152660236383807,
+              "observed_rate": 0.532258064516129
+            },
+            {
+              "bin": 5,
+              "rows": 47,
+              "mean_probability": 0.5494153389640334,
+              "observed_rate": 0.5531914893617021
+            },
+            {
+              "bin": 6,
+              "rows": 54,
+              "mean_probability": 0.6519965475815171,
+              "observed_rate": 0.6296296296296297
+            },
+            {
+              "bin": 7,
+              "rows": 46,
+              "mean_probability": 0.7480936520453014,
+              "observed_rate": 0.5869565217391305
+            },
+            {
+              "bin": 8,
+              "rows": 20,
+              "mean_probability": 0.8316303018851343,
+              "observed_rate": 0.35
+            }
+          ]
+        },
+        "D": {
+          "rows": 5131,
+          "precision": 0.4569932685115931,
+          "recall": 0.3785625774473358,
+          "f1": 0.41409691629955947,
+          "roc_auc": 0.6627245818592575,
+          "pr_auc": 0.43707838115778996,
+          "brier": 0.21042793421638642,
+          "log_loss": 0.6076124858585122,
+          "confusion_matrix": [
+            [
+              2791,
+              726
+            ],
+            [
+              1003,
+              611
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 517,
+              "mean_probability": 0.06468959960292002,
+              "observed_rate": 0.10638297872340426
+            },
+            {
+              "bin": 1,
+              "rows": 779,
+              "mean_probability": 0.15163242130447135,
+              "observed_rate": 0.15661103979460847
+            },
+            {
+              "bin": 2,
+              "rows": 746,
+              "mean_probability": 0.2540438722600892,
+              "observed_rate": 0.2546916890080429
+            },
+            {
+              "bin": 3,
+              "rows": 1033,
+              "mean_probability": 0.3478392531133634,
+              "observed_rate": 0.3436592449177154
+            },
+            {
+              "bin": 4,
+              "rows": 719,
+              "mean_probability": 0.44700008188079243,
+              "observed_rate": 0.3908205841446453
+            },
+            {
+              "bin": 5,
+              "rows": 539,
+              "mean_probability": 0.5436857551404662,
+              "observed_rate": 0.44155844155844154
+            },
+            {
+              "bin": 6,
+              "rows": 460,
+              "mean_probability": 0.6506469498498703,
+              "observed_rate": 0.44565217391304346
+            },
+            {
+              "bin": 7,
+              "rows": 294,
+              "mean_probability": 0.740152946103317,
+              "observed_rate": 0.4897959183673469
+            },
+            {
+              "bin": 8,
+              "rows": 44,
+              "mean_probability": 0.8222027160338652,
+              "observed_rate": 0.5454545454545454
+            }
+          ]
+        },
+        "E": {
+          "rows": 1871,
+          "precision": 0.46736292428198434,
+          "recall": 0.30033557046979864,
+          "f1": 0.36567926455566907,
+          "roc_auc": 0.6853987366758785,
+          "pr_auc": 0.4551506712549013,
+          "brier": 0.20257847873987098,
+          "log_loss": 0.5863958814690191,
+          "confusion_matrix": [
+            [
+              1071,
+              204
+            ],
+            [
+              417,
+              179
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 264,
+              "mean_probability": 0.06467758807561962,
+              "observed_rate": 0.07196969696969698
+            },
+            {
+              "bin": 1,
+              "rows": 346,
+              "mean_probability": 0.15218985270937951,
+              "observed_rate": 0.17341040462427745
+            },
+            {
+              "bin": 2,
+              "rows": 312,
+              "mean_probability": 0.2510380661563338,
+              "observed_rate": 0.34294871794871795
+            },
+            {
+              "bin": 3,
+              "rows": 333,
+              "mean_probability": 0.3509771155603784,
+              "observed_rate": 0.36036036036036034
+            },
+            {
+              "bin": 4,
+              "rows": 233,
+              "mean_probability": 0.4485220330553342,
+              "observed_rate": 0.47639484978540775
+            },
+            {
+              "bin": 5,
+              "rows": 188,
+              "mean_probability": 0.5477564047271394,
+              "observed_rate": 0.4148936170212766
+            },
+            {
+              "bin": 6,
+              "rows": 132,
+              "mean_probability": 0.6445009147523616,
+              "observed_rate": 0.5378787878787878
+            },
+            {
+              "bin": 7,
+              "rows": 57,
+              "mean_probability": 0.7409859213958626,
+              "observed_rate": 0.47368421052631576
+            },
+            {
+              "bin": 8,
+              "rows": 6,
+              "mean_probability": 0.8265526297155099,
+              "observed_rate": 0.5
+            }
+          ]
+        },
+        "F": {
+          "rows": 810,
+          "precision": 0.4863636363636364,
+          "recall": 0.42971887550200805,
+          "f1": 0.4562899786780384,
+          "roc_auc": 0.6990922692552742,
+          "pr_auc": 0.4419522052464902,
+          "brier": 0.20592462370561265,
+          "log_loss": 0.5983891007530578,
+          "confusion_matrix": [
+            [
+              448,
+              113
+            ],
+            [
+              142,
+              107
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 127,
+              "mean_probability": 0.06679728843733736,
+              "observed_rate": 0.08661417322834646
+            },
+            {
+              "bin": 1,
+              "rows": 128,
+              "mean_probability": 0.14627042872086582,
+              "observed_rate": 0.1796875
+            },
+            {
+              "bin": 2,
+              "rows": 94,
+              "mean_probability": 0.2485792546964492,
+              "observed_rate": 0.24468085106382978
+            },
+            {
+              "bin": 3,
+              "rows": 105,
+              "mean_probability": 0.3563688445422281,
+              "observed_rate": 0.20952380952380953
+            },
+            {
+              "bin": 4,
+              "rows": 136,
+              "mean_probability": 0.44805903278050346,
+              "observed_rate": 0.4632352941176471
+            },
+            {
+              "bin": 5,
+              "rows": 81,
+              "mean_probability": 0.5505496665682149,
+              "observed_rate": 0.5555555555555556
+            },
+            {
+              "bin": 6,
+              "rows": 53,
+              "mean_probability": 0.6451057826341225,
+              "observed_rate": 0.5283018867924528
+            },
+            {
+              "bin": 7,
+              "rows": 53,
+              "mean_probability": 0.7483514586238773,
+              "observed_rate": 0.3584905660377358
+            },
+            {
+              "bin": 8,
+              "rows": 32,
+              "mean_probability": 0.8429990540584247,
+              "observed_rate": 0.46875
+            },
+            {
+              "bin": 9,
+              "rows": 1,
+              "mean_probability": 0.9036494468761868,
+              "observed_rate": 0.0
+            }
+          ]
+        },
+        "G": {
+          "rows": 608,
+          "precision": 0.55,
+          "recall": 0.43612334801762115,
+          "f1": 0.4864864864864865,
+          "roc_auc": 0.7044584735278133,
+          "pr_auc": 0.5417717127703325,
+          "brier": 0.21156852254606723,
+          "log_loss": 0.6144930165024024,
+          "confusion_matrix": [
+            [
+              300,
+              81
+            ],
+            [
+              128,
+              99
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 52,
+              "mean_probability": 0.07029366499921756,
+              "observed_rate": 0.19230769230769232
+            },
+            {
+              "bin": 1,
+              "rows": 78,
+              "mean_probability": 0.15153847890068115,
+              "observed_rate": 0.1282051282051282
+            },
+            {
+              "bin": 2,
+              "rows": 97,
+              "mean_probability": 0.24801346562416032,
+              "observed_rate": 0.16494845360824742
+            },
+            {
+              "bin": 3,
+              "rows": 112,
+              "mean_probability": 0.3531863020712884,
+              "observed_rate": 0.4107142857142857
+            },
+            {
+              "bin": 4,
+              "rows": 89,
+              "mean_probability": 0.44229825582955845,
+              "observed_rate": 0.5168539325842697
+            },
+            {
+              "bin": 5,
+              "rows": 69,
+              "mean_probability": 0.5449092084274529,
+              "observed_rate": 0.5507246376811594
+            },
+            {
+              "bin": 6,
+              "rows": 47,
+              "mean_probability": 0.6550565698036604,
+              "observed_rate": 0.425531914893617
+            },
+            {
+              "bin": 7,
+              "rows": 44,
+              "mean_probability": 0.7459774217226756,
+              "observed_rate": 0.6363636363636364
+            },
+            {
+              "bin": 8,
+              "rows": 20,
+              "mean_probability": 0.8341637145986137,
+              "observed_rate": 0.65
+            }
+          ]
+        },
+        "H": {
+          "rows": 137,
+          "precision": 0.6458333333333334,
+          "recall": 0.5961538461538461,
+          "f1": 0.62,
+          "roc_auc": 0.7709276018099548,
+          "pr_auc": 0.6915824184359783,
+          "brier": 0.19428064180065088,
+          "log_loss": 0.5762693251228929,
+          "confusion_matrix": [
+            [
+              68,
+              17
+            ],
+            [
+              21,
+              31
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 1,
+              "mean_probability": 0.0513401442561611,
+              "observed_rate": 0.0
+            },
+            {
+              "bin": 1,
+              "rows": 24,
+              "mean_probability": 0.1493344496170914,
+              "observed_rate": 0.25
+            },
+            {
+              "bin": 2,
+              "rows": 10,
+              "mean_probability": 0.25110289345946757,
+              "observed_rate": 0.1
+            },
+            {
+              "bin": 3,
+              "rows": 26,
+              "mean_probability": 0.35850765168366816,
+              "observed_rate": 0.07692307692307693
+            },
+            {
+              "bin": 4,
+              "rows": 28,
+              "mean_probability": 0.44137273324354914,
+              "observed_rate": 0.42857142857142855
+            },
+            {
+              "bin": 5,
+              "rows": 17,
+              "mean_probability": 0.5446696309601368,
+              "observed_rate": 0.5882352941176471
+            },
+            {
+              "bin": 6,
+              "rows": 13,
+              "mean_probability": 0.6517694964603937,
+              "observed_rate": 0.38461538461538464
+            },
+            {
+              "bin": 7,
+              "rows": 15,
+              "mean_probability": 0.7466895066828695,
+              "observed_rate": 0.9333333333333333
+            },
+            {
+              "bin": 8,
+              "rows": 1,
+              "mean_probability": 0.8412157686639449,
+              "observed_rate": 1.0
+            },
+            {
+              "bin": 9,
+              "rows": 2,
+              "mean_probability": 0.9116610150468588,
+              "observed_rate": 0.5
+            }
+          ]
+        }
+      },
+      "arrival_month": {
+        "1": {
+          "rows": 1319,
+          "precision": 0.8888888888888888,
+          "recall": 0.061068702290076333,
+          "f1": 0.11428571428571428,
+          "roc_auc": 0.7212134063279102,
+          "pr_auc": 0.33571052526041667,
+          "brier": 0.08383501227333262,
+          "log_loss": 0.3035136075676283,
+          "confusion_matrix": [
+            [
+              1187,
+              1
+            ],
+            [
+              123,
+              8
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 531,
+              "mean_probability": 0.06029751504946353,
+              "observed_rate": 0.04896421845574388
+            },
+            {
+              "bin": 1,
+              "rows": 418,
+              "mean_probability": 0.13899389631547254,
+              "observed_rate": 0.07655502392344497
+            },
+            {
+              "bin": 2,
+              "rows": 276,
+              "mean_probability": 0.2528461836604489,
+              "observed_rate": 0.13768115942028986
+            },
+            {
+              "bin": 3,
+              "rows": 76,
+              "mean_probability": 0.3298091589734861,
+              "observed_rate": 0.2894736842105263
+            },
+            {
+              "bin": 4,
+              "rows": 9,
+              "mean_probability": 0.4356426303786221,
+              "observed_rate": 0.5555555555555556
+            },
+            {
+              "bin": 5,
+              "rows": 5,
+              "mean_probability": 0.5529582535318586,
+              "observed_rate": 0.8
+            },
+            {
+              "bin": 6,
+              "rows": 4,
+              "mean_probability": 0.6283126875510405,
+              "observed_rate": 1.0
+            }
+          ]
+        },
+        "2": {
+          "rows": 2366,
+          "precision": 0.42857142857142855,
+          "recall": 0.006224066390041493,
+          "f1": 0.012269938650306749,
+          "roc_auc": 0.6886860084044718,
+          "pr_auc": 0.3559128982897938,
+          "brier": 0.1507287875463645,
+          "log_loss": 0.4739594838257616,
+          "confusion_matrix": [
+            [
+              1880,
+              4
+            ],
+            [
+              479,
+              3
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 690,
+              "mean_probability": 0.06276871988663758,
+              "observed_rate": 0.10434782608695652
+            },
+            {
+              "bin": 1,
+              "rows": 625,
+              "mean_probability": 0.14117399139499556,
+              "observed_rate": 0.1408
+            },
+            {
+              "bin": 2,
+              "rows": 548,
+              "mean_probability": 0.25729733686658746,
+              "observed_rate": 0.22445255474452555
+            },
+            {
+              "bin": 3,
+              "rows": 434,
+              "mean_probability": 0.3390321860852029,
+              "observed_rate": 0.391705069124424
+            },
+            {
+              "bin": 4,
+              "rows": 62,
+              "mean_probability": 0.4329005847770486,
+              "observed_rate": 0.41935483870967744
+            },
+            {
+              "bin": 5,
+              "rows": 7,
+              "mean_probability": 0.5344714740510527,
+              "observed_rate": 0.42857142857142855
+            }
+          ]
+        },
+        "3": {
+          "rows": 2578,
+          "precision": 0.6666666666666666,
+          "recall": 0.032432432432432434,
+          "f1": 0.061855670103092786,
+          "roc_auc": 0.6820554612942157,
+          "pr_auc": 0.3612432311427105,
+          "brier": 0.1576399123399045,
+          "log_loss": 0.4896114711542016,
+          "confusion_matrix": [
+            [
+              2014,
+              9
+            ],
+            [
+              537,
+              18
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 607,
+              "mean_probability": 0.0623645787545762,
+              "observed_rate": 0.10214168039538715
+            },
+            {
+              "bin": 1,
+              "rows": 626,
+              "mean_probability": 0.14491039148664994,
+              "observed_rate": 0.13099041533546327
+            },
+            {
+              "bin": 2,
+              "rows": 494,
+              "mean_probability": 0.25657271508244056,
+              "observed_rate": 0.20850202429149797
+            },
+            {
+              "bin": 3,
+              "rows": 531,
+              "mean_probability": 0.3515665896798579,
+              "observed_rate": 0.3465160075329567
+            },
+            {
+              "bin": 4,
+              "rows": 293,
+              "mean_probability": 0.4377657844673349,
+              "observed_rate": 0.36177474402730375
+            },
+            {
+              "bin": 5,
+              "rows": 23,
+              "mean_probability": 0.5400321822978232,
+              "observed_rate": 0.6521739130434783
+            },
+            {
+              "bin": 6,
+              "rows": 4,
+              "mean_probability": 0.6219029681822226,
+              "observed_rate": 0.75
+            }
+          ]
+        },
+        "4": {
+          "rows": 2771,
+          "precision": 0.5355450236966824,
+          "recall": 0.14358322744599747,
+          "f1": 0.22645290581162325,
+          "roc_auc": 0.7035003022912654,
+          "pr_auc": 0.4565032765773259,
+          "brier": 0.18264950018752424,
+          "log_loss": 0.5430416017899744,
+          "confusion_matrix": [
+            [
+              1886,
+              98
+            ],
+            [
+              674,
+              113
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 456,
+              "mean_probability": 0.06548216829810527,
+              "observed_rate": 0.09429824561403509
+            },
+            {
+              "bin": 1,
+              "rows": 538,
+              "mean_probability": 0.15059894723084954,
+              "observed_rate": 0.1449814126394052
+            },
+            {
+              "bin": 2,
+              "rows": 502,
+              "mean_probability": 0.24938103612537332,
+              "observed_rate": 0.24302788844621515
+            },
+            {
+              "bin": 3,
+              "rows": 604,
+              "mean_probability": 0.3468233443437317,
+              "observed_rate": 0.3890728476821192
+            },
+            {
+              "bin": 4,
+              "rows": 460,
+              "mean_probability": 0.44632022265588706,
+              "observed_rate": 0.4260869565217391
+            },
+            {
+              "bin": 5,
+              "rows": 190,
+              "mean_probability": 0.5385172344304207,
+              "observed_rate": 0.5210526315789473
+            },
+            {
+              "bin": 6,
+              "rows": 21,
+              "mean_probability": 0.6394223055637757,
+              "observed_rate": 0.6666666666666666
+            }
+          ]
+        },
+        "5": {
+          "rows": 3286,
+          "precision": 0.4344569288389513,
+          "recall": 0.2508108108108108,
+          "f1": 0.31802604523646333,
+          "roc_auc": 0.6762521606740158,
+          "pr_auc": 0.40548310225758255,
+          "brier": 0.19006306399877068,
+          "log_loss": 0.5609869774766972,
+          "confusion_matrix": [
+            [
+              2059,
+              302
+            ],
+            [
+              693,
+              232
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 415,
+              "mean_probability": 0.06913364567959394,
+              "observed_rate": 0.08674698795180723
+            },
+            {
+              "bin": 1,
+              "rows": 739,
+              "mean_probability": 0.14864212709194882,
+              "observed_rate": 0.16373477672530445
+            },
+            {
+              "bin": 2,
+              "rows": 639,
+              "mean_probability": 0.2547932401193766,
+              "observed_rate": 0.23943661971830985
+            },
+            {
+              "bin": 3,
+              "rows": 549,
+              "mean_probability": 0.3441712904606449,
+              "observed_rate": 0.40255009107468126
+            },
+            {
+              "bin": 4,
+              "rows": 410,
+              "mean_probability": 0.4502201461990046,
+              "observed_rate": 0.3951219512195122
+            },
+            {
+              "bin": 5,
+              "rows": 445,
+              "mean_probability": 0.541945176609464,
+              "observed_rate": 0.4404494382022472
+            },
+            {
+              "bin": 6,
+              "rows": 79,
+              "mean_probability": 0.631474795776461,
+              "observed_rate": 0.379746835443038
+            },
+            {
+              "bin": 7,
+              "rows": 10,
+              "mean_probability": 0.7198165592437312,
+              "observed_rate": 0.6
+            }
+          ]
+        },
+        "6": {
+          "rows": 3159,
+          "precision": 0.468,
+          "recall": 0.34960159362549803,
+          "f1": 0.40022805017103763,
+          "roc_auc": 0.6539024874978047,
+          "pr_auc": 0.4354084433100387,
+          "brier": 0.20980053862673603,
+          "log_loss": 0.6076541857876657,
+          "confusion_matrix": [
+            [
+              1756,
+              399
+            ],
+            [
+              653,
+              351
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 281,
+              "mean_probability": 0.07097980436847875,
+              "observed_rate": 0.099644128113879
+            },
+            {
+              "bin": 1,
+              "rows": 557,
+              "mean_probability": 0.15235150244007248,
+              "observed_rate": 0.21543985637342908
+            },
+            {
+              "bin": 2,
+              "rows": 500,
+              "mean_probability": 0.25288408199257517,
+              "observed_rate": 0.246
+            },
+            {
+              "bin": 3,
+              "rows": 707,
+              "mean_probability": 0.3496004626599103,
+              "observed_rate": 0.3323903818953324
+            },
+            {
+              "bin": 4,
+              "rows": 364,
+              "mean_probability": 0.44389317034004205,
+              "observed_rate": 0.40384615384615385
+            },
+            {
+              "bin": 5,
+              "rows": 368,
+              "mean_probability": 0.5505401118694371,
+              "observed_rate": 0.45108695652173914
+            },
+            {
+              "bin": 6,
+              "rows": 298,
+              "mean_probability": 0.6448046299167213,
+              "observed_rate": 0.4798657718120805
+            },
+            {
+              "bin": 7,
+              "rows": 81,
+              "mean_probability": 0.7343477890369049,
+              "observed_rate": 0.5061728395061729
+            },
+            {
+              "bin": 8,
+              "rows": 3,
+              "mean_probability": 0.8303744922525542,
+              "observed_rate": 0.3333333333333333
+            }
+          ]
+        },
+        "7": {
+          "rows": 3586,
+          "precision": 0.437403400309119,
+          "recall": 0.48376068376068376,
+          "f1": 0.4594155844155844,
+          "roc_auc": 0.6375314852549951,
+          "pr_auc": 0.44336229386320863,
+          "brier": 0.22719302380269005,
+          "log_loss": 0.6475784441769565,
+          "confusion_matrix": [
+            [
+              1688,
+              728
+            ],
+            [
+              604,
+              566
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 185,
+              "mean_probability": 0.07165698187209751,
+              "observed_rate": 0.1783783783783784
+            },
+            {
+              "bin": 1,
+              "rows": 474,
+              "mean_probability": 0.1535877177057976,
+              "observed_rate": 0.16033755274261605
+            },
+            {
+              "bin": 2,
+              "rows": 475,
+              "mean_probability": 0.24992788010140063,
+              "observed_rate": 0.24
+            },
+            {
+              "bin": 3,
+              "rows": 649,
+              "mean_probability": 0.34806458238923055,
+              "observed_rate": 0.3312788906009245
+            },
+            {
+              "bin": 4,
+              "rows": 509,
+              "mean_probability": 0.4484183979687367,
+              "observed_rate": 0.32612966601178783
+            },
+            {
+              "bin": 5,
+              "rows": 412,
+              "mean_probability": 0.5457251862326307,
+              "observed_rate": 0.34951456310679613
+            },
+            {
+              "bin": 6,
+              "rows": 492,
+              "mean_probability": 0.6549626033582667,
+              "observed_rate": 0.4532520325203252
+            },
+            {
+              "bin": 7,
+              "rows": 353,
+              "mean_probability": 0.7376060877639207,
+              "observed_rate": 0.5014164305949008
+            },
+            {
+              "bin": 8,
+              "rows": 37,
+              "mean_probability": 0.8178541879424823,
+              "observed_rate": 0.5945945945945946
+            }
+          ]
+        },
+        "8": {
+          "rows": 3828,
+          "precision": 0.48125836680053546,
+          "recall": 0.5389805097451275,
+          "f1": 0.5084865629420084,
+          "roc_auc": 0.6610236381408334,
+          "pr_auc": 0.4630487392554549,
+          "brier": 0.22862552574543699,
+          "log_loss": 0.6534526651884284,
+          "confusion_matrix": [
+            [
+              1719,
+              775
+            ],
+            [
+              615,
+              719
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 211,
+              "mean_probability": 0.06751336480726804,
+              "observed_rate": 0.14691943127962084
+            },
+            {
+              "bin": 1,
+              "rows": 506,
+              "mean_probability": 0.1486461720298907,
+              "observed_rate": 0.16798418972332016
+            },
+            {
+              "bin": 2,
+              "rows": 470,
+              "mean_probability": 0.25365913491059927,
+              "observed_rate": 0.23617021276595745
+            },
+            {
+              "bin": 3,
+              "rows": 646,
+              "mean_probability": 0.35055069130222366,
+              "observed_rate": 0.2801857585139319
+            },
+            {
+              "bin": 4,
+              "rows": 501,
+              "mean_probability": 0.4476627981035012,
+              "observed_rate": 0.41317365269461076
+            },
+            {
+              "bin": 5,
+              "rows": 414,
+              "mean_probability": 0.5485605141765449,
+              "observed_rate": 0.4420289855072464
+            },
+            {
+              "bin": 6,
+              "rows": 450,
+              "mean_probability": 0.6529680614644433,
+              "observed_rate": 0.5044444444444445
+            },
+            {
+              "bin": 7,
+              "rows": 469,
+              "mean_probability": 0.7481883016016823,
+              "observed_rate": 0.4946695095948827
+            },
+            {
+              "bin": 8,
+              "rows": 158,
+              "mean_probability": 0.8306943889594314,
+              "observed_rate": 0.4810126582278481
+            },
+            {
+              "bin": 9,
+              "rows": 3,
+              "mean_probability": 0.9089904923233014,
+              "observed_rate": 0.3333333333333333
+            }
+          ]
+        }
+      },
+      "market_segment": {
+        "Aviation": {
+          "rows": 103,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "roc_auc": 0.49849397590361444,
+          "pr_auc": 0.20466115032104765,
+          "brier": 0.16016550828562157,
+          "log_loss": 0.5002571701820447,
+          "confusion_matrix": [
+            [
+              83,
+              0
+            ],
+            [
+              20,
+              0
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 2,
+              "mean_probability": 0.08673967075203347,
+              "observed_rate": 0.0
+            },
+            {
+              "bin": 1,
+              "rows": 26,
+              "mean_probability": 0.1891623610725177,
+              "observed_rate": 0.23076923076923078
+            },
+            {
+              "bin": 2,
+              "rows": 67,
+              "mean_probability": 0.22809618060156614,
+              "observed_rate": 0.208955223880597
+            },
+            {
+              "bin": 3,
+              "rows": 8,
+              "mean_probability": 0.34463895410090856,
+              "observed_rate": 0.0
+            }
+          ]
+        },
+        "Complementary": {
+          "rows": 194,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "roc_auc": 0.37941049913941477,
+          "pr_auc": 0.11386126554753534,
+          "brier": 0.13231991020377507,
+          "log_loss": 0.4594938802736276,
+          "confusion_matrix": [
+            [
+              166,
+              0
+            ],
+            [
+              28,
+              0
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 120,
+              "mean_probability": 0.07619720143774224,
+              "observed_rate": 0.16666666666666666
+            },
+            {
+              "bin": 1,
+              "rows": 63,
+              "mean_probability": 0.13139959731935738,
+              "observed_rate": 0.12698412698412698
+            },
+            {
+              "bin": 2,
+              "rows": 11,
+              "mean_probability": 0.2403220269578714,
+              "observed_rate": 0.0
+            }
+          ]
+        },
+        "Corporate": {
+          "rows": 1157,
+          "precision": 1.0,
+          "recall": 0.006493506493506494,
+          "f1": 0.012903225806451613,
+          "roc_auc": 0.5906145200761352,
+          "pr_auc": 0.23532009785243158,
+          "brier": 0.11333453173098262,
+          "log_loss": 0.3892580091432481,
+          "confusion_matrix": [
+            [
+              1003,
+              0
+            ],
+            [
+              153,
+              1
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 575,
+              "mean_probability": 0.07104508948353928,
+              "observed_rate": 0.11478260869565217
+            },
+            {
+              "bin": 1,
+              "rows": 494,
+              "mean_probability": 0.15052612493726875,
+              "observed_rate": 0.10728744939271255
+            },
+            {
+              "bin": 2,
+              "rows": 80,
+              "mean_probability": 0.2308696601494658,
+              "observed_rate": 0.4
+            },
+            {
+              "bin": 3,
+              "rows": 5,
+              "mean_probability": 0.3195167437949892,
+              "observed_rate": 0.4
+            },
+            {
+              "bin": 4,
+              "rows": 2,
+              "mean_probability": 0.47656015248226286,
+              "observed_rate": 0.0
+            },
+            {
+              "bin": 6,
+              "rows": 1,
+              "mean_probability": 0.6140280658084559,
+              "observed_rate": 1.0
+            }
+          ]
+        },
+        "Direct": {
+          "rows": 3728,
+          "precision": 0.17777777777777778,
+          "recall": 0.045889101338432124,
+          "f1": 0.0729483282674772,
+          "roc_auc": 0.6172671763467097,
+          "pr_auc": 0.18348223316105639,
+          "brier": 0.12953320090730655,
+          "log_loss": 0.4201891268999844,
+          "confusion_matrix": [
+            [
+              3094,
+              111
+            ],
+            [
+              499,
+              24
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 1320,
+              "mean_probability": 0.0658017040578238,
+              "observed_rate": 0.08484848484848485
+            },
+            {
+              "bin": 1,
+              "rows": 1401,
+              "mean_probability": 0.13875096505296758,
+              "observed_rate": 0.15132048536759457
+            },
+            {
+              "bin": 2,
+              "rows": 435,
+              "mean_probability": 0.24580461806868284,
+              "observed_rate": 0.20229885057471264
+            },
+            {
+              "bin": 3,
+              "rows": 256,
+              "mean_probability": 0.35052227144224446,
+              "observed_rate": 0.21484375
+            },
+            {
+              "bin": 4,
+              "rows": 181,
+              "mean_probability": 0.44475281203427297,
+              "observed_rate": 0.17679558011049723
+            },
+            {
+              "bin": 5,
+              "rows": 88,
+              "mean_probability": 0.5427094231877653,
+              "observed_rate": 0.17045454545454544
+            },
+            {
+              "bin": 6,
+              "rows": 35,
+              "mean_probability": 0.6412921187178791,
+              "observed_rate": 0.22857142857142856
+            },
+            {
+              "bin": 7,
+              "rows": 11,
+              "mean_probability": 0.7255608729445299,
+              "observed_rate": 0.09090909090909091
+            },
+            {
+              "bin": 8,
+              "rows": 1,
+              "mean_probability": 0.8184358673171082,
+              "observed_rate": 0.0
+            }
+          ]
+        },
+        "Groups": {
+          "rows": 559,
+          "precision": 0.5454545454545454,
+          "recall": 0.0851063829787234,
+          "f1": 0.147239263803681,
+          "roc_auc": 0.6867555736536699,
+          "pr_auc": 0.4743644380682788,
+          "brier": 0.18232569241620208,
+          "log_loss": 0.5785649929656747,
+          "confusion_matrix": [
+            [
+              408,
+              10
+            ],
+            [
+              129,
+              12
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 306,
+              "mean_probability": 0.06147486752300783,
+              "observed_rate": 0.16666666666666666
+            },
+            {
+              "bin": 1,
+              "rows": 165,
+              "mean_probability": 0.12895338485654925,
+              "observed_rate": 0.22424242424242424
+            },
+            {
+              "bin": 2,
+              "rows": 35,
+              "mean_probability": 0.24486736857575372,
+              "observed_rate": 0.5142857142857142
+            },
+            {
+              "bin": 3,
+              "rows": 14,
+              "mean_probability": 0.34747803162191254,
+              "observed_rate": 0.8571428571428571
+            },
+            {
+              "bin": 4,
+              "rows": 17,
+              "mean_probability": 0.43526735581830645,
+              "observed_rate": 0.6470588235294118
+            },
+            {
+              "bin": 5,
+              "rows": 18,
+              "mean_probability": 0.5357726689757806,
+              "observed_rate": 0.5
+            },
+            {
+              "bin": 6,
+              "rows": 4,
+              "mean_probability": 0.6268993875108771,
+              "observed_rate": 0.75
+            }
+          ]
+        },
+        "Offline TA/TO": {
+          "rows": 2483,
+          "precision": 0.23076923076923078,
+          "recall": 0.0395778364116095,
+          "f1": 0.06756756756756757,
+          "roc_auc": 0.5854735796623093,
+          "pr_auc": 0.1887552587962683,
+          "brier": 0.1388278649407205,
+          "log_loss": 0.449587949538353,
+          "confusion_matrix": [
+            [
+              2054,
+              50
+            ],
+            [
+              364,
+              15
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 810,
+              "mean_probability": 0.05803385902771532,
+              "observed_rate": 0.09506172839506173
+            },
+            {
+              "bin": 1,
+              "rows": 878,
+              "mean_probability": 0.14305772765981667,
+              "observed_rate": 0.1765375854214123
+            },
+            {
+              "bin": 2,
+              "rows": 348,
+              "mean_probability": 0.24279093277876998,
+              "observed_rate": 0.20114942528735633
+            },
+            {
+              "bin": 3,
+              "rows": 237,
+              "mean_probability": 0.3456846653778356,
+              "observed_rate": 0.16455696202531644
+            },
+            {
+              "bin": 4,
+              "rows": 145,
+              "mean_probability": 0.4463676561421131,
+              "observed_rate": 0.15862068965517243
+            },
+            {
+              "bin": 5,
+              "rows": 61,
+              "mean_probability": 0.5360728302515465,
+              "observed_rate": 0.21311475409836064
+            },
+            {
+              "bin": 6,
+              "rows": 4,
+              "mean_probability": 0.6363175871542912,
+              "observed_rate": 0.5
+            }
+          ]
+        },
+        "Online TA": {
+          "rows": 14669,
+          "precision": 0.4772117962466488,
+          "recall": 0.38071164689869724,
+          "f1": 0.4235345014060134,
+          "roc_auc": 0.6491601992789957,
+          "pr_auc": 0.45812853482914195,
+          "brier": 0.22183484835028452,
+          "log_loss": 0.6324954345644065,
+          "confusion_matrix": [
+            [
+              7381,
+              2145
+            ],
+            [
+              3185,
+              1958
+            ]
+          ],
+          "threshold": 0.5,
+          "calibration": [
+            {
+              "bin": 0,
+              "rows": 243,
+              "mean_probability": 0.06722699698917275,
+              "observed_rate": 0.0205761316872428
+            },
+            {
+              "bin": 1,
+              "rows": 1456,
+              "mean_probability": 0.159315106331353,
+              "observed_rate": 0.14491758241758243
+            },
+            {
+              "bin": 2,
+              "rows": 2928,
+              "mean_probability": 0.25735279234689684,
+              "observed_rate": 0.2271174863387978
+            },
+            {
+              "bin": 3,
+              "rows": 3676,
+              "mean_probability": 0.34710432401622104,
+              "observed_rate": 0.36860718171926005
+            },
+            {
+              "bin": 4,
+              "rows": 2263,
+              "mean_probability": 0.44606648832914025,
+              "observed_rate": 0.41935483870967744
+            },
+            {
+              "bin": 5,
+              "rows": 1697,
+              "mean_probability": 0.5461694288446155,
+              "observed_rate": 0.45550972304066
+            },
+            {
+              "bin": 6,
+              "rows": 1304,
+              "mean_probability": 0.6506381349792696,
+              "observed_rate": 0.4831288343558282
+            },
+            {
+              "bin": 7,
+              "rows": 902,
+              "mean_probability": 0.7427654427204986,
+              "observed_rate": 0.5044345898004434
+            },
+            {
+              "bin": 8,
+              "rows": 197,
+              "mean_probability": 0.8283401320756476,
+              "observed_rate": 0.5025380710659898
+            },
+            {
+              "bin": 9,
+              "rows": 3,
+              "mean_probability": 0.9089904923233014,
+              "observed_rate": 0.3333333333333333
+            }
+          ]
+        }
+      }
+    },
+    "baseline_reference": "constant_prevalence",
+    "test_improvement_over_reference": 0.029638923341208656,
+    "ml_beats_reference_on_test": true,
+    "target": "is_canceled",
+    "adr_unit": null,
+    "cohort": "valid unique booking records; is_canceled includes No-Show",
+    "largest_errors": [
+      {
+        "row_id": "booking-10616",
+        "arrival_date": "2017-03-22T00:00:00.000",
+        "creation_date": "2017-03-02T00:00:00.000",
+        "lead_time": 20,
+        "arrival_month": 3,
+        "arrival_day": 22,
+        "arrival_weekday": 2,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Offline TA/TO",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient-Party",
+        "is_canceled": 1,
+        "observed": 1,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.0181683612,
+        "prediction_hist_gradient_boosting": 0.1054334498,
+        "prediction": 0.0181683612,
+        "error": 0.9818316388
+      },
+      {
+        "row_id": "booking-12128",
+        "arrival_date": "2017-06-15T00:00:00.000",
+        "creation_date": "2017-06-02T00:00:00.000",
+        "lead_time": 13,
+        "arrival_month": 6,
+        "arrival_day": 15,
+        "arrival_weekday": 3,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Offline TA/TO",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient-Party",
+        "is_canceled": 1,
+        "observed": 1,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.0185558474,
+        "prediction_hist_gradient_boosting": 0.0915682689,
+        "prediction": 0.0185558474,
+        "error": 0.9814441526
+      },
+      {
+        "row_id": "booking-11646",
+        "arrival_date": "2017-05-24T00:00:00.000",
+        "creation_date": "2017-05-22T00:00:00.000",
+        "lead_time": 2,
+        "arrival_month": 5,
+        "arrival_day": 24,
+        "arrival_weekday": 2,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Offline TA/TO",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Group",
+        "is_canceled": 1,
+        "observed": 1,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.019580197,
+        "prediction_hist_gradient_boosting": 0.0578625093,
+        "prediction": 0.019580197,
+        "error": 0.980419803
+      },
+      {
+        "row_id": "booking-12686",
+        "arrival_date": "2017-07-12T00:00:00.000",
+        "creation_date": "2017-07-07T00:00:00.000",
+        "lead_time": 5,
+        "arrival_month": 7,
+        "arrival_day": 12,
+        "arrival_weekday": 2,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Direct",
+        "distribution_channel": "Direct",
+        "customer_type": "Transient-Party",
+        "is_canceled": 1,
+        "observed": 1,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.0211642461,
+        "prediction_hist_gradient_boosting": 0.0715863036,
+        "prediction": 0.0211642461,
+        "error": 0.9788357539
+      },
+      {
+        "row_id": "booking-10231",
+        "arrival_date": "2017-02-22T00:00:00.000",
+        "creation_date": "2017-02-20T00:00:00.000",
+        "lead_time": 2,
+        "arrival_month": 2,
+        "arrival_day": 22,
+        "arrival_weekday": 2,
+        "stay_nights": 3,
+        "weekend_share": 0.0,
+        "adults": 2,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Groups",
+        "distribution_channel": "Direct",
+        "customer_type": "Transient-Party",
+        "is_canceled": 1,
+        "observed": 1,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.0231957841,
+        "prediction_hist_gradient_boosting": 0.0914916867,
+        "prediction": 0.0231957841,
+        "error": 0.9768042159
+      },
+      {
+        "row_id": "booking-9891",
+        "arrival_date": "2017-01-17T00:00:00.000",
+        "creation_date": "2017-01-16T00:00:00.000",
+        "lead_time": 1,
+        "arrival_month": 1,
+        "arrival_day": 17,
+        "arrival_weekday": 1,
+        "stay_nights": 2,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "Undefined",
+        "market_segment": "Groups",
+        "distribution_channel": "Direct",
+        "customer_type": "Transient-Party",
+        "is_canceled": 1,
+        "observed": 1,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.0234430343,
+        "prediction_hist_gradient_boosting": 0.0605177686,
+        "prediction": 0.0234430343,
+        "error": 0.9765569657
+      },
+      {
+        "row_id": "booking-10195",
+        "arrival_date": "2017-02-19T00:00:00.000",
+        "creation_date": "2017-02-19T00:00:00.000",
+        "lead_time": 0,
+        "arrival_month": 2,
+        "arrival_day": 19,
+        "arrival_weekday": 6,
+        "stay_nights": 1,
+        "weekend_share": 1.0,
+        "adults": 2,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "E",
+        "meal": "BB",
+        "market_segment": "Direct",
+        "distribution_channel": "Direct",
+        "customer_type": "Transient-Party",
+        "is_canceled": 1,
+        "observed": 1,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.0235584043,
+        "prediction_hist_gradient_boosting": 0.0323022634,
+        "prediction": 0.0235584043,
+        "error": 0.9764415957
+      },
+      {
+        "row_id": "booking-10236",
+        "arrival_date": "2017-02-22T00:00:00.000",
+        "creation_date": "2017-02-20T00:00:00.000",
+        "lead_time": 2,
+        "arrival_month": 2,
+        "arrival_day": 22,
+        "arrival_weekday": 2,
+        "stay_nights": 4,
+        "weekend_share": 0.25,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Groups",
+        "distribution_channel": "Direct",
+        "customer_type": "Transient-Party",
+        "is_canceled": 1,
+        "observed": 1,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.023708371,
+        "prediction_hist_gradient_boosting": 0.0713435396,
+        "prediction": 0.023708371,
+        "error": 0.976291629
+      },
+      {
+        "row_id": "booking-12643",
+        "arrival_date": "2017-07-10T00:00:00.000",
+        "creation_date": "2017-06-30T00:00:00.000",
+        "lead_time": 10,
+        "arrival_month": 7,
+        "arrival_day": 10,
+        "arrival_weekday": 0,
+        "stay_nights": 2,
+        "weekend_share": 0.0,
+        "adults": 2,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Direct",
+        "distribution_channel": "Direct",
+        "customer_type": "Transient-Party",
+        "is_canceled": 1,
+        "observed": 1,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.0239074776,
+        "prediction_hist_gradient_boosting": 0.0996024273,
+        "prediction": 0.0239074776,
+        "error": 0.9760925224
+      },
+      {
+        "row_id": "booking-12644",
+        "arrival_date": "2017-07-10T00:00:00.000",
+        "creation_date": "2017-06-30T00:00:00.000",
+        "lead_time": 10,
+        "arrival_month": 7,
+        "arrival_day": 10,
+        "arrival_weekday": 0,
+        "stay_nights": 2,
+        "weekend_share": 0.0,
+        "adults": 2,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Direct",
+        "distribution_channel": "Direct",
+        "customer_type": "Transient-Party",
+        "is_canceled": 1,
+        "observed": 1,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.0239074776,
+        "prediction_hist_gradient_boosting": 0.0996024273,
+        "prediction": 0.0239074776,
+        "error": 0.9760925224
+      }
+    ],
+    "smallest_errors": [
+      {
+        "row_id": "booking-29913",
+        "arrival_date": "2017-02-01T00:00:00.000",
+        "creation_date": "2017-01-27T00:00:00.000",
+        "lead_time": 5,
+        "arrival_month": 2,
+        "arrival_day": 1,
+        "arrival_weekday": 2,
+        "stay_nights": 2,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Offline TA/TO",
+        "distribution_channel": "Corporate",
+        "customer_type": "Group",
+        "is_canceled": 0,
+        "observed": 0,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.0104947929,
+        "prediction_hist_gradient_boosting": 0.0425520305,
+        "prediction": 0.0104947929,
+        "error": 0.0104947929
+      },
+      {
+        "row_id": "booking-20247",
+        "arrival_date": "2017-02-16T00:00:00.000",
+        "creation_date": "2017-02-14T00:00:00.000",
+        "lead_time": 2,
+        "arrival_month": 2,
+        "arrival_day": 16,
+        "arrival_weekday": 3,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Offline TA/TO",
+        "distribution_channel": "Corporate",
+        "customer_type": "Group",
+        "is_canceled": 0,
+        "observed": 0,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.0105865826,
+        "prediction_hist_gradient_boosting": 0.0626603425,
+        "prediction": 0.0105865826,
+        "error": 0.0105865826
+      },
+      {
+        "row_id": "booking-32854",
+        "arrival_date": "2017-02-07T00:00:00.000",
+        "creation_date": "2017-02-07T00:00:00.000",
+        "lead_time": 0,
+        "arrival_month": 2,
+        "arrival_day": 7,
+        "arrival_weekday": 1,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Offline TA/TO",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient-Party",
+        "is_canceled": 0,
+        "observed": 0,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.0131525001,
+        "prediction_hist_gradient_boosting": 0.0288530939,
+        "prediction": 0.0131525001,
+        "error": 0.0131525001
+      },
+      {
+        "row_id": "booking-33111",
+        "arrival_date": "2017-02-14T00:00:00.000",
+        "creation_date": "2017-02-13T00:00:00.000",
+        "lead_time": 1,
+        "arrival_month": 2,
+        "arrival_day": 14,
+        "arrival_weekday": 1,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 1,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Offline TA/TO",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient-Party",
+        "is_canceled": 0,
+        "observed": 0,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.0137555271,
+        "prediction_hist_gradient_boosting": 0.0369471324,
+        "prediction": 0.0137555271,
+        "error": 0.0137555271
+      },
+      {
+        "row_id": "booking-32853",
+        "arrival_date": "2017-02-07T00:00:00.000",
+        "creation_date": "2017-02-07T00:00:00.000",
+        "lead_time": 0,
+        "arrival_month": 2,
+        "arrival_day": 7,
+        "arrival_weekday": 1,
+        "stay_nights": 1,
+        "weekend_share": 0.0,
+        "adults": 2,
+        "children": 0.0,
+        "babies": 0,
+        "hotel": "Resort Hotel",
+        "reserved_room_type": "A",
+        "meal": "BB",
+        "market_segment": "Offline TA/TO",
+        "distribution_channel": "TA/TO",
+        "customer_type": "Transient-Party",
+        "is_canceled": 0,
+        "observed": 0,
+        "prediction_constant_prevalence": 0.2810824907,
+        "prediction_logistic_regression": 0.0140006074,
+        "prediction_hist_gradient_boosting": 0.0288530939,
+        "prediction": 0.0140006074,
+        "error": 0.0140006074
+      }
+    ]
+  }
+}

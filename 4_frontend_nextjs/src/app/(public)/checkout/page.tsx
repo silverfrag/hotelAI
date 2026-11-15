@@ -4,8 +4,8 @@ import { getRoomTypes } from '@/services/room.service';
 import { addIsoDays, getHotelBusinessDate } from '@/utils/businessDate';
 
 export const metadata = {
-  title: 'Báo giá và đặt phòng | Hotel AI',
-  description: 'Kiểm tra tồn phòng, nhận báo giá AI và xác nhận booking.',
+  title: 'Báo giá và đặt phòng | White Sand Boutique Hotel Đà Nẵng',
+  description: 'Kiểm tra tồn phòng White Sand Boutique Hotel Đà Nẵng, áp mã ưu đãi, nhận báo giá thông minh và xác nhận đặt phòng.',
 };
 
 interface CheckoutPageProps {

@@ -4,186 +4,259 @@ import type { RoomPresentation } from '@/types/room-presentation.type';
 interface RoomMeta {
   img: string;
   gallery: string[];
-  sqm: number;
   category: string;
-  rating: number;
   floor: string;
+  sqm: number;
   features: string[];
+  featureIcons: { icon: string; label: string }[];
   featuresDetail: string[];
-  description: string;
+  descriptionVi: string;
 }
 
+const WHITE_SAND_ADDRESS = '89-91 Võ Văn Kiệt, Sơn Trà, TP. Đà Nẵng';
+
 const DEFAULT_GALLERY = [
-  'https://images.unsplash.com/photo-1731336478850-6bce7235e320?w=800&h=600&fit=crop&auto=format',
-  'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=800&h=600&fit=crop&auto=format',
-  'https://images.unsplash.com/photo-1602002418679-43121356bf41?w=800&h=600&fit=crop&auto=format',
-  'https://images.unsplash.com/photo-1611971263023-105938ce12ed?w=800&h=600&fit=crop&auto=format',
+  '/images/whitesand/hero/hotel-exterior.jpg',
+  '/images/whitesand/rooms/superior/superior-1.jpg',
+  '/images/whitesand/rooms/deluxe/deluxe-1.jpg',
+  '/images/whitesand/hero/ocean-suite-view.jpg',
+  '/images/whitesand/facilities/pool-gym-2f.jpg',
 ];
 
 const ROOM_METADATA: Record<string, RoomMeta> = {
-  'deluxe king': {
-    img: 'https://images.unsplash.com/photo-1591088398332-8a7791972843?w=900&h=600&fit=crop&auto=format',
+  'superior room': {
+    img: '/images/whitesand/rooms/superior/superior-1.jpg',
     gallery: [
-      'https://images.unsplash.com/photo-1591088398332-8a7791972843?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=900&h=600&fit=crop&auto=format',
+      '/images/whitesand/rooms/superior/superior-1.jpg',
+      '/images/whitesand/rooms/superior/superior-2.jpg',
+      '/images/whitesand/rooms/superior/superior-3.jpg',
+      '/images/whitesand/rooms/superior/superior-4.jpg',
+      '/images/whitesand/rooms/superior/superior-5.jpg',
     ],
-    sqm: 42,
-    category: 'Deluxe Collection',
-    rating: 4.85,
-    floor: 'Floors 1 - 2',
-    features: ['King Featherbed', 'Marble Bath', 'High-Speed Wi-Fi', 'Balcony'],
-    featuresDetail: ['Plush King-size luxury bed', 'Full Italian marble bath with rain shower', 'Soundproof floor-to-ceiling glass doors'],
-    description: 'Designed for effortless comfort and refined tranquility, the Deluxe King features warm timber millwork, tailored linens, and a private balcony overlooking our landscaped sanctuary.',
+    category: 'Standard & Deluxe',
+    floor: 'Tầng 3F – 4F (301–406)',
+    sqm: 26,
+    features: ['Wi-Fi tốc độ cao', 'Bàn làm việc', 'Smart TV 43"', 'Cửa sổ ánh sáng tự nhiên'],
+    featureIcons: [
+      { icon: 'size', label: '26 m²' },
+      { icon: 'bed', label: '1 giường Queen hoặc 2 giường đơn' },
+      { icon: 'shower', label: 'Phòng tắm vòi sen đứng' },
+      { icon: 'wifi', label: 'Wi-Fi miễn phí' },
+    ],
+    featuresDetail: [
+      'Diện tích tiêu chuẩn 26 m² tại tầng 3F – 4F (12 phòng: 301–406)',
+      '1 giường Queen hoặc 2 giường đơn êm ái, tối đa 2 khách',
+      'Điều hòa 2 chiều, Smart TV, minibar và két sắt điện tử',
+      'Khu vực bàn làm việc gọn gàng phù hợp công tác & nghỉ ngắn ngày',
+      'Phòng tắm riêng với vòi sen nóng lạnh và bộ đồ dùng cá nhân',
+      'Giá trần kê khai tối đa 1.550.000 VND/đêm',
+    ],
+    descriptionVi:
+      'Hạng phòng Superior Room (26 m²) gồm 12 phòng tại tầng 3F–4F của White Sand Boutique Hotel Đà Nẵng, thiết kế tối giản ấm cúng cách bãi biển Mỹ Khê chỉ vài phút di chuyển.',
   },
-  'premier twin retreat': {
-    img: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=900&h=600&fit=crop&auto=format',
+  'deluxe room': {
+    img: '/images/whitesand/rooms/deluxe/deluxe-1.jpg',
     gallery: [
-      'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1611971263023-105938ce12ed?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1602002418679-43121356bf41?w=900&h=600&fit=crop&auto=format',
+      '/images/whitesand/rooms/deluxe/deluxe-1.jpg',
+      '/images/whitesand/rooms/deluxe/deluxe-2.jpg',
+      '/images/whitesand/rooms/deluxe/deluxe-3.jpg',
+      '/images/whitesand/rooms/deluxe/deluxe-4.jpg',
+      '/images/whitesand/rooms/deluxe/deluxe-5.jpg',
     ],
-    sqm: 46,
-    category: 'Deluxe Collection',
-    rating: 4.88,
-    floor: 'Floor 1',
-    features: ['Twin Beds', 'Garden Terrace', 'Ergonomic Desk', 'Smart Climate'],
-    featuresDetail: ['Two bespoke twin beds with plush duvets', 'Private veranda opening toward botanical paths', 'Executive workstation and smart ambient controls'],
-    description: 'Perfect for discerning colleagues or traveling friends, the Premier Twin Retreat combines dual-bed flexibility with bespoke craftsmanship and lush terrace garden vistas.',
+    category: 'Standard & Deluxe',
+    floor: 'Tầng 5F – 6F (501–606)',
+    sqm: 30,
+    features: ['Ban công thoáng mát', 'Khu ghế thư giãn', 'Smart TV 49"', 'Cà phê & trà'],
+    featureIcons: [
+      { icon: 'size', label: '30 m²' },
+      { icon: 'bed', label: '1 giường King hoặc 2 giường đơn' },
+      { icon: 'coffee', label: 'Trà & cà phê pha sẵn' },
+      { icon: 'wifi', label: 'Wi-Fi miễn phí' },
+    ],
+    featuresDetail: [
+      'Diện tích 30 m² tại tầng 5F – 6F (12 phòng: 501–606)',
+      'Không gian sáng, ban công hoặc cửa sổ lớn hướng phố biển Sơn Trà',
+      'Khu vực ghế thư giãn riêng bên cửa sổ',
+      'Phòng tắm hiện đại đầy đủ tiện nghi & máy sấy tóc',
+      'Sử dụng hồ bơi & phòng gym miễn phí tại tầng 2F',
+      'Giá trần kê khai tối đa 1.700.000 VND/đêm',
+    ],
+    descriptionVi:
+      'Deluxe Room rộng 30 m² phân bổ tại tầng 5F–6F với ánh sáng tự nhiên dồi dào, mang lại trải nghiệm lưu trú thư thái gần cầu Rồng và biển Mỹ Khê.',
   },
-  'family suite': {
-    img: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=900&h=600&fit=crop&auto=format',
+  'premium room': {
+    img: '/images/whitesand/rooms/premium/premium-1.jpg',
     gallery: [
-      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1735199579641-c6d4bd824134?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1591088398332-8a7791972843?w=900&h=600&fit=crop&auto=format',
+      '/images/whitesand/rooms/premium/premium-1.jpg',
+      '/images/whitesand/rooms/premium/premium-2.jpg',
+      '/images/whitesand/rooms/premium/premium-3.jpg',
+      '/images/whitesand/rooms/premium/premium-4.jpg',
+      '/images/whitesand/hero/ocean-suite-view.jpg',
     ],
-    sqm: 78,
-    category: 'Suite Collection',
-    rating: 4.92,
-    floor: 'Floor 2',
-    features: ['2 Bedrooms', 'Living Lounge', 'Kids Nook', 'Deep Soaking Tub'],
-    featuresDetail: ['Separate master bedroom and junior bedroom', 'Spacious open-plan living and entertainment area', 'Dual-vanity bathroom with free-standing soaking tub'],
-    description: 'An expansive family sanctuary boasting dual bedrooms and an interconnected lounge. Specially appointed with child-friendly amenities and thoughtful privacy for parents.',
+    category: 'Premium & Executive',
+    floor: 'Tầng 7F – 8F (701–804)',
+    sqm: 34,
+    features: ['Phòng gia đình 4 khách', 'Không gian mở', 'Cửa sổ rộng', 'Sofa tiếp khách'],
+    featureIcons: [
+      { icon: 'size', label: '34 m²' },
+      { icon: 'bed', label: '2 giường đôi (tối đa 4 khách)' },
+      { icon: 'ocean', label: 'Tầm nhìn tầng trung cao' },
+      { icon: 'wifi', label: 'Wi-Fi tốc độ cao' },
+    ],
+    featuresDetail: [
+      'Diện tích 34 m² tại tầng 7F – 8F (8 phòng: 701–804)',
+      'Sức chứa rộng rãi tới 4 khách, lý tưởng cho gia đình hoặc nhóm bạn',
+      'Trang bị sofa tiếp khách, Smart TV, minibar & bình đun nước',
+      'Cách âm tốt, rèm cản sáng hai lớp giúp nghỉ ngơi trọn vẹn',
+      'Truy cập tiện ích hồ bơi tầng 2F và nhà hàng tầng 14F',
+      'Giá trần kê khai tối đa 1.850.000 VND/đêm',
+    ],
+    descriptionVi:
+      'Premium Room (34 m²) nằm trên tầng 7F–8F, bố trí tối đa 4 khách cho gia đình và nhóm du lịch khám phá Đà Nẵng với tầm nhìn thông thoáng về phía bán đảo Sơn Trà.',
   },
-  'executive ocean suite': {
-    img: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=900&h=600&fit=crop&auto=format',
+  'executive room': {
+    img: '/images/whitesand/rooms/executive/executive-1.jpg',
     gallery: [
-      'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=900&h=600&fit=crop&auto=format',
+      '/images/whitesand/rooms/executive/executive-1.jpg',
+      '/images/whitesand/rooms/executive/executive-2.jpg',
+      '/images/whitesand/rooms/executive/executive-3.jpg',
+      '/images/whitesand/rooms/executive/executive-4.jpg',
+      '/images/whitesand/facilities/concierge-reception.jpg',
     ],
-    sqm: 58,
-    category: 'Executive Collection',
-    rating: 4.94,
-    floor: 'Floor 3',
-    features: ['180° Ocean View', 'Lounge Access', 'Nespresso Bar', 'Sunset Veranda'],
-    featuresDetail: ['Direct uninterrupted sea views', 'Complimentary access to the Aurum Executive Club Lounge', 'Artisanal espresso bar and daily sommelier selection'],
-    description: 'Perched on high elevations, the Executive Ocean Suite delivers breathtaking panoramic horizon views, personalized check-in privileges, and access to the Aurum VIP Lounge.',
+    category: 'Premium & Executive',
+    floor: 'Tầng 9F – 10F (901–1004)',
+    sqm: 38,
+    features: ['Tầm nhìn hướng biển', 'Bồn tắm nằm', 'Góc làm việc Executive', 'Tầng cao yên tĩnh'],
+    featureIcons: [
+      { icon: 'size', label: '38 m²' },
+      { icon: 'ocean', label: 'Hướng biển Mỹ Khê' },
+      { icon: 'bath', label: 'Bồn tắm nằm thư giãn' },
+      { icon: 'bed', label: '1 giường King cao cấp' },
+    ],
+    featuresDetail: [
+      'Diện tích 38 m² tại tầng 9F – 10F (8 phòng: 901–1004)',
+      'Tầm nhìn tầng cao mở rộng về phía biển Mỹ Khê và đại lộ Võ Văn Kiệt',
+      'Bồn tắm nằm riêng biệt kết hợp phòng tắm đứng kính trong suốt',
+      'Góc làm việc yên tĩnh với bàn gỗ lớn và ghế công thái học',
+      'Ưu tiên nhận phòng sớm / trả phòng trễ tùy tình trạng trống thực tế',
+      'Giá trần kê khai tối đa 2.000.000 VND/đêm',
+    ],
+    descriptionVi:
+      'Executive Room rộng 38 m² tại tầng 9F–10F mang đến sự riêng tư và tầm nhìn cao khoáng đạt hướng biển Mỹ Khê cùng bồn tắm nằm thư giãn.',
   },
-  'panoramic sunrise suite': {
-    img: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=900&h=600&fit=crop&auto=format',
+  'suite': {
+    img: '/images/whitesand/rooms/suite/suite-1.jpg',
     gallery: [
-      'https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900&h=600&fit=crop&auto=format',
+      '/images/whitesand/rooms/suite/suite-1.jpg',
+      '/images/whitesand/rooms/suite/suite-2.jpg',
+      '/images/whitesand/rooms/suite/suite-3.jpg',
+      '/images/whitesand/rooms/suite/suite-4.jpg',
+      '/images/whitesand/hero/ocean-suite-view.jpg',
     ],
-    sqm: 88,
-    category: 'Suite Collection',
-    rating: 4.96,
-    floor: 'Floor 4',
-    features: ['Glass Corner Wall', 'Jacuzzi Spa Bath', 'Private Sunbed', 'Sunset Cocktail'],
-    featuresDetail: ['Corner architecture with 270-degree wraparound glazing', 'In-suite heated hydromassage jacuzzi overlooking the horizon', 'Daybed terrace for sunrise meditations'],
-    description: 'Awaken to the golden dawn breaking across the horizon. This corner suite offers 270-degree floor-to-ceiling glass architecture and an in-suite hydromassage bath.',
+    category: 'Suite & Studio',
+    floor: 'Tầng 11F – 12F (1101–1204)',
+    sqm: 48,
+    features: ['Phòng khách tách biệt', 'Ban công hướng biển', 'Bồn tắm đá', 'Tối đa 3 khách'],
+    featureIcons: [
+      { icon: 'size', label: '48 m²' },
+      { icon: 'ocean', label: 'Toàn cảnh biển & cầu Rồng' },
+      { icon: 'bath', label: 'Bồn tắm lớn & áo choàng' },
+      { icon: 'bed', label: 'Phòng ngủ + Phòng khách riêng' },
+    ],
+    featuresDetail: [
+      'Diện tích 48 m² tại tầng 11F – 12F (8 phòng: 1101–1204)',
+      'Thiết kế Suite gồm phòng ngủ King tách biệt phòng khách sofa rộng',
+      'Sức chứa tối đa 3 khách, phù hợp cặp đôi cao cấp hoặc gia đình nhỏ',
+      'Cửa kính tràn viền đón bình minh Mỹ Khê ngay từ tầng cao',
+      'Chỉ một tầng di chuyển tới nhà hàng tầng 14F và Spa tầng 15F',
+      'Giá trần kê khai tối đa 2.150.000 VND/đêm',
+    ],
+    descriptionVi:
+      'Hạng Suite (48 m²) tại tầng 11F–12F kết hợp phòng ngủ King riêng tư và phòng khách thoáng đãng, thu trọn khung cảnh biển Đông và nhịp sống Đà Nẵng.',
   },
-  'wellness & spa villa': {
-    img: 'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=900&h=600&fit=crop&auto=format',
+  'studio apartment': {
+    img: '/images/whitesand/rooms/studio/studio-1.jpg',
     gallery: [
-      'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1609601546193-f558f1ebb385?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=900&h=600&fit=crop&auto=format',
+      '/images/whitesand/rooms/studio/studio-1.jpg',
+      '/images/whitesand/rooms/studio/studio-2.jpg',
+      '/images/whitesand/rooms/studio/studio-3.jpg',
+      '/images/whitesand/rooms/studio/studio-4.jpg',
+      '/images/whitesand/hero/hotel-exterior.jpg',
     ],
-    sqm: 110,
-    category: 'Villa Collection',
-    rating: 4.98,
-    floor: 'Garden Enclave',
-    features: ['Private Herbal Sauna', 'Outdoor Stone Bath', 'Yoga Pavilion', 'Daily Spa Included'],
-    featuresDetail: ['Private cedarwood sauna and steam chamber', 'Monolithic granite outdoor bath amidst tropical greenery', 'One 60-minute therapeutic spa session included per adult daily'],
-    description: 'An oasis of rejuvenation enveloped in tropical foliage. Features a private cedarwood sauna, outdoor stone soaking bath, and daily bespoke Ayurvedic therapies.',
-  },
-  'royal penthouse suite': {
-    img: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900&h=600&fit=crop&auto=format',
-    gallery: [
-      'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=900&h=600&fit=crop&auto=format',
+    category: 'Suite & Studio',
+    floor: 'Tầng 13F (1301–1306)',
+    sqm: 56,
+    features: ['Bếp nhỏ tiện nghi', 'Bàn ăn 4 chỗ', 'Tầng lưu trú cao nhất', 'Lưu trú dài ngày'],
+    featureIcons: [
+      { icon: 'size', label: '56 m²' },
+      { icon: 'chef', label: 'Khu bếp & bàn ăn riêng' },
+      { icon: 'ocean', label: 'Tầm nhìn 13F thoáng rộng' },
+      { icon: 'bed', label: 'Căn hộ tối đa 4 khách' },
     ],
-    sqm: 185,
-    category: 'Signature Penthouse',
-    rating: 5.0,
-    floor: 'Floor 6 (Penthouse)',
-    features: ['Infinity Plunge Pool', '24/7 Butler Service', 'Grand Piano', 'Private Cellar'],
-    featuresDetail: ['Heated rooftop infinity pool commanding the skyline', 'Dedicated certified butler service at your beck and call', 'Private temperature-controlled wine cellar and tasting area'],
-    description: 'The pinnacle of vertical luxury. Occupying the entire top floor with private elevator access, a rooftop infinity plunge pool, and round-the-clock dedicated butler service.',
-  },
-  'presidential beachfront villa': {
-    img: 'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=900&h=600&fit=crop&auto=format',
-    gallery: [
-      'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b?w=900&h=600&fit=crop&auto=format',
-      'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=900&h=600&fit=crop&auto=format',
+    featuresDetail: [
+      'Diện tích 56 m² tại tầng 13F (6 căn hộ: 1301–1306)',
+      'Trang bị bếp từ, lò vi sóng, tủ lạnh lớn và bộ bàn ăn gia đình',
+      'Tối ưu cho kỳ nghỉ dài ngày hoặc gia đình 4 khách cần sinh hoạt riêng',
+      'Cách tầng 14F Nhà hàng & tầng 15F Spa chỉ vài bước thang máy',
+      'Ánh sáng tự nhiên bao quanh 2 mặt kính rộng',
+      'Giá trần kê khai tối đa 2.300.000 VND/đêm',
     ],
-    sqm: 320,
-    category: 'Signature Estate',
-    rating: 5.0,
-    floor: 'Oceanfront Private Estate',
-    features: ['Direct Beach Access', '25m Private Lap Pool', 'Private Chef Kitchen', '3 Master Suites'],
-    featuresDetail: ['Private gated pathway leading directly onto pristine white sands', '25-meter private swimming pool and sun terrace pavilion', 'Full professional kitchen with private chef dining options'],
-    description: 'Our crown jewel. A sprawling private compound steps from the turquoise sea, featuring three grand master suites, a 25-meter private pool, and private beachfront cabana.',
+    descriptionVi:
+      'Studio Apartment 56 m² tọa lạc trên tầng 13F — tầng phòng nghỉ cao nhất của White Sand Boutique Hotel, tích hợp bếp tiện nghi cho kỳ nghỉ gia đình dài ngày tại Đà Nẵng.',
   },
 };
 
 export function mapApiRoomToPresentation(room: RoomType): RoomPresentation {
   const normalizedKey = room.type_name.trim().toLowerCase();
-  const meta = ROOM_METADATA[normalizedKey] ?? {
-    img: DEFAULT_GALLERY[0],
-    gallery: DEFAULT_GALLERY,
-    sqm: Math.max(35, room.capacity * 20),
-    category: 'Aurum Collection',
-    rating: 4.85,
-    floor: 'Main Resort Wing',
-    features: [`Up to ${room.capacity} guests`, `${room.total_rooms} rooms in collection`, 'Date-based pricing'],
-    featuresDetail: [`Capacity: ${room.capacity} guests`, `Collection: ${room.total_rooms} physical rooms`, 'Final pricing and availability are checked for your travel dates.'],
-    description: `Plan your stay in ${room.type_name}, accommodating up to ${room.capacity} guests. Choose your dates to check current availability and receive a hotel price quote.`,
-  };
+  const meta = ROOM_METADATA[normalizedKey];
+
+  const category = meta?.category ?? 'White Sand Collection';
+  const img = meta?.img ?? DEFAULT_GALLERY[0];
+  const gallery = meta?.gallery ?? DEFAULT_GALLERY;
+  const featureIcons = meta?.featureIcons ?? [{ icon: 'bed', label: `Tối đa ${room.capacity} khách` }];
+  const features = meta?.features ?? [];
+  const featuresDetail = meta?.featuresDetail ?? [];
+  const description =
+    meta?.descriptionVi ??
+    `Lên kế hoạch lưu trú tại hạng phòng ${room.type_name} (tối đa ${room.capacity} khách) ở White Sand Boutique Hotel Đà Nẵng. Chọn ngày nhận và trả phòng để nhận báo giá theo ngữ cảnh thực tế.`;
 
   return {
     id: room.type_id,
     name: room.type_name,
-    type: `Up to ${room.capacity} guests · ${meta.category}`,
-    img: meta.img,
-    gallery: meta.gallery,
+    type: `Tối đa ${room.capacity} khách`,
+    img,
+    gallery,
     price: room.base_price,
     originalPrice: room.base_price,
     discount: 0,
-    address: 'Aurum Luxury Retreat · Coastal Sanctuary',
-    floor: meta.floor,
-    tags: [meta.category, `${room.capacity} guests`, `${meta.sqm} m²`],
-    features: meta.features,
-    featureIcons: [
-      { icon: 'bed', label: `${room.capacity} guests` },
-      { icon: 'size', label: `${meta.sqm} m²` },
-    ],
+    address: WHITE_SAND_ADDRESS,
+    tags: [category, `Tối đa ${room.capacity} khách`],
+    featureIcons,
     extraServices: [],
-    sqm: meta.sqm,
     guests: room.capacity,
-    category: meta.category,
-    description: meta.description,
-    features_detail: meta.featuresDetail,
+    category,
+    features_detail: featuresDetail,
+    floor: meta?.floor ?? '',
+    features,
+    sqm: meta?.sqm ?? null,
+    rating: null,
+    description,
     reviews: [],
-    rating: meta.rating,
     availableNow: room.available_now,
     totalRooms: room.total_rooms,
     currency: 'VND',
   };
+}
+
+export const FALLBACK_ROOM_TYPES: RoomType[] = [
+  { type_id: 1, type_name: 'Superior Room', base_price: 1200000, declared_max_price: 1550000, capacity: 2, total_rooms: 12, available_now: 12 },
+  { type_id: 2, type_name: 'Deluxe Room', base_price: 1400000, declared_max_price: 1700000, capacity: 2, total_rooms: 12, available_now: 12 },
+  { type_id: 3, type_name: 'Premium Room', base_price: 1600000, declared_max_price: 1850000, capacity: 4, total_rooms: 8, available_now: 8 },
+  { type_id: 4, type_name: 'Executive Room', base_price: 1700000, declared_max_price: 2000000, capacity: 2, total_rooms: 8, available_now: 8 },
+  { type_id: 5, type_name: 'Suite', base_price: 1800000, declared_max_price: 2150000, capacity: 3, total_rooms: 8, available_now: 8 },
+  { type_id: 6, type_name: 'Studio Apartment', base_price: 2000000, declared_max_price: 2300000, capacity: 4, total_rooms: 6, available_now: 6 },
+];
+
+export function getFallbackRoomPresentations(): RoomPresentation[] {
+  return FALLBACK_ROOM_TYPES.map(mapApiRoomToPresentation);
 }

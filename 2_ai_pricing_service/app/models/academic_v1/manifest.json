@@ -1,0 +1,8 @@
+{
+  "model_version": "academic-v1-2e41bc467a6d1302",
+  "files": {
+    "bundle.joblib": "0a3e5b4c8b47dbecce5c6513c59d03ab22114378da84f996157a2f0b68036cc0",
+    "report.json": "274bf69daae42f649176958157d73792a2ca77c70476de47e0bde005d7fd9a2d",
+    "holdout.json": "9cace0a5c22d95b12f47c5c164ac2a4148abb091d6dcfda10fa871b419e9a5cc"
+  }
+}

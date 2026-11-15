@@ -109,7 +109,9 @@ async function historyChecks() {
   const requests = [];
   const canceled = {...booking, status:'Canceled', can_cancel:false, net_paid:100, balance_due:0, refund_due:100, payment_status:'RefundPending'};
   class BookingServiceError extends Error { constructor(message, status) { super(message); this.status=status; } }
-  const bookingService = { BookingServiceError, getBookings: () => new Promise(resolve => requests.push(resolve)), cancelBooking: async () => canceled };
+  const bookingService = { BookingServiceError,
+    getBookings: () => new Promise((resolve, reject) => requests.push(Object.assign(resolve, { reject }))),
+    cancelBooking: async () => canceled };
   const file = path.join(root, 'src/hooks/useBookingHistory.ts');
   const hookModule = new Module(file, module);
   hookModule.filename = file;
@@ -140,6 +142,29 @@ async function historyChecks() {
   requests[3]([{...booking, booking_id:'after-unmount'}]);
   await unmountedLoad;
   check(render().bookings[0].status === 'Canceled', 'Unmount invalidates background responses');
+
+  const offline = render().reload(false);
+  requests.at(-1).reject(new TypeError('Failed to fetch'));
+  await offline;
+  hook = render();
+  check(hook.loadFailed && !hook.refreshing && !hook.loading, 'Network failure exposes a finished retryable state');
+  check(hook.bookings[0].status === 'Canceled', 'Refresh failure preserves the last confirmed booking');
+  check(hook.error.includes('Không thể tải lịch sử đặt phòng') && !hook.error.includes('Failed to fetch'), 'Network exception becomes useful Vietnamese guidance');
+  const retry = hook.reload(false);
+  hook = render();
+  check(hook.refreshing && hook.loadFailed && !!hook.error, 'Warning stays visible while retry has not succeeded');
+  requests.at(-1)([{...canceled, room_number:'102'}]);
+  await retry;
+  hook = render();
+  check(!hook.refreshing && !hook.loadFailed && !hook.error && hook.bookings[0].room_number === '102', 'Successful retry replaces cached data and clears the stale warning');
+  const unavailable = hook.reload(false);
+  requests.at(-1).reject(new BookingServiceError('upstream internal detail', 503));
+  await unavailable;
+  check(!render().error.includes('upstream internal detail'), 'Server outages do not expose infrastructure details');
+  bookingService.cancelBooking = async () => { throw new TypeError('Failed to fetch'); };
+  check(!(await render().cancel(booking.booking_id)), 'Ambiguous cancellation does not claim success');
+  hook = render();
+  check(hook.error.includes('Chưa xác nhận được kết quả hủy') && !hook.actionMessage && !hook.cancellingId, 'Ambiguous cancellation offers state lookup and releases busy state');
 }
 
 (async () => {

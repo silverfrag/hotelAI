@@ -8,8 +8,9 @@ import {
 import { PriceQuote } from '@/types/room.type';
 
 export function useDynamicPrice(input: PriceQuoteInput | null, refreshKey = 0) {
+  const normalizedCoupon = input?.coupon_code?.trim().toUpperCase() || '';
   const requestKey = JSON.stringify([input?.room_type_id, input?.check_in_date,
-    input?.check_out_date, input?.total_of_special_requests, input?.guest_count, refreshKey]);
+    input?.check_out_date, input?.total_of_special_requests, input?.guest_count, normalizedCoupon, refreshKey]);
   const [resolved, setResolved] = useState<{ quote: PriceQuote; key: string } | null>(null);
   const quote = resolved?.key === requestKey ? resolved.quote : null;
   const [loading, setLoading] = useState(false);
@@ -48,6 +49,7 @@ export function useDynamicPrice(input: PriceQuoteInput | null, refreshKey = 0) {
     input?.check_out_date,
     input?.total_of_special_requests,
     input?.guest_count,
+    normalizedCoupon,
     refreshKey,
   ]);
 

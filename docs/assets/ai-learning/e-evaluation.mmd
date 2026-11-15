@@ -1,0 +1,13 @@
+flowchart TD
+    sealed["Tập kiểm tra có đầu vào và nhãn thật; không dùng để học hay chọn"] --> x["Chỉ lấy đầu vào để dự đoán"]
+    sealed --> y["Giữ nhãn thật riêng để chấm"]
+    x --> calendar["Script cộng giá cuối tuần và hai ngày lễ cố định"]
+    x --> median["Đối chứng trung vị theo mùa và phòng"]
+    x --> ml["Mô hình học máy đã chốt"]
+    calendar --> score["So từng dự đoán với cùng nhãn thật"]
+    median --> score
+    ml --> score
+    y --> score
+    score --> metrics["Tính sai số trên toàn bộ tập kiểm tra"]
+    metrics --> inspect["Xem thêm nhóm dữ liệu, ví dụ đúng và lỗi lớn"]
+    inspect --> conclusion["Kết luận trong phạm vi dữ liệu; ghi rõ giới hạn"]

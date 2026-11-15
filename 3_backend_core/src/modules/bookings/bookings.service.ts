@@ -29,6 +29,10 @@ export type CreatedBooking = {
   nightly_price: number;
   nights: number;
   total_price: number;
+  coupon_code?: string | null;
+  coupon_discount_vnd?: number;
+  pre_coupon_total_price?: number;
+  is_floor_price_clamped?: boolean;
   ai_multiplier: number;
   ai_model_version: string | null;
   ai_training_run_id: string | null;
@@ -75,6 +79,10 @@ type IdempotentBookingRow = {
   request_hash: string;
   booking_id: string;
   quote_id: string | null;
+  coupon_code: string | null;
+  coupon_discount_vnd: number | string | null;
+  pre_coupon_total_price: number | string | null;
+  is_floor_price_clamped: boolean | null;
   customer_id: string;
   check_in_date: string;
   check_out_date: string;
@@ -86,6 +94,7 @@ type IdempotentBookingRow = {
   checked_out_by: string | null;
   created_at: Date;
   room_id: number | string;
+  room_type_id: number | string;
   room_number: string;
   nightly_price: number | string;
   nights: number | string;
@@ -122,23 +131,17 @@ export class BookingsService {
     customer_id: string,
     rawIdempotencyKey?: string,
   ): Promise<CreatedBooking> {
+    dto = this.normalizeCreateRequest(dto);
     const idempotencyKey = this.normalizeIdempotencyKey(rawIdempotencyKey);
     const requestHash = idempotencyKey ? this.hashCreateRequest(dto) : null;
     const { check_in_date, check_out_date, total_of_special_requests } = dto;
 
-    const roomsInput = dto.rooms?.length
-      ? dto.rooms
-      : [
-          {
-            room_type_id: dto.room_type_id,
-            guest_count: dto.guest_count ?? 1,
-            quote_id: dto.quote_id,
-          },
-        ];
-
-    if (!roomsInput.length || !roomsInput[0].room_type_id) {
-      throw new BadRequestException('Phải chọn ít nhất một phòng.');
-    }
+    const roomsInput = [{
+      room_type_id: dto.room_type_id,
+      guest_count: dto.guest_count,
+      quote_id: dto.quote_id,
+      coupon_code: dto.coupon_code,
+    }];
 
     if (idempotencyKey && requestHash) {
       const replay = await this.findIdempotentBooking(
@@ -187,28 +190,58 @@ export class BookingsService {
       const allocatedRooms = [];
       const usedRoomIds = new Set<number>();
 
+      for (const typeId of [...new Set(roomsInput.map((room) => room.room_type_id))].sort((left, right) => left - right)) {
+        await queryRunner.query('SELECT pg_advisory_xact_lock($1)', [typeId]);
+      }
+
       for (const roomInput of roomsInput) {
         const calculatedPricing = roomInput.quote_id
           ? null
-          : await this.pricingService.calculate({
-              room_type_id: roomInput.room_type_id,
-              check_in_date,
-              check_out_date,
-              total_of_special_requests,
-              guest_count: roomInput.guest_count,
-            } as any);
+          : await this.pricingService.calculate(
+              {
+                room_type_id: roomInput.room_type_id!,
+                check_in_date,
+                check_out_date,
+                total_of_special_requests,
+                guest_count: roomInput.guest_count ?? 1,
+                coupon_code: roomInput.coupon_code,
+              },
+              { manager: queryRunner.manager },
+            );
 
         const pricing = roomInput.quote_id
           ? await this.pricingService.lockQuoteForBooking(queryRunner.manager, roomInput.quote_id, {
-              ...dto,
-              room_type_id: roomInput.room_type_id,
-              guest_count: roomInput.guest_count,
-              quote_id: roomInput.quote_id,
-            } as any)
+              room_type_id: roomInput.room_type_id!,
+              check_in_date,
+              check_out_date,
+              total_of_special_requests,
+              guest_count: roomInput.guest_count ?? 1,
+              coupon_code: roomInput.coupon_code,
+            })
           : calculatedPricing;
 
         if (!pricing) {
           throw new ConflictException('Không thể xác định giá cho booking.');
+        }
+
+        if (pricing.couponCode) {
+          const couponConsumeResult = await queryRunner.query(
+            `UPDATE pricing_coupons
+             SET used_count = used_count + 1
+             WHERE code = $1
+               AND active = TRUE
+               AND used_count < usage_limit
+               AND (expiry_date IS NULL OR expiry_date >= $2::date)
+               AND $3::int >= min_room_type_id
+             RETURNING code`,
+            [pricing.couponCode, this.pricingService.getBusinessDate(), roomInput.room_type_id],
+            true,
+          );
+          if (couponConsumeResult.affected !== 1) {
+            throw new ConflictException(
+              `Mã giảm giá ${pricing.couponCode} vừa hết lượt sử dụng hoặc không còn hiệu lực.`,
+            );
+          }
         }
 
         const { roomType, leadTime, nights, nightlyPrice, totalPrice } = pricing;
@@ -226,8 +259,6 @@ export class BookingsService {
         }
         this.assertGuestCapacity(roomInput.guest_count, Number(capacityRows[0].capacity));
 
-        await queryRunner.query('SELECT pg_advisory_xact_lock($1)', [roomInput.room_type_id]);
-        
         let candidateRoomsQuery = queryRunner.manager.getRepository(Room).createQueryBuilder('room')
           .where('room.type_id = :roomTypeId', { roomTypeId: roomInput.room_type_id })
           .andWhere("room.current_status <> 'Maintenance'")
@@ -295,10 +326,13 @@ export class BookingsService {
               score += 10;
             }
 
-            if (candidate.housekeeping_status === 'Ready') {
-              score += 30;
-            } else if (candidate.housekeeping_status === 'Cleaning') {
-              score += 15;
+            // Housekeeping Readiness: only apply readiness score to same-day arrivals
+            if (check_in_date === this.pricingService.getBusinessDate()) {
+              if (candidate.housekeeping_status === 'Ready') {
+                score += 30;
+              } else if (candidate.housekeeping_status === 'Cleaning') {
+                score += 15;
+              }
             }
 
             if (score > highestScore) {
@@ -408,13 +442,17 @@ export class BookingsService {
 
       return {
         booking: { ...booking, deposit_required: Number(booking.deposit_required) },
-        quote_id: dto.quote_id ?? null,
+        quote_id: primary.roomInput.quote_id ?? null,
         room_id: primary.room.room_id,
         room_number: mappedRooms.map(r => r.room_number).join(', '),
         applied_price: primary.nightlyPrice,
         nightly_price: primary.nightlyPrice,
         nights: primary.nights,
         total_price: grandTotalPrice,
+        coupon_code: primary.pricing.couponCode,
+        coupon_discount_vnd: primary.pricing.couponDiscountVnd,
+        pre_coupon_total_price: primary.pricing.preCouponTotalPrice,
+        is_floor_price_clamped: primary.pricing.isFloorPriceClamped,
         ai_multiplier: primary.pricing.multiplier,
         ai_model_version: primary.pricing.aiModelVersion,
         ai_training_run_id: primary.pricing.aiTrainingRunId,
@@ -639,6 +677,21 @@ export class BookingsService {
         },
       });
 
+      const quoteCouponRows = await queryRunner.query(
+        `SELECT coupon_code
+         FROM pricing_quotes
+         WHERE booking_id = $1::uuid AND coupon_code IS NOT NULL`,
+        [bookingId],
+      ) as Array<{ coupon_code: string }>;
+      if (quoteCouponRows[0]?.coupon_code) {
+        await queryRunner.query(
+          `UPDATE pricing_coupons
+           SET used_count = GREATEST(used_count - 1, 0)
+           WHERE code = $1`,
+          [quoteCouponRows[0].coupon_code],
+        );
+      }
+
       await queryRunner.commitTransaction();
       return {
         ...summary,
@@ -685,7 +738,44 @@ export class BookingsService {
       total_of_special_requests: dto.total_of_special_requests,
       guest_count: dto.guest_count ?? 1,
       quote_id: dto.quote_id ?? null,
+      ...(dto.coupon_code ? { coupon_code: dto.coupon_code } : {}),
     })).digest('hex');
+  }
+
+  private normalizeCreateRequest(dto: CreateBookingDto): CreateBookingDto {
+    if (dto.rooms !== undefined && (!Array.isArray(dto.rooms) || dto.rooms.length !== 1)) {
+      throw new BadRequestException('Mỗi đặt phòng hiện hỗ trợ một phòng. Vui lòng tạo một đặt phòng riêng cho từng phòng.');
+    }
+    const room = dto.rooms?.[0];
+    const roomCoupon = room?.coupon_code?.trim().toUpperCase() || undefined;
+    const topCoupon = dto.coupon_code?.trim().toUpperCase() || undefined;
+    if (room && (
+      (dto.room_type_id != null && dto.room_type_id !== room.room_type_id)
+      || (dto.guest_count != null && dto.guest_count !== (room.guest_count ?? 1))
+      || (dto.quote_id != null && dto.quote_id !== room.quote_id)
+      || (topCoupon != null && roomCoupon != null && topCoupon !== roomCoupon)
+    )) {
+      throw new BadRequestException('Thông tin phòng và báo giá không nhất quán. Vui lòng kiểm tra lại đặt phòng.');
+    }
+    const roomTypeId = room ? room.room_type_id : dto.room_type_id;
+    const guestCount = (room ? room.guest_count : dto.guest_count) ?? 1;
+    if (!Number.isInteger(roomTypeId) || roomTypeId < 1 || roomTypeId > 2_147_483_647) {
+      throw new BadRequestException('Vui lòng chọn một loại phòng hợp lệ.');
+    }
+    if (!Number.isInteger(guestCount) || guestCount < 1 || guestCount > 1000) {
+      throw new BadRequestException('Số khách phải là số nguyên từ 1 đến 1000.');
+    }
+    // One canonical shape keeps legacy single-room keys valid and includes the
+    // effective room, guests, and quote when the caller uses the rooms array.
+    return {
+      room_type_id: roomTypeId,
+      guest_count: guestCount,
+      quote_id: (room ? room.quote_id : dto.quote_id) ?? undefined,
+      coupon_code: roomCoupon ?? topCoupon,
+      check_in_date: dto.check_in_date,
+      check_out_date: dto.check_out_date,
+      total_of_special_requests: dto.total_of_special_requests,
+    };
   }
 
   private async lockIdempotencyKey(
@@ -708,6 +798,10 @@ export class BookingsService {
       `SELECT request.request_hash,
               booking.booking_id,
               quote.quote_id,
+              quote.coupon_code,
+              quote.coupon_discount_vnd,
+              quote.pre_coupon_total_price,
+              quote.is_floor_price_clamped,
               booking.customer_id,
               booking.check_in_date::text,
               booking.check_out_date::text,
@@ -728,6 +822,7 @@ export class BookingsService {
               booking.checked_out_by,
               booking.created_at,
               detail.room_id,
+              room.type_id AS room_type_id,
               detail.room_number_snapshot AS room_number,
               detail.applied_price AS nightly_price,
               (booking.check_out_date - booking.check_in_date) AS nights,
@@ -740,7 +835,8 @@ export class BookingsService {
               pricing_log.settings_version
        FROM booking_create_requests request
        INNER JOIN bookings booking ON booking.booking_id = request.booking_id
-       INNER JOIN booking_details detail ON detail.booking_id = booking.booking_id
+        INNER JOIN booking_details detail ON detail.booking_id = booking.booking_id
+        INNER JOIN rooms room ON room.room_id = detail.room_id
        INNER JOIN daily_pricing_logs pricing_log ON pricing_log.booking_id = booking.booking_id
        LEFT JOIN pricing_quotes quote ON quote.booking_id = booking.booking_id
        WHERE request.customer_id = $1::uuid
@@ -794,6 +890,10 @@ export class BookingsService {
       nightly_price: nightlyPrice,
       nights: Number(row.nights),
       total_price: totalPrice,
+      coupon_code: row.coupon_code ?? null,
+      coupon_discount_vnd: Number(row.coupon_discount_vnd ?? 0),
+      pre_coupon_total_price: row.pre_coupon_total_price != null ? Number(row.pre_coupon_total_price) : totalPrice,
+      is_floor_price_clamped: Boolean(row.is_floor_price_clamped),
       ai_multiplier: Number(row.ai_multiplier),
       ai_model_version: row.ai_model_version,
       ai_training_run_id: row.ai_training_run_id,
@@ -808,6 +908,12 @@ export class BookingsService {
       paid_amount: Number(row.paid_amount),
       balance_due: ['Canceled', 'Expired', 'NoShow'].includes(row.status)
         ? 0 : Math.max(0, totalPrice - Number(row.paid_amount) + Number(row.refunded_amount)),
+      rooms: [{
+        room_id: Number(row.room_id),
+        room_number: row.room_number,
+        room_type_id: Number(row.room_type_id),
+        applied_price: nightlyPrice,
+      }],
     };
   }
 

@@ -126,7 +126,7 @@ async function navigationChecks() {
   const common={
     '@/hooks/useAuth':{useAuth:()=>({ready:true,user,session:{accessToken:'cookie-session',user},logout:()=>logout(),loggingOut:false,logoutError:'Please retry sign out',invalidateSession(){}})},
     'next/navigation':{usePathname:()=>'/admin',useRouter:()=>({push:path=>navigations.push(path),replace:path=>navigations.push(path),refresh:()=>navigations.push('refresh')})},
-    '@/contexts/LanguageContext':{useTranslation:()=>({language:'en',setLanguage(){},t:key=>key})},
+    '@/contexts/LanguageContext':{useTranslation:()=>({language:'en',setLanguage(){},supportedLanguages:[{code:'en',flag:'EN'}],currentLanguageInfo:{code:'en',flag:'EN'},t:key=>key})},
     '@/contexts/ThemeContext':{useTheme:()=>({theme:'light',toggleTheme(){}})},
   };
   const buttonText=node=>{
@@ -141,7 +141,7 @@ async function navigationChecks() {
     return find(node.props?.children,predicate);
   }
   for(const [relative,name,props,label] of [
-    ['components/features/figma/AccountMenu.tsx','AccountMenu',{},'Sign out'],
+    ['components/features/figma/AccountMenu.tsx','AccountMenu',{},'account_sign_out'],
     ['components/layout/Header.tsx','Header',{user,onMobileOpen(){}},'Đăng xuất'],
     ['components/layouts/Navbar.tsx','Navbar',{},'nav_logout'],
     ['components/layout/AdminShell.tsx','AdminShell',{children:null},'Đăng nhập tài khoản khác'],

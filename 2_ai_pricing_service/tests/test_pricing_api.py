@@ -7,7 +7,10 @@ import joblib
 import pytest
 
 from app.core.config import Settings
-from app.core.feature_contract import FEATURE_CONTRACT_VERSION, FEATURE_ORDER, feature_contract_metadata
+from app.core.serving_contract import (
+    SERVING_CONTRACT_VERSION as FEATURE_CONTRACT_VERSION,
+    SERVING_FEATURE_ORDER as FEATURE_ORDER,
+)
 from app.main import create_app
 from app.services.inference import MODEL_ARTIFACT_SCHEMA_VERSION
 
@@ -72,7 +75,7 @@ def model_path(tmp_path: Path) -> Path:
             "metadata": {
                 "model_version": "test-pricing-v1",
                 "training_run_id": "test-run",
-                "feature_contract": feature_contract_metadata(),
+                "feature_contract": {"version": FEATURE_CONTRACT_VERSION, "feature_order": list(FEATURE_ORDER)},
                 "evaluation": {"mae": 0.1},
             },
         },
@@ -232,3 +235,59 @@ async def test_non_finite_prediction_returns_controlled_500(tmp_path: Path) -> N
 
     assert response.status_code == 500
     assert response.json() == {"detail": "Pricing inference failed."}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("defect", ["unknown_version", "wrong_order", "wrong_count"])
+async def test_artifact_contract_is_checked_before_serving(model_path: Path, defect: str) -> None:
+    artifact = joblib.load(model_path)
+    if defect == "unknown_version":
+        artifact["metadata"]["feature_contract"]["version"] = "3.0.0"
+    elif defect == "wrong_order":
+        artifact["metadata"]["feature_contract"]["feature_order"].reverse()
+    else:
+        artifact["model"].n_features_in_ = 14
+    joblib.dump(artifact, model_path)
+    async with client_for_model(model_path) as client:
+        assert (await client.get("/health")).status_code == 503
+        assert (await client.get("/health/live")).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_unvalidated_explanation_returns_controlled_503(model_path: Path) -> None:
+    async with client_for_model(model_path) as client:
+        response = await client.post("/api/v1/explain-price", json={
+            "lead_time": 21, "check_in_date": "2026-08-14",
+            "check_out_date": "2026-08-17", "guest_count": 2,
+        })
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Pricing explanations have not been validated."}
+
+
+@pytest.mark.asyncio
+async def test_demand_inputs_cannot_be_silently_ignored_by_v2(model_path: Path) -> None:
+    async with client_for_model(model_path) as client:
+        response = await client.post("/api/v1/predict-price", json={
+            "lead_time": 21, "check_in_date": "2026-08-14",
+            "check_out_date": "2026-08-17", "guest_count": 2,
+            "occupancy_ratio": 0.95,
+        })
+    assert response.status_code == 422
+
+
+def test_default_keeps_v2_benchmark_and_v3_artifact_is_not_released(monkeypatch) -> None:
+    from app.core.config import load_settings
+    from app.services.inference import PricingInferenceService
+
+    monkeypatch.delenv("MODEL_PATH", raising=False)
+    settings = load_settings()
+    assert settings.model_path.name == "random_forest_v2.pkl"
+    service = PricingInferenceService(settings.model_path)
+    service.load()
+    assert service.is_ready
+    assert service.model_info["feature_contract"]["version"] == "2.0.0"
+    challenger = settings.model_path.with_name("random_forest_v3.pkl")
+    if challenger.exists():
+        experimental = PricingInferenceService(challenger)
+        experimental.load()
+        assert not experimental.is_ready

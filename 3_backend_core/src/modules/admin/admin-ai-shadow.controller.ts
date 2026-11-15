@@ -69,4 +69,12 @@ export class AdminAiShadowController {
       data: await this.shadow.listAudits(Number.isFinite(parsed) ? parsed : 50),
     };
   }
+
+  @Get('runtime-status')
+  async runtimeStatus() {
+    return {
+      status: 'success',
+      data: await this.shadow.getRuntimeStatus(),
+    };
+  }
 }

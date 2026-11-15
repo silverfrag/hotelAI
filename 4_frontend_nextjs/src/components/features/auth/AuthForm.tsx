@@ -75,30 +75,30 @@ export function AuthForm({ mode }: AuthFormProps) {
     <main className={styles.page} lang="vi">
       <Link href="/" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" /> Về trang chủ</Link>
       <div className={styles.layout}>
-        <aside className={styles.story} aria-label="Cảm hứng cho kỳ nghỉ">
+        <aside className={styles.story} aria-label="White Sand Boutique Hotel Đà Nẵng">
           <img
-            src="https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b?w=1200&h=1500&fit=crop&auto=format"
-            alt=""
+            src="/images/whitesand/hero/lobby-reception.png"
+            alt="Sảnh lễ tân White Sand Boutique Hotel Đà Nẵng"
             className={styles.storyImage}
           />
           <div className={styles.storyShade} />
-          <div className={styles.storyTop}><span>AURUM</span><span>YOUR NEXT CHAPTER</span></div>
+          <div className={styles.storyTop}><span>WHITE SAND</span><span>ĐÀ NẴNG BOUTIQUE HOTEL</span></div>
           <div className={styles.storyCopy}>
             <span className={styles.storyRule} />
-            <p className={styles.storyTitle}>Những kỳ nghỉ<br /><em>đáng nhớ.</em></p>
-            <p>Một nơi để lên kế hoạch cho hành trình mới và tìm lại những đặt phòng của bạn.</p>
+            <p className={styles.storyTitle}>Kỳ nghỉ tại<br /><em>Đà Nẵng.</em></p>
+            <p>White Sand Boutique Hotel · 89-91 Võ Văn Kiệt, Sơn Trà · 54 phòng thuộc 6 hạng phòng.</p>
           </div>
-          <div className={styles.storyBottom}><span>THOUGHTFULLY CURATED</span><span>01 — YOUR JOURNEY</span></div>
+          <div className={styles.storyBottom}><span>89-91 VÕ VĂN KIỆT</span><span>54 PHÒNG · 6 HẠNG PHÒNG</span></div>
         </aside>
 
         <section className={styles.panel} aria-labelledby="auth-title">
           <div className={styles.formWrap}>
             <header className={styles.heading}>
-              <p className={styles.eyebrow}>Tài khoản Aurum</p>
-              <h1 id="auth-title">{isRegister ? <>Hành trình mới<br /><em>bắt đầu từ đây.</em></> : <>Chào mừng<br /><em>bạn trở lại.</em></>}</h1>
+              <p className={styles.eyebrow}>Tài khoản White Sand</p>
+              <h1 id="auth-title">{isRegister ? <>Tạo tài khoản<br /><em>White Sand.</em></> : <>Chào mừng<br /><em>bạn trở lại.</em></>}</h1>
               <p className={styles.intro}>{isRegister
-                ? 'Tạo tài khoản để đặt phòng và lưu giữ thông tin những kỳ nghỉ sắp tới.'
-                : 'Đăng nhập để tiếp tục đặt phòng và quản lý kỳ nghỉ của bạn.'}</p>
+                ? 'Tạo tài khoản để đặt phòng tại White Sand Boutique Hotel Đà Nẵng và theo dõi đặt phòng.'
+                : 'Đăng nhập để tiếp tục đặt phòng và quản lý kỳ nghỉ của bạn tại White Sand.'}</p>
             </header>
 
             <form onSubmit={submit} className={styles.form} aria-label={isRegister ? 'Đăng ký tài khoản' : 'Đăng nhập'} aria-busy={loading}>
@@ -137,7 +137,7 @@ export function AuthForm({ mode }: AuthFormProps) {
               </fieldset>
             </form>
 
-            <p className={styles.switchMode}>{isRegister ? 'Bạn đã có tài khoản?' : 'Lần đầu đến với Aurum?'}{' '}
+            <p className={styles.switchMode}>{isRegister ? 'Bạn đã có tài khoản?' : 'Lần đầu đến với White Sand?'}{' '}
               <Link href={switchHref}>{isRegister ? 'Đăng nhập' : 'Tạo tài khoản'}</Link>
             </p>
             <div className={styles.formFooter}><span />Không gian riêng cho kỳ nghỉ của bạn<span /></div>

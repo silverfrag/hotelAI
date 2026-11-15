@@ -34,11 +34,21 @@ from app.core.conversion_feature_contract import (
     build_conversion_features,
     conversion_feature_contract_metadata,
 )
-from app.services.conversion_inference import CONVERSION_ARTIFACT_SCHEMA_VERSION
+from app.services.conversion_inference import (
+    CONVERSION_ARTIFACT_SCHEMA_VERSION,
+    CONVERSION_PROVENANCE_POLICY_VERSION,
+)
 
 TARGET_COLUMN: Final = "acceptance_label"
 EXPOSURE_COLUMN: Final = "exposure_at"
 DEFAULT_MODEL_VERSION: Final = "conversion_challenger_v1"
+PROVENANCE_POLICY_VERSION: Final = CONVERSION_PROVENANCE_POLICY_VERSION
+PROVENANCE_COLUMNS: Final = (
+    "ai_model_version", "data_provenance", "provenance_reference"
+)
+SYNTHETIC_MODEL_PATTERN: Final = (
+    r"(?:^|[^a-z0-9])(?:mock|synthetic|fixture|test|demo)(?:[^a-z0-9]|$)"
+)
 REQUIRED_COLUMNS: Final[frozenset[str]] = frozenset(
     {
         "quote_id",
@@ -137,6 +147,29 @@ def prepare_training_data(
         raise ValueError(f"Training export is missing columns: {sorted(missing)}")
 
     frame = source.copy()
+    # An explicit UI exposure can be fabricated by seeds or browser fixtures.
+    # Missing provenance in legacy exports must never certify real guest data.
+    missing_provenance_columns = [
+        column for column in PROVENANCE_COLUMNS if column not in frame
+    ]
+    provenance = frame.get(
+        "data_provenance", pd.Series("unverified", index=frame.index)
+    ).astype("string").str.strip().str.lower().fillna("unverified")
+    provenance_reference = frame.get(
+        "provenance_reference", pd.Series("", index=frame.index)
+    ).astype("string").str.strip().fillna("")
+    model_version = frame.get(
+        "ai_model_version", pd.Series("", index=frame.index)
+    ).astype("string").str.strip().fillna("")
+    synthetic = provenance.isin(["synthetic", "test", "demo", "fixture"]) | (
+        model_version.str.contains(SYNTHETIC_MODEL_PATTERN, case=False, regex=True)
+    )
+    verified_observed = (
+        provenance.eq("observed")
+        & provenance_reference.ne("")
+        & ~synthetic
+        & (not missing_provenance_columns)
+    )
     frame["exposure_confirmed"] = _normalize_boolean(
         frame["exposure_confirmed"], nullable=False
     )
@@ -168,7 +201,8 @@ def prepare_training_data(
         & frame["check_out_date"].notna()
     )
     candidate_mask = (
-        confirmed
+        verified_observed
+        & confirmed
         & mature
         & inventory_valid
         & conflict_free
@@ -239,6 +273,11 @@ def prepare_training_data(
     report: dict[str, Any] = {
         "status": "ready" if all(gate_checks.values()) else "insufficient_data",
         "source_rows": int(len(frame)),
+        "provenance_policy_version": PROVENANCE_POLICY_VERSION,
+        "missing_provenance_columns": missing_provenance_columns,
+        "verified_observed_rows": int(verified_observed.sum()),
+        "synthetic_or_test_rows": int(synthetic.sum()),
+        "unverified_provenance_rows": int((~verified_observed & ~synthetic).sum()),
         "confirmed_exposure_rows": int(confirmed.sum()),
         "generated_proxy_or_unconfirmed_rows": int((~confirmed).sum()),
         "open_or_unmatured_label_rows": int((~mature).sum()),
@@ -256,6 +295,8 @@ def prepare_training_data(
         "checks": gate_checks,
         "passes_readiness_gate": all(gate_checks.values()),
         "filter": (
+            "data_provenance = observed AND provenance_reference is present AND "
+            "ai_model_version has no synthetic/test marker AND "
             "exposure_confirmed = true AND acceptance_label IS NOT NULL AND "
             "inventory_snapshot_consistent = true AND "
             "has_disposition_conflict = false AND quote_id is unique"
@@ -480,6 +521,7 @@ def run_pipeline(
     data_sha256 = sha256_file(data_path)
     reproducibility = {
         "data_sha256": data_sha256,
+        "provenance_policy_version": PROVENANCE_POLICY_VERSION,
         "feature_contract": conversion_feature_contract_metadata(),
         "training_config": asdict(config),
         "thresholds": asdict(thresholds),
