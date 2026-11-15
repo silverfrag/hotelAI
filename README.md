@@ -10,8 +10,7 @@ Chạy toàn hệ thống qua Nginx tại `http://localhost`, mở `/ai-experime
 
 ## Triển khai Production & Tên miền thương hiệu (HTTPS)
 
-- **Triển khai Production với tên miền riêng (Khuyên dùng)**: Xem [Hướng dẫn triển khai Production & Tên miền thương hiệu](docs/PRODUCTION_DOMAIN_DEPLOYMENT.md). Hướng dẫn thiết lập tên miền riêng (`.vn`, `.com`), tối ưu CDN/DDoS qua Cloudflare, tự động cấp HTTPS chuẩn A+ qua Caddy, bảo mật mạng nội bộ và tích hợp thẻ xem trước thương hiệu (OpenGraph preview).
-- **Môi trường thử nghiệm miễn phí**: Xem [hướng dẫn dùng VM miễn phí cùng DuckDNS](docs/FREE_VM_DEPLOYMENT.md) (chỉ phù hợp trình diễn học thuật tạm thời; không có cam kết uptime hoặc bảo vệ thương hiệu).
+- **Triển khai public tại `whitesandhotel.dev`**: Xem [hướng dẫn VPS, DNS và HTTPS](docs/PRODUCTION_DOMAIN_DEPLOYMENT.md). Máy chủ cloud chạy độc lập với máy cá nhân; Compose tự khởi động lại các dịch vụ sau reboot.
 
 > [!IMPORTANT]
 > File cấu hình bí mật `.env.production` chỉ lưu trực tiếp trên máy chủ và tuyệt đối không commit lên git repository.
