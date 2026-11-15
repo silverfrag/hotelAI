@@ -1,0 +1,28 @@
+services:
+  frontend_nextjs:
+    environment:
+      FRONTEND_ORIGIN: https://${PUBLIC_DOMAIN:?PUBLIC_DOMAIN must be set in .env.production}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    profiles: ["public"]
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?PUBLIC_DOMAIN must be set in .env.production}
+    ports:
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:80:80"
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:443:443"
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:443:443/udp"
+    volumes:
+      - ./1_infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      nginx:
+        condition: service_started
+    networks:
+      - hotel_network
+
+volumes:
+  caddy_data:
+  caddy_config:

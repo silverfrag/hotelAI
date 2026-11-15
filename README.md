@@ -8,6 +8,10 @@ Phần thực nghiệm dùng dữ liệu thật Portugal 2015–2017 để ướ
 
 Chạy toàn hệ thống qua Nginx tại `http://localhost`, mở `/ai-experiment` hoặc `/decision-lab`. Xem thêm [hướng dẫn demo & đánh giá kiểm thử](docs/HUONG_DAN_DEMO_VA_DANH_GIA.md), [kết quả thực nghiệm](docs/AI_EXPERIMENT_RESULTS.md), [kịch bản bảo vệ](docs/AI_DEFENSE.md) và [lộ trình E2E](docs/E2E_CONTEXT_AND_ROADMAP.md). Hai pipeline academic dùng hợp đồng riêng và được bảo toàn nguyên vẹn.
 
+## Public demo có HTTPS
+
+Triển khai full-stack một máy chủ có cấu hình HTTPS/Caddy và chỉ mở cổng web: xem [hướng dẫn dùng VM miễn phí cùng DuckDNS](docs/FREE_VM_DEPLOYMENT.md). `.env.production` chỉ lưu trên máy chủ và không được commit. VM miễn phí phù hợp trình diễn học thuật; không có cam kết uptime hoặc sao lưu dữ liệu.
+
 ## Kiến trúc
 
 - `1_infrastructure`: PostgreSQL schema/migration, seed và Nginx API Gateway.

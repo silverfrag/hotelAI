@@ -184,7 +184,7 @@ services:
     container_name: hotel_nginx
     restart: always
     ports:
-      - "80:80"
+      - "${NGINX_BIND_ADDRESS:-127.0.0.1}:${NGINX_PORT:-80}:80"
     volumes:
       - ./1_infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf
     networks:
